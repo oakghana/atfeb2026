@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   BarChart,
   Bar,
@@ -34,8 +35,11 @@ import {
   FileText,
   AlertTriangle,
   CheckCircle,
-  XCircle,
+  FileSpreadsheet,
+  FileDown,
+  MapPin,
 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 interface AttendanceRecord {
   id: string
@@ -50,6 +54,9 @@ interface AttendanceRecord {
     departments?: {
       name: string
       code: string
+    }
+    districts?: {
+      name: string
     }
   }
   geofence_locations?: {
@@ -78,6 +85,12 @@ export function AttendanceReports() {
   const [endDate, setEndDate] = useState(new Date().toISOString().split("T")[0])
   const [selectedDepartment, setSelectedDepartment] = useState("all")
   const [selectedUser, setSelectedUser] = useState("all")
+  const [locations, setLocations] = useState([])
+  const [districts, setDistricts] = useState([])
+  const [selectedLocation, setSelectedLocation] = useState("all")
+  const [selectedDistrict, setSelectedDistrict] = useState("all")
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const [analyticsData, setAnalyticsData] = useState({
     dailyTrends: [],
@@ -94,7 +107,9 @@ export function AttendanceReports() {
     fetchReport()
     fetchDepartments()
     fetchUsers()
-  }, [startDate, endDate, selectedDepartment, selectedUser])
+    fetchLocations()
+    fetchDistricts()
+  }, [startDate, endDate, selectedDepartment, selectedUser, selectedLocation, selectedDistrict])
 
   const fetchReport = async () => {
     setLoading(true)
@@ -106,6 +121,8 @@ export function AttendanceReports() {
 
       if (selectedDepartment !== "all") params.append("department_id", selectedDepartment)
       if (selectedUser !== "all") params.append("user_id", selectedUser)
+      if (selectedLocation !== "all") params.append("location_id", selectedLocation)
+      if (selectedDistrict !== "all") params.append("district_id", selectedDistrict)
 
       const response = await fetch(`/api/admin/reports/attendance?${params}`)
       const result = await response.json()
@@ -145,33 +162,113 @@ export function AttendanceReports() {
     }
   }
 
-  const exportReport = () => {
-    const csvContent = [
-      ["Date", "Employee ID", "Name", "Department", "Check In", "Check Out", "Work Hours", "Status", "Location"].join(
-        ",",
-      ),
-      ...records.map((record) =>
-        [
-          new Date(record.check_in_time).toLocaleDateString(),
-          record.user_profiles.employee_id,
-          `${record.user_profiles.first_name} ${record.user_profiles.last_name}`,
-          record.user_profiles.departments?.name || "N/A",
-          new Date(record.check_in_time).toLocaleTimeString(),
-          record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : "N/A",
-          record.work_hours?.toFixed(2) || "N/A",
-          record.status,
-          record.geofence_locations?.name || "N/A",
-        ].join(","),
-      ),
-    ].join("\n")
+  const fetchLocations = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("geofence_locations")
+        .select("id, name, address")
+        .eq("is_active", true)
+        .order("name")
 
-    const blob = new Blob([csvContent], { type: "text/csv" })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `attendance-report-${startDate}-to-${endDate}.csv`
-    a.click()
-    window.URL.revokeObjectURL(url)
+      if (error) throw error
+      setLocations(data || [])
+    } catch (error) {
+      console.error("Failed to fetch locations:", error)
+    }
+  }
+
+  const fetchDistricts = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.from("districts").select("id, name").eq("is_active", true).order("name")
+
+      if (error) throw error
+      setDistricts(data || [])
+    } catch (error) {
+      console.error("Failed to fetch districts:", error)
+    }
+  }
+
+  const exportReport = async (format: "excel" | "pdf" | "csv") => {
+    setExporting(true)
+    setExportError(null)
+
+    try {
+      if (format === "csv") {
+        const csvContent = [
+          [
+            "Date",
+            "Employee ID",
+            "Name",
+            "Department",
+            "District",
+            "Location",
+            "Check In",
+            "Check Out",
+            "Work Hours",
+            "Status",
+          ].join(","),
+          ...records.map((record) =>
+            [
+              new Date(record.check_in_time).toLocaleDateString(),
+              record.user_profiles.employee_id,
+              `${record.user_profiles.first_name} ${record.user_profiles.last_name}`,
+              record.user_profiles.departments?.name || "N/A",
+              record.user_profiles.districts?.name || "N/A",
+              record.geofence_locations?.name || "N/A",
+              new Date(record.check_in_time).toLocaleTimeString(),
+              record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : "N/A",
+              record.work_hours?.toFixed(2) || "N/A",
+              record.status,
+            ].join(","),
+          ),
+        ].join("\n")
+
+        const blob = new Blob([csvContent], { type: "text/csv" })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `qcc-attendance-report-${startDate}-to-${endDate}.csv`
+        a.click()
+        window.URL.revokeObjectURL(url)
+      } else {
+        const response = await fetch("/api/admin/reports/export", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            format,
+            filters: {
+              startDate,
+              endDate,
+              locationId: selectedLocation !== "all" ? selectedLocation : null,
+              districtId: selectedDistrict !== "all" ? selectedDistrict : null,
+              departmentId: selectedDepartment !== "all" ? selectedDepartment : null,
+              reportType: "attendance",
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error("Export failed")
+        }
+
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `qcc-attendance-report-${startDate}-to-${endDate}.${format === "excel" ? "xlsx" : "pdf"}`
+        a.click()
+        window.URL.revokeObjectURL(url)
+      }
+    } catch (error) {
+      console.error("Export error:", error)
+      setExportError("Failed to export report. Please try again.")
+    } finally {
+      setExporting(false)
+    }
   }
 
   const statusChartData = summary
@@ -196,12 +293,20 @@ export function AttendanceReports() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            Advanced Attendance Analytics
+            Advanced Attendance Analytics & Export
           </CardTitle>
-          <CardDescription>Comprehensive attendance reports and insights with advanced filtering</CardDescription>
+          <CardDescription>
+            Comprehensive attendance reports with location and district filtering, plus Excel/PDF export
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-5">
+          {exportError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{exportError}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-7">
             <div>
               <Label htmlFor="startDate">Start Date</Label>
               <Input id="startDate" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
@@ -209,6 +314,38 @@ export function AttendanceReports() {
             <div>
               <Label htmlFor="endDate">End Date</Label>
               <Input id="endDate" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="location">Location</Label>
+              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Locations" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+                  {locations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="district">District</Label>
+              <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Districts" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Districts</SelectItem>
+                  {districts.map((district) => (
+                    <SelectItem key={district.id} value={district.id}>
+                      {district.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="department">Department</Label>
@@ -242,16 +379,40 @@ export function AttendanceReports() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end gap-2">
-              <Button onClick={exportReport} variant="outline" className="flex-1 bg-transparent">
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-              <Button onClick={fetchReport} className="flex-1">
-                <FileText className="mr-2 h-4 w-4" />
-                Generate
-              </Button>
+            <div className="flex flex-col gap-2">
+              <Label>Actions</Label>
+              <div className="flex gap-1">
+                <Button onClick={fetchReport} size="sm" className="flex-1">
+                  <FileText className="mr-1 h-3 w-3" />
+                  Generate
+                </Button>
+              </div>
             </div>
+          </div>
+
+          <div className="flex gap-2 mt-4 pt-4 border-t">
+            <Button
+              onClick={() => exportReport("excel")}
+              variant="outline"
+              disabled={exporting || records.length === 0}
+              className="bg-green-50 hover:bg-green-100 border-green-200"
+            >
+              <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" />
+              {exporting ? "Exporting..." : "Export Excel"}
+            </Button>
+            <Button
+              onClick={() => exportReport("pdf")}
+              variant="outline"
+              disabled={exporting || records.length === 0}
+              className="bg-red-50 hover:bg-red-100 border-red-200"
+            >
+              <FileDown className="mr-2 h-4 w-4 text-red-600" />
+              {exporting ? "Exporting..." : "Export PDF"}
+            </Button>
+            <Button onClick={() => exportReport("csv")} variant="outline" disabled={exporting || records.length === 0}>
+              <Download className="mr-2 h-4 w-4" />
+              {exporting ? "Exporting..." : "Export CSV"}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -259,6 +420,17 @@ export function AttendanceReports() {
       {/* Enhanced Summary Cards */}
       {summary && (
         <div className="grid gap-4 md:grid-cols-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Locations</CardTitle>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">{locations.length}</div>
+              <p className="text-xs text-muted-foreground">Active locations</p>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Records</CardTitle>
@@ -289,17 +461,6 @@ export function AttendanceReports() {
             <CardContent>
               <div className="text-2xl font-bold text-orange-500">{summary.statusCounts.late || 0}</div>
               <p className="text-xs text-muted-foreground">Late arrivals</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Absent</CardTitle>
-              <XCircle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-500">{summary.statusCounts.absent || 0}</div>
-              <p className="text-xs text-muted-foreground">Absences</p>
             </CardContent>
           </Card>
 
@@ -337,7 +498,6 @@ export function AttendanceReports() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {/* Charts */}
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
@@ -453,7 +613,6 @@ export function AttendanceReports() {
         </TabsContent>
 
         <TabsContent value="details" className="space-y-6">
-          {/* Records Table */}
           <Card>
             <CardHeader>
               <CardTitle>Detailed Attendance Records</CardTitle>

@@ -90,22 +90,52 @@ export default function SettingsPage() {
     }
   }
 
-  const loadSettings = () => {
-    // Load settings from localStorage or API
-    const savedSettings = localStorage.getItem("qcc-app-settings")
-    if (savedSettings) {
-      const parsed = JSON.parse(savedSettings)
-      setAppSettings({ ...appSettings, ...parsed })
-    }
+  const loadSettings = async () => {
+    try {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-    const savedSystemSettings = localStorage.getItem("qcc-system-settings")
-    if (savedSystemSettings) {
-      setSystemSettings({ ...systemSettings, ...JSON.parse(savedSystemSettings) })
-    }
+      if (user) {
+        // Load user-specific settings from database
+        const { data: userSettings } = await supabase.from("user_settings").select("*").eq("user_id", user.id).single()
 
-    const savedNotificationSettings = localStorage.getItem("qcc-notification-settings")
-    if (savedNotificationSettings) {
-      setNotificationSettings({ ...notificationSettings, ...JSON.parse(savedNotificationSettings) })
+        if (userSettings) {
+          setAppSettings({ ...appSettings, ...userSettings.app_settings })
+          setNotificationSettings({ ...notificationSettings, ...userSettings.notification_settings })
+        }
+
+        // Load system settings if admin
+        const { data: profile } = await supabase.from("user_profiles").select("role").eq("id", user.id).single()
+
+        if (profile?.role === "admin") {
+          const { data: systemConfig } = await supabase.from("system_settings").select("*").single()
+
+          if (systemConfig) {
+            setSystemSettings({ ...systemSettings, ...systemConfig.settings })
+            setGeoSettings({ ...geoSettings, ...systemConfig.geo_settings })
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load settings:", error)
+      // Fallback to localStorage
+      const savedSettings = localStorage.getItem("qcc-app-settings")
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings)
+        setAppSettings({ ...appSettings, ...parsed })
+      }
+
+      const savedSystemSettings = localStorage.getItem("qcc-system-settings")
+      if (savedSystemSettings) {
+        setSystemSettings({ ...systemSettings, ...JSON.parse(savedSystemSettings) })
+      }
+
+      const savedNotificationSettings = localStorage.getItem("qcc-notification-settings")
+      if (savedNotificationSettings) {
+        setNotificationSettings({ ...notificationSettings, ...JSON.parse(savedNotificationSettings) })
+      }
     }
   }
 
@@ -114,7 +144,50 @@ export default function SettingsPage() {
     setError(null)
 
     try {
-      // Save to localStorage for now - replace with API call
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user) {
+        // Save user settings
+        const { error: userSettingsError } = await supabase.from("user_settings").upsert({
+          user_id: user.id,
+          app_settings: appSettings,
+          notification_settings: notificationSettings,
+          updated_at: new Date().toISOString(),
+        })
+
+        if (userSettingsError) throw userSettingsError
+
+        // Save system settings if admin
+        if (profile?.role === "admin") {
+          const { error: systemSettingsError } = await supabase.from("system_settings").upsert({
+            id: 1, // Single row for system settings
+            settings: systemSettings,
+            geo_settings: geoSettings,
+            updated_at: new Date().toISOString(),
+          })
+
+          if (systemSettingsError) throw systemSettingsError
+
+          // Update geofence locations with new default radius
+          const { error: locationUpdateError } = await supabase
+            .from("geofence_locations")
+            .update({ radius_meters: Number.parseInt(geoSettings.defaultRadius) })
+            .eq("radius_meters", 20) // Update locations with default radius
+
+          if (locationUpdateError) console.warn("Failed to update location radius:", locationUpdateError)
+        }
+
+        setSuccess("Settings saved successfully")
+        setTimeout(() => setSuccess(null), 3000)
+      }
+    } catch (error) {
+      console.error("Failed to save settings:", error)
+      setError("Failed to save settings. Please try again.")
+
+      // Fallback to localStorage
       localStorage.setItem("qcc-app-settings", JSON.stringify(appSettings))
       localStorage.setItem("qcc-notification-settings", JSON.stringify(notificationSettings))
 
@@ -122,11 +195,6 @@ export default function SettingsPage() {
         localStorage.setItem("qcc-geo-settings", JSON.stringify(geoSettings))
         localStorage.setItem("qcc-system-settings", JSON.stringify(systemSettings))
       }
-
-      setSuccess("Settings saved successfully")
-      setTimeout(() => setSuccess(null), 3000)
-    } catch (error) {
-      setError("Failed to save settings")
     } finally {
       setSaving(false)
     }
@@ -460,7 +528,9 @@ export default function SettingsPage() {
                       value={geoSettings.defaultRadius}
                       onChange={(e) => setGeoSettings({ ...geoSettings, defaultRadius: e.target.value })}
                     />
-                    <p className="text-sm text-muted-foreground mt-1">Minimum distance for attendance scanning</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Minimum distance for attendance scanning (minimum 20m)
+                    </p>
                   </div>
                   <div>
                     <Label htmlFor="maxLocationAge">Max Location Age (milliseconds)</Label>

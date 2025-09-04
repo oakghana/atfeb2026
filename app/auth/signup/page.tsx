@@ -208,7 +208,7 @@ export default function SignupPage() {
                 </Label>
                 <Input
                   id="employeeId"
-                  placeholder="QCC001234"
+                  placeholder="701234"
                   value={formData.employeeId}
                   onChange={(e) => handleInputChange("employeeId", e.target.value)}
                   className="h-11 border-2 focus:border-secondary transition-colors"
@@ -223,7 +223,7 @@ export default function SignupPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="kwame.asante@qcc.edu.gh"
+                  placeholder="kwame.asante@qccgh.com"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
                   className="h-11 border-2 focus:border-secondary transition-colors"

@@ -82,31 +82,92 @@ export default function LoginPage() {
     try {
       console.log("[v0] Attempting login with identifier:", identifier)
 
+      if (identifier === "admin.user@qccgh.com" || identifier === "1000001") {
+        console.log("[v0] Test admin login detected - checking if account exists")
+
+        // Check if this is a profile that exists but hasn't signed up yet
+        const { data: profileCheck } = await supabase
+          .from("user_profiles")
+          .select("email, first_name, last_name")
+          .or(`email.eq.admin.user@qccgh.com,employee_id.eq.1000001`)
+          .single()
+
+        if (profileCheck) {
+          console.log("[v0] Profile exists for admin user:", profileCheck)
+          setError(
+            `Account profile found for ${profileCheck.first_name} ${profileCheck.last_name}. Please sign up first at /auth/signup with email: admin.user@qccgh.com and password: pa$$w0rd to activate your account.`,
+          )
+          return
+        }
+      }
+
+      if (identifier === "QCC@qccgh.onmicrosoft.com") {
+        console.log("[v0] QCC Admin login detected - checking if account exists")
+
+        // Check if admin has signed up yet
+        const { data: authUser, error: authError } = await supabase.auth.signInWithPassword({
+          email: identifier,
+          password,
+        })
+
+        if (authError && authError.message.includes("Invalid login credentials")) {
+          setError(
+            "QCC Admin account not found. Please sign up first at the signup page with email: QCC@qccgh.onmicrosoft.com and password: admin",
+          )
+          console.log("[v0] QCC Admin needs to sign up first")
+          return
+        }
+
+        if (authError) {
+          console.log("[v0] QCC Admin login error:", authError)
+          setError(`Admin login error: ${authError.message}`)
+          return
+        }
+
+        console.log("[v0] QCC Admin authenticated successfully:", authUser)
+      }
+
       let email = identifier
 
       // If identifier doesn't contain @, it's a staff number - look up the email
       if (!identifier.includes("@")) {
-        const response = await fetch("/api/auth/lookup-staff", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ identifier }),
-        })
+        if (identifier === "1000001") {
+          console.log("[v0] Test admin staff number detected")
+          email = "admin.user@qccgh.com"
+        } else {
+          const response = await fetch("/api/auth/lookup-staff", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ identifier }),
+          })
 
-        const result = await response.json()
+          const result = await response.json()
 
-        if (!response.ok) {
-          setError(result.error || "Staff number not found")
-          return
+          if (!response.ok) {
+            setError(result.error || "Staff number not found")
+            return
+          }
+
+          email = result.email
+          console.log("[v0] Staff number resolved to email:", email)
         }
-
-        email = result.email
-        console.log("[v0] Staff number resolved to email:", email)
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      let data, error
+      if (identifier === "QCC@qccgh.onmicrosoft.com") {
+        // Already authenticated above, just get the session
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        data = sessionData
+        error = sessionError
+        console.log("[v0] QCC Admin session data:", data)
+      } else {
+        const authResult = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+        data = authResult.data
+        error = authResult.error
+      }
 
       console.log("[v0] Login response:", { data, error })
 
@@ -119,7 +180,11 @@ export default function LoginPage() {
 
         let errorMessage = error.message
         if (error.message.includes("Invalid login credentials")) {
-          errorMessage = "Invalid credentials. Please check your staff number/email and password."
+          if (email === "admin.user@qccgh.com" || email === "staff.user@qccgh.com" || email === "hod.user@qccgh.com") {
+            errorMessage = `Account not activated. Please sign up first at /auth/signup with email: ${email} and password: pa$$w0rd to activate your account.`
+          } else {
+            errorMessage = "Invalid credentials. Please check your staff number/email and password."
+          }
         } else if (error.message.includes("Email not confirmed")) {
           errorMessage = "Please check your email and click the confirmation link before logging in."
         } else if (error.message.includes("User not found")) {
