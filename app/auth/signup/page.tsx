@@ -273,7 +273,7 @@ export default function SignupPage() {
                   </Label>
                   <Input
                     id="position"
-                    placeholder="Senior HR Manager"
+                    placeholder="Snr HR Manager"
                     value={formData.position}
                     onChange={(e) => handleInputChange("position", e.target.value)}
                     className="h-11 border-2 focus:border-secondary transition-colors"
