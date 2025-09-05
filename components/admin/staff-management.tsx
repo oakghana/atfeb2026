@@ -18,7 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Users, Plus, Search, Edit, Trash2, UserCheck, UserX, Key } from "lucide-react"
+import { Users, Plus, Search, Edit, Trash2, UserCheck, UserX, Key, MapPin } from "lucide-react"
 import { PasswordManagement } from "./password-management"
 
 interface StaffMember {
@@ -31,10 +31,16 @@ interface StaffMember {
   role: string
   is_active: boolean
   department_id?: string
+  assigned_location_id?: string
   departments?: {
     id: string
     name: string
     code: string
+  }
+  assigned_location?: {
+    id: string
+    name: string
+    address: string
   }
 }
 
@@ -44,9 +50,18 @@ interface Department {
   code: string
 }
 
+interface Location {
+  id: string
+  name: string
+  address: string
+  latitude: number
+  longitude: number
+}
+
 export function StaffManagement() {
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDepartment, setSelectedDepartment] = useState("all")
@@ -66,11 +81,13 @@ export function StaffManagement() {
     department_id: "",
     position: "",
     role: "staff",
+    assigned_location_id: "",
   })
 
   useEffect(() => {
     fetchStaff()
     fetchDepartments()
+    fetchLocations()
   }, [searchTerm, selectedDepartment, selectedRole])
 
   const fetchStaff = async () => {
@@ -116,6 +133,23 @@ export function StaffManagement() {
     }
   }
 
+  const fetchLocations = async () => {
+    try {
+      console.log("[v0] Fetching locations...")
+      const response = await fetch("/api/attendance/locations")
+      const result = await response.json()
+      console.log("[v0] Locations fetch result:", result)
+
+      if (result.success) {
+        setLocations(result.data || [])
+      } else {
+        console.error("[v0] Failed to fetch locations:", result.error)
+      }
+    } catch (error) {
+      console.error("[v0] Locations fetch exception:", error)
+    }
+  }
+
   const handleAddStaff = async () => {
     try {
       setError(null)
@@ -141,6 +175,7 @@ export function StaffManagement() {
           department_id: "",
           position: "",
           role: "staff",
+          assigned_location_id: "",
         })
         fetchStaff()
       } else {
@@ -214,6 +249,7 @@ export function StaffManagement() {
         role: editingStaff.role,
         department_id: editingStaff.department_id || editingStaff.departments?.id,
         is_active: editingStaff.is_active,
+        assigned_location_id: editingStaff.assigned_location_id,
       }
 
       console.log("[v0] Updating staff member:", editingStaff.id, updateData)
@@ -250,7 +286,7 @@ export function StaffManagement() {
             <Users className="h-5 w-5" />
             Staff Management
           </CardTitle>
-          <CardDescription>Manage QCC staff members and their roles</CardDescription>
+          <CardDescription>Manage QCC staff members, roles, and location assignments</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (
@@ -419,6 +455,28 @@ export function StaffManagement() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <Label htmlFor="assignedLocation">Assigned Location</Label>
+                      <Select
+                        value={newStaff.assigned_location_id}
+                        onValueChange={(value) => setNewStaff({ ...newStaff, assigned_location_id: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Location (Optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Location Assigned</SelectItem>
+                          {locations.map((location) => (
+                            <SelectItem key={location.id} value={location.id}>
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-3 w-3" />
+                                {location.name} - {location.address}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
@@ -437,7 +495,7 @@ export function StaffManagement() {
               <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>Edit Staff Member</DialogTitle>
-                  <DialogDescription>Update staff member information</DialogDescription>
+                  <DialogDescription>Update staff member information and assignments</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -486,7 +544,7 @@ export function StaffManagement() {
                   <div>
                     <Label htmlFor="editDepartment">Department</Label>
                     <Select
-                      value={editingStaff.department_id || editingStaff.departments?.id || ""}
+                      value={editingStaff.department_id || editingStaff.departments?.id || "none"}
                       onValueChange={(value) =>
                         setEditingStaff({
                           ...editingStaff,
@@ -523,6 +581,30 @@ export function StaffManagement() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <Label htmlFor="editAssignedLocation">Assigned Location</Label>
+                    <Select
+                      value={editingStaff.assigned_location_id || "none"}
+                      onValueChange={(value) => setEditingStaff({ ...editingStaff, assigned_location_id: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Location (Optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Location Assigned</SelectItem>
+                        {locations.map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            <div className="flex items-center gap-1 text-sm">
+                              <MapPin className="h-3 w-3 text-muted-foreground" />
+                              <span className="truncate max-w-32" title={location.address}>
+                                {location.name}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setEditingStaff(null)}>
@@ -544,6 +626,7 @@ export function StaffManagement() {
                   <TableHead>Email</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Assigned Location</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -551,13 +634,13 @@ export function StaffManagement() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       Loading staff...
                     </TableCell>
                   </TableRow>
                 ) : staff.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       No staff members found
                     </TableCell>
                   </TableRow>
@@ -574,6 +657,18 @@ export function StaffManagement() {
                         <Badge variant={member.role === "admin" ? "default" : "secondary"}>
                           {member.role.replace("_", " ")}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {member.assigned_location ? (
+                          <div className="flex items-center gap-1 text-sm">
+                            <MapPin className="h-3 w-3 text-muted-foreground" />
+                            <span className="truncate max-w-32" title={member.assigned_location.address}>
+                              {member.assigned_location.name}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">No location</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={member.is_active ? "default" : "destructive"}>

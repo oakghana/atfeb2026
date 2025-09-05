@@ -23,7 +23,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     const body = await request.json()
-    const { first_name, last_name, employee_id, department_id, position, role, is_active } = body
+    const { first_name, last_name, employee_id, department_id, position, role, is_active, assigned_location_id } = body
 
     // Update user profile
     const { data: updatedProfile, error: updateError } = await supabase
@@ -36,6 +36,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         position,
         role,
         is_active,
+        assigned_location_id: assigned_location_id && assigned_location_id !== "none" ? assigned_location_id : null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", params.id)

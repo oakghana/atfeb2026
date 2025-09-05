@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import crypto from "crypto"
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,10 +55,16 @@ export async function GET(request: NextRequest) {
     // Get departments separately to avoid join issues
     const { data: departments } = await supabase.from("departments").select("*")
 
-    // Enrich staff data with department info
+    const { data: locations } = await supabase
+      .from("geofence_locations")
+      .select("id, name, address")
+      .eq("is_active", true)
+
+    // Enrich staff data with department info and location info
     const enrichedStaff = (staff || []).map((member) => ({
       ...member,
       departments: departments?.find((dept) => dept.id === member.department_id) || null,
+      assigned_location: locations?.find((loc) => loc.id === member.assigned_location_id) || null,
     }))
 
     console.log("[v0] Staff API - Returning success response")
@@ -119,7 +126,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { email, first_name, last_name, employee_id, department_id, position, role } = body
+    const { email, first_name, last_name, employee_id, department_id, position, role, assigned_location_id } = body
 
     // Create user profile
     const { data: newProfile, error: insertError } = await supabase
@@ -133,6 +140,7 @@ export async function POST(request: NextRequest) {
         department_id: department_id || null,
         position: position || null,
         role: role || "staff",
+        assigned_location_id: assigned_location_id && assigned_location_id !== "none" ? assigned_location_id : null,
         is_active: false,
         created_at: new Date().toISOString(),
       })
