@@ -7,15 +7,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import Image from "next/image"
+import { useNotifications } from "@/components/ui/notification-system"
 
 export default function LoginPage() {
-  const [identifier, setIdentifier] = useState("") // Changed from email to identifier to support both email and staff number
+  const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [otpEmail, setOtpEmail] = useState("")
   const [otp, setOtp] = useState("")
@@ -24,6 +24,8 @@ export default function LoginPage() {
   const [otpSent, setOtpSent] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const router = useRouter()
+
+  const { showFieldError, showSuccess, showError, showWarning } = useNotifications()
 
   const logLoginActivity = async (userId: string, action: string, success: boolean, method: string) => {
     try {
@@ -82,6 +84,16 @@ export default function LoginPage() {
     try {
       console.log("[v0] Attempting login with identifier:", identifier)
 
+      if (!identifier.trim()) {
+        showFieldError("Staff Number/Email", "Please enter your staff number or email address")
+        return
+      }
+
+      if (!password.trim()) {
+        showFieldError("Password", "Please enter your password")
+        return
+      }
+
       const demoUsers = [
         { email: "admin.system@qccgh.com", staff: "5000001", name: "System Admin" },
         { email: "admin.hr@qccgh.com", staff: "5000002", name: "HR Admin" },
@@ -106,8 +118,9 @@ export default function LoginPage() {
         })
 
         if (authError && authError.message.includes("Invalid login credentials")) {
-          setError(
-            `Demo Account: ${demoUser.name} needs activation. Please sign up first at /auth/signup with:\n\nEmail: ${demoUser.email}\nPassword: pa$$w0rd\n\nThen return here to login.`,
+          showError(
+            `Demo Account: ${demoUser.name} needs activation. Please sign up first at /auth/signup with Email: ${demoUser.email} and Password: pa$$w0rd`,
+            "Account Activation Required",
           )
           console.log("[v0] Demo user needs to sign up first:", demoUser.email)
           return
@@ -115,7 +128,7 @@ export default function LoginPage() {
 
         if (authError) {
           console.log("[v0] Demo user login error:", authError)
-          setError(`Demo login error: ${authError.message}`)
+          showError(`Demo login error: ${authError.message}`, "Login Failed")
           return
         }
 
@@ -133,8 +146,9 @@ export default function LoginPage() {
         })
 
         if (authError && authError.message.includes("Invalid login credentials")) {
-          setError(
+          showError(
             "QCC Admin account not found. Please sign up first at the signup page with email: QCC@qccgh.onmicrosoft.com and password: admin",
+            "Account Not Found",
           )
           console.log("[v0] QCC Admin needs to sign up first")
           return
@@ -142,7 +156,7 @@ export default function LoginPage() {
 
         if (authError) {
           console.log("[v0] QCC Admin login error:", authError)
-          setError(`Admin login error: ${authError.message}`)
+          showError(`Admin login error: ${authError.message}`, "Login Failed")
           return
         }
 
@@ -167,7 +181,7 @@ export default function LoginPage() {
           const result = await response.json()
 
           if (!response.ok) {
-            setError(result.error || "Staff number not found")
+            showFieldError("Staff Number", result.error || "Staff number not found")
             return
           }
 
@@ -201,20 +215,26 @@ export default function LoginPage() {
           await logLoginActivity(data.user.id, "login_failed", false, "password")
         }
 
-        let errorMessage = error.message
+        const errorMessage = error.message
         if (error.message.includes("Invalid login credentials")) {
           if (email === "admin.user@qccgh.com" || email === "staff.user@qccgh.com" || email === "hod.user@qccgh.com") {
-            errorMessage = `Account not activated. Please sign up first at /auth/signup with email: ${email} and password: pa$$w0rd to activate your account.`
+            showError(
+              `Account not activated. Please sign up first at /auth/signup with email: ${email} and password: pa$$w0rd to activate your account.`,
+              "Account Activation Required",
+            )
           } else {
-            errorMessage = "Invalid credentials. Please check your staff number/email and password."
+            showFieldError("Credentials", "Invalid credentials. Please check your staff number/email and password.")
           }
         } else if (error.message.includes("Email not confirmed")) {
-          errorMessage = "Please check your email and click the confirmation link before logging in."
+          showWarning(
+            "Please check your email and click the confirmation link before logging in.",
+            "Email Confirmation Required",
+          )
         } else if (error.message.includes("User not found")) {
-          errorMessage = "No account found. Please contact your administrator or sign up first."
+          showFieldError("Account", "No account found. Please contact your administrator or sign up first.")
+        } else {
+          showError(errorMessage, "Login Failed")
         }
-
-        setError(errorMessage)
         return
       }
 
@@ -223,13 +243,8 @@ export default function LoginPage() {
 
         if (!approvalCheck.approved) {
           await logLoginActivity(data.user.id, "login_blocked_unapproved", false, "password")
-
-          // Sign out the user since they're not approved
           await supabase.auth.signOut()
-
-          setError(approvalCheck.error || "Account not approved")
-
-          // Redirect to pending approval page
+          showWarning(approvalCheck.error || "Account not approved", "Account Approval Required")
           if (approvalCheck.error?.includes("pending admin approval")) {
             router.push("/auth/pending-approval")
           }
@@ -240,10 +255,11 @@ export default function LoginPage() {
       }
 
       console.log("[v0] Login successful, redirecting to dashboard")
+      showSuccess("Login successful! Redirecting to dashboard...", "Welcome Back")
       router.push("/dashboard")
     } catch (error: unknown) {
       console.log("[v0] Caught error:", error)
-      setError(error instanceof Error ? error.message : "An error occurred during login")
+      showError(error instanceof Error ? error.message : "An error occurred during login", "Login Error")
     } finally {
       setIsLoading(false)
     }
@@ -257,43 +273,68 @@ export default function LoginPage() {
     setSuccessMessage(null)
 
     try {
+      if (!otpEmail.trim()) {
+        showFieldError("Email", "Please enter your email address")
+        return
+      }
+
+      if (!otpEmail.includes("@") || !otpEmail.includes(".")) {
+        showFieldError("Email", "Please enter a valid email address")
+        return
+      }
+
       console.log("[v0] Validating email before sending OTP:", otpEmail)
 
       let validateResponse
       try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
         validateResponse = await fetch("/api/auth/validate-email", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
+            "Cache-Control": "no-cache",
           },
           body: JSON.stringify({ email: otpEmail }),
+          signal: controller.signal,
         })
+
+        clearTimeout(timeoutId)
         console.log("[v0] Fetch completed successfully")
       } catch (fetchError) {
         console.error("[v0] Fetch failed:", fetchError)
-        setError("Network error: Unable to connect to server. Please check your internet connection and try again.")
+        if (fetchError instanceof Error && fetchError.name === "AbortError") {
+          showError("Request timeout. Please try again.", "Timeout Error")
+        } else {
+          showError(
+            "Network error: Unable to connect to server. Please check your internet connection and try again.",
+            "Connection Error",
+          )
+        }
         return
       }
 
       console.log("[v0] Validate response status:", validateResponse.status)
       console.log("[v0] Validate response headers:", validateResponse.headers.get("content-type"))
 
-      // Check if response is actually JSON
       const contentType = validateResponse.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
-        console.error("[v0] Response is not JSON:", contentType)
-        setError("Server error: Invalid response format. Please try again.")
-        return
-      }
 
       // Get response text first to debug
       const responseText = await validateResponse.text()
-      console.log("[v0] Raw response text:", responseText)
+      console.log("[v0] Raw response text:", responseText.substring(0, 200)) // Log first 200 chars
 
       if (!responseText) {
         console.error("[v0] Empty response received")
-        setError("Server error: Empty response. Please try again.")
+        showError("Server error: Empty response. Please try again.", "Server Error")
+        return
+      }
+
+      // Check if response looks like HTML (common on deployed domains when there's an error)
+      if (responseText.trim().startsWith("<!DOCTYPE") || responseText.trim().startsWith("<html")) {
+        console.error("[v0] Received HTML instead of JSON - likely server error")
+        showError("Server configuration error. Please contact support or try again later.", "Server Error")
         return
       }
 
@@ -302,25 +343,33 @@ export default function LoginPage() {
         validateResult = JSON.parse(responseText)
       } catch (jsonError) {
         console.error("[v0] JSON parsing error:", jsonError)
-        console.error("[v0] Response text that failed to parse:", responseText)
-        setError("Server error: Invalid response format. Please contact support.")
+        console.error("[v0] Response text that failed to parse:", responseText.substring(0, 500))
+
+        if (responseText.includes("Internal Server Error") || responseText.includes("500")) {
+          showError("Server is temporarily unavailable. Please try again in a few minutes.", "Server Error")
+        } else {
+          showError("Server error: Invalid response format. Please contact support.", "Server Error")
+        }
         return
       }
 
       console.log("[v0] Parsed validation result:", validateResult.message)
 
       if (!validateResponse.ok) {
-        setError(validateResult.error || "Email validation failed")
+        showFieldError("Email", validateResult.error || "Email validation failed")
         return
       }
 
       if (!validateResult.exists) {
-        setError("This email is not registered in the QCC system. Please contact your administrator.")
+        showFieldError("Email", "This email is not registered in the QCC system. Please contact your administrator.")
         return
       }
 
       if (!validateResult.approved) {
-        setError("Your account is pending admin approval. Please wait for activation before using OTP login.")
+        showWarning(
+          "Your account is pending admin approval. Please wait for activation before using OTP login.",
+          "Account Approval Required",
+        )
         return
       }
 
@@ -333,6 +382,7 @@ export default function LoginPage() {
           email: otpEmail,
           options: {
             emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
+            shouldCreateUser: false, // Don't create new users via OTP
           },
         })
 
@@ -345,13 +395,14 @@ export default function LoginPage() {
             details: otpResult.error,
           })
 
-          // Handle specific Supabase errors
           if (otpResult.error.message.includes("Email rate limit exceeded")) {
-            throw new Error("Too many OTP requests. Please wait a few minutes before trying again.")
+            throw new Error("Too many OTP requests. Please wait 5 minutes before trying again.")
           } else if (otpResult.error.message.includes("Invalid email")) {
             throw new Error("Invalid email format. Please check your email address.")
           } else if (otpResult.error.message.includes("User not found")) {
             throw new Error("Email not found in the system. Please contact your administrator.")
+          } else if (otpResult.error.message.includes("Signup not allowed")) {
+            throw new Error("OTP login is not available for this email. Please use password login.")
           } else {
             throw new Error(`OTP sending failed: ${otpResult.error.message}`)
           }
@@ -359,7 +410,7 @@ export default function LoginPage() {
 
         console.log("[v0] OTP sent successfully")
         setOtpSent(true)
-        setSuccessMessage("OTP sent to your email. Please check your inbox and enter the code below.")
+        showSuccess("OTP sent to your email. Please check your inbox and enter the code below.", "OTP Sent")
       } catch (supabaseError) {
         console.error("[v0] Supabase OTP call failed:", supabaseError)
         throw supabaseError
@@ -368,19 +419,22 @@ export default function LoginPage() {
       console.error("[v0] OTP send error:", error)
       if (error instanceof Error) {
         if (error.message.includes("Failed to fetch")) {
-          setError("Network error: Unable to connect to server. Please check your internet connection and try again.")
+          showError(
+            "Network error: Unable to connect to server. Please check your internet connection and try again.",
+            "Connection Error",
+          )
         } else if (
           error.message.includes("OTP sending failed") ||
           error.message.includes("Too many OTP requests") ||
           error.message.includes("Invalid email") ||
           error.message.includes("Email not found")
         ) {
-          setError(error.message)
+          showFieldError("Email", error.message)
         } else {
-          setError(`Failed to send OTP: ${error.message}. Please try again or contact support.`)
+          showError(`Failed to send OTP: ${error.message}. Please try again or contact support.`, "OTP Error")
         }
       } else {
-        setError("Failed to send OTP. Please try again.")
+        showError("Failed to send OTP. Please try again.", "OTP Error")
       }
     } finally {
       setIsLoading(false)
@@ -394,6 +448,16 @@ export default function LoginPage() {
     setError(null)
 
     try {
+      if (!otp.trim()) {
+        showFieldError("OTP Code", "Please enter the OTP code")
+        return
+      }
+
+      if (otp.length !== 6) {
+        showFieldError("OTP Code", "OTP code must be 6 digits")
+        return
+      }
+
       const { data, error } = await supabase.auth.verifyOtp({
         email: otpEmail,
         token: otp,
@@ -404,7 +468,8 @@ export default function LoginPage() {
         if (data?.user?.id) {
           await logLoginActivity(data.user.id, "otp_login_failed", false, "otp")
         }
-        throw error
+        showFieldError("OTP Code", "Invalid or expired OTP code. Please try again.")
+        return
       }
 
       if (data?.user?.id) {
@@ -412,13 +477,8 @@ export default function LoginPage() {
 
         if (!approvalCheck.approved) {
           await logLoginActivity(data.user.id, "otp_login_blocked_unapproved", false, "otp")
-
-          // Sign out the user since they're not approved
           await supabase.auth.signOut()
-
-          setError(approvalCheck.error || "Account not approved")
-
-          // Redirect to pending approval page
+          showWarning(approvalCheck.error || "Account not approved", "Account Approval Required")
           if (approvalCheck.error?.includes("pending admin approval")) {
             router.push("/auth/pending-approval")
           }
@@ -428,9 +488,10 @@ export default function LoginPage() {
         await logLoginActivity(data.user.id, "otp_login_success", true, "otp")
       }
 
+      showSuccess("OTP verified successfully! Redirecting to dashboard...", "Login Successful")
       router.push("/dashboard")
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Invalid OTP code")
+      showFieldError("OTP Code", error instanceof Error ? error.message : "Invalid OTP code")
     } finally {
       setIsLoading(false)
     }
@@ -556,18 +617,6 @@ export default function LoginPage() {
                 )}
               </TabsContent>
             </Tabs>
-
-            {error && (
-              <Alert variant="destructive" className="mt-4">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            {successMessage && (
-              <Alert className="mt-4">
-                <AlertDescription>{successMessage}</AlertDescription>
-              </Alert>
-            )}
 
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">

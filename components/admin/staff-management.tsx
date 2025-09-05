@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { Users, Plus, Search, Edit, Trash2, UserCheck, UserX, Key, MapPin } from "lucide-react"
 import { PasswordManagement } from "./password-management"
+import { useNotifications } from "@/components/ui/notification-system"
 
 interface StaffMember {
   id: string
@@ -71,9 +72,7 @@ export function StaffManagement() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
-  const [notifications, setNotifications] = useState<Array<{ id: string; message: string; type: "success" | "error" }>>(
-    [],
-  )
+  const { showSuccess, showError, showWarning, showFieldError } = useNotifications()
 
   const [newStaff, setNewStaff] = useState({
     email: "",
@@ -159,12 +158,15 @@ export function StaffManagement() {
       setError(null)
 
       if (!newStaff.email || !newStaff.first_name || !newStaff.last_name || !newStaff.employee_id) {
-        addNotification("Please fill in all required fields", "error")
+        if (!newStaff.first_name) showFieldError("First Name", "First name is required")
+        if (!newStaff.last_name) showFieldError("Last Name", "Last name is required")
+        if (!newStaff.email) showFieldError("Email", "Email address is required")
+        if (!newStaff.employee_id) showFieldError("Employee ID", "Employee ID is required")
         return
       }
 
       if (!newStaff.assigned_location_id) {
-        addNotification("Please assign a location to this staff member", "error")
+        showFieldError("Location", "Please assign a location to this staff member")
         return
       }
 
@@ -179,7 +181,7 @@ export function StaffManagement() {
       console.log("[v0] Add staff result:", result)
 
       if (result.success) {
-        addNotification("Staff member added successfully", "success")
+        showSuccess("Staff member added successfully", "Staff Added")
         setSuccess("Staff member added successfully")
         setIsAddDialogOpen(false)
         setNewStaff({
@@ -195,13 +197,13 @@ export function StaffManagement() {
         })
         fetchStaff()
       } else {
-        addNotification(result.error || "Failed to add staff member", "error")
+        showError(result.error || "Failed to add staff member", "Add Staff Failed")
         setError(result.error)
       }
     } catch (error) {
       console.error("[v0] Add staff exception:", error)
       const errorMessage = "Failed to add staff member"
-      addNotification(errorMessage, "error")
+      showError(errorMessage, "Add Staff Error")
       setError(errorMessage)
     }
   }
@@ -220,17 +222,17 @@ export function StaffManagement() {
       console.log("[v0] Update staff result:", result)
 
       if (result.success) {
-        addNotification("Staff member updated successfully", "success")
+        showSuccess("Staff member updated successfully", "Staff Updated")
         setSuccess("Staff member updated successfully")
         fetchStaff()
       } else {
-        addNotification(result.error || "Failed to update staff member", "error")
+        showError(result.error || "Failed to update staff member", "Update Failed")
         setError(result.error)
       }
     } catch (error) {
       console.error("[v0] Update exception:", error)
       const errorMessage = "Failed to update staff member"
-      addNotification(errorMessage, "error")
+      showError(errorMessage, "Update Error")
       setError(errorMessage)
     }
   }
@@ -247,16 +249,16 @@ export function StaffManagement() {
       const result = await response.json()
 
       if (result.success) {
-        addNotification("Staff member deactivated successfully", "success")
+        showSuccess("Staff member deactivated successfully", "Staff Deactivated")
         setSuccess("Staff member deactivated successfully")
         fetchStaff()
       } else {
-        addNotification(result.error || "Failed to deactivate staff member", "error")
+        showError(result.error || "Failed to deactivate staff member", "Deactivation Failed")
         setError(result.error)
       }
     } catch (error) {
       const errorMessage = "Failed to deactivate staff member"
-      addNotification(errorMessage, "error")
+      showError(errorMessage, "Deactivation Error")
       setError(errorMessage)
     }
   }
@@ -270,7 +272,7 @@ export function StaffManagement() {
       if (!editingStaff.assigned_location_id || editingStaff.assigned_location_id === "none") {
         const headOfficeLocation = locations.find((loc) => loc.name.toLowerCase().includes("head office"))
         if (!headOfficeLocation) {
-          addNotification("Please assign a location to this staff member", "error")
+          showFieldError("Location", "Please assign a location to this staff member")
           return
         }
       }
@@ -307,46 +309,26 @@ export function StaffManagement() {
       console.log("[v0] Update response data:", result)
 
       if (result.success) {
-        addNotification("Staff member updated successfully", "success")
+        showSuccess("Staff member updated successfully", "Staff Updated")
         setSuccess("Staff member updated successfully")
         setEditingStaff(null)
         fetchStaff()
       } else {
         console.error("[v0] Update failed:", result.error)
         const errorMessage = result.error || "Failed to update staff member"
-        addNotification(errorMessage, "error")
+        showError(errorMessage, "Update Failed")
         setError(errorMessage)
       }
     } catch (error) {
       console.error("[v0] Update exception:", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to update staff member"
-      addNotification(errorMessage, "error")
+      showError(errorMessage, "Update Error")
       setError(errorMessage)
     }
   }
 
-  const addNotification = (message: string, type: "success" | "error") => {
-    const id = Date.now().toString() // Use timestamp instead of crypto.randomUUID for better compatibility
-    setNotifications((prev) => [...prev, { id, message, type }])
-    setTimeout(() => {
-      setNotifications((prev) => prev.filter((n) => n.id !== id))
-    }, 5000)
-  }
-
   return (
     <div className="space-y-6">
-      <div className="fixed top-4 right-4 z-50 space-y-2">
-        {notifications.map((notification) => (
-          <Alert
-            key={notification.id}
-            variant={notification.type === "error" ? "destructive" : "default"}
-            className="w-80 shadow-lg"
-          >
-            <AlertDescription>{notification.message}</AlertDescription>
-          </Alert>
-        ))}
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

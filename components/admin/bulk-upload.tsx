@@ -84,9 +84,17 @@ export function BulkUpload() {
   }
 
   const downloadTemplate = (type: string) => {
+    if (type === "staff") {
+      // Use the new template API endpoint for staff
+      const link = document.createElement("a")
+      link.href = "/api/admin/bulk-upload/template"
+      link.download = "qcc-staff-import-template.csv"
+      link.click()
+      return
+    }
+
+    // Keep existing templates for other types
     const templates = {
-      staff:
-        "employee_id,first_name,last_name,email,phone,department_code,position,role\n1000001,John,Doe,john.doe@qccgh.com,0241234567,IT,Developer,staff",
       departments: "name,code,description\nInformation Technology,IT,IT Department",
       locations: "name,address,latitude,longitude,radius_meters\nHead Office,Accra Ghana,5.551760,-0.211845,20",
       regions: "name,code,country\nGreater Accra,GA,Ghana",
@@ -144,6 +152,32 @@ export function BulkUpload() {
                   <div>
                     <h3 className="text-lg font-semibold capitalize">{type} Upload</h3>
                     <p className="text-sm text-muted-foreground">Upload {type} data in CSV or Excel format</p>
+                    {type === "staff" && (
+                      <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <h4 className="font-medium text-blue-900 mb-2">Format Requirements:</h4>
+                        <ul className="text-sm text-blue-800 space-y-1">
+                          <li>
+                            <strong>Email:</strong> Valid format (e.g., user@qccgh.com)
+                          </li>
+                          <li>
+                            <strong>Phone:</strong> Ghana format with country code (e.g., +233241234567)
+                          </li>
+                          <li>
+                            <strong>Employee ID:</strong> Unique alphanumeric code (e.g., EMP001, 1151908)
+                          </li>
+                          <li>
+                            <strong>Department Code:</strong> 2-4 letter code (e.g., IT, HR, FIN, ADM)
+                          </li>
+                          <li>
+                            <strong>Hire Date:</strong> YYYY-MM-DD format (e.g., 2024-01-15)
+                          </li>
+                        </ul>
+                        <p className="text-xs text-blue-700 mt-2">
+                          <strong>Note:</strong> Invalid formats will be auto-corrected during import. Only first_name
+                          and last_name are required.
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <Button variant="outline" onClick={() => downloadTemplate(type)} className="flex items-center gap-2">
                     <Download className="h-4 w-4" />
