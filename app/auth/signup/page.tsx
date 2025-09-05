@@ -100,12 +100,7 @@ export default function SignupPage() {
             first_name: formData.firstName,
             last_name: formData.lastName,
             employee_id: formData.employeeId,
-            department_id: formData.departmentId,
-            position: formData.position,
-            region: formData.region,
-            role: "staff",
-            is_active: false,
-            approval_status: "pending",
+            email: formData.email,
           },
         },
       })
@@ -114,31 +109,68 @@ export default function SignupPage() {
 
       if (error) {
         console.error("[v0] Signup error:", error)
-        if (error.message.includes("email") || error.message.includes("confirmation")) {
-          setError("Email confirmation failed. Please check your email settings or contact IT support.")
+
+        if (error.message.includes("User already registered")) {
+          setError("This email is already registered. Please try logging in instead.")
+        } else if (error.message.includes("Invalid email")) {
+          setError("Please enter a valid email address.")
+        } else if (error.message.includes("Password")) {
+          setError("Password must be at least 6 characters long.")
+        } else if (error.message.includes("Database error") || error.message.includes("unexpected_failure")) {
+          setError("Account creation is temporarily unavailable. Please try again later or contact IT support.")
         } else {
-          setError(error.message)
+          setError(`Signup failed: ${error.message}`)
         }
         return
       }
 
       if (data.user) {
-        console.log("[v0] User created, redirecting to pending approval page")
+        console.log("[v0] User created successfully, now creating profile...")
+
+        try {
+          const { error: profileError } = await supabase.from("user_profiles").insert({
+            id: data.user.id,
+            email: formData.email,
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            employee_id: formData.employeeId,
+            department_id: formData.departmentId || null,
+            position: formData.position || null,
+            region: formData.region || null,
+            role: "staff",
+            is_active: false,
+            approval_status: "pending",
+            created_at: new Date().toISOString(),
+          })
+
+          if (profileError) {
+            console.error("[v0] Profile creation error:", profileError)
+            console.log("[v0] Profile creation failed but auth succeeded, redirecting anyway")
+          } else {
+            console.log("[v0] Profile created successfully")
+          }
+        } catch (profileError) {
+          console.error("[v0] Profile creation exception:", profileError)
+        }
+
+        console.log("[v0] Redirecting to pending approval page")
         router.push("/auth/pending-approval")
       } else {
-        console.warn("[v0] Unexpected signup response")
+        console.warn("[v0] Unexpected signup response - no user returned")
         setError("Account creation completed, but please check your email for verification.")
       }
     } catch (error: unknown) {
       console.error("[v0] Signup exception:", error)
       const errorMessage = error instanceof Error ? error.message : "An error occurred during signup"
 
-      if (errorMessage.includes("SMTP") || errorMessage.includes("email")) {
-        setError(
-          "Email service is currently unavailable. Your account may have been created - try logging in or contact IT support.",
-        )
+      if (errorMessage.includes("fetch")) {
+        setError("Network error. Please check your connection and try again.")
+      } else if (errorMessage.includes("SMTP") || errorMessage.includes("email")) {
+        setError("Email service is currently unavailable. Your account may have been created - try logging in.")
+      } else if (errorMessage.includes("Database") || errorMessage.includes("constraint")) {
+        setError("Database error. Please contact IT support or try again later.")
       } else {
-        setError(errorMessage)
+        setError(`Signup failed: ${errorMessage}`)
       }
     } finally {
       setIsLoading(false)

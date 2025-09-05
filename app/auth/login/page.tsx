@@ -82,23 +82,45 @@ export default function LoginPage() {
     try {
       console.log("[v0] Attempting login with identifier:", identifier)
 
-      if (identifier === "admin.user@qccgh.com" || identifier === "1000001") {
-        console.log("[v0] Test admin login detected - checking if account exists")
+      const demoUsers = [
+        { email: "admin.system@qccgh.com", staff: "5000001", name: "System Admin" },
+        { email: "admin.hr@qccgh.com", staff: "5000002", name: "HR Admin" },
+        { email: "admin.ops@qccgh.com", staff: "5000003", name: "Operations Admin" },
+        { email: "hod.academic@qccgh.com", staff: "4000001", name: "Academic Affairs HOD" },
+        { email: "hod.student@qccgh.com", staff: "4000002", name: "Student Affairs HOD" },
+        { email: "hod.finance@qccgh.com", staff: "4000003", name: "Finance HOD" },
+        { email: "admin.user@qccgh.com", staff: "1000001", name: "Test Admin" },
+        { email: "staff.user@qccgh.com", staff: "2000001", name: "Test Staff" },
+        { email: "hod.user@qccgh.com", staff: "3000001", name: "Test HOD" },
+      ]
 
-        // Check if this is a profile that exists but hasn't signed up yet
-        const { data: profileCheck } = await supabase
-          .from("user_profiles")
-          .select("email, first_name, last_name")
-          .or(`email.eq.admin.user@qccgh.com,employee_id.eq.1000001`)
-          .single()
+      const demoUser = demoUsers.find((user) => identifier === user.email || identifier === user.staff)
 
-        if (profileCheck) {
-          console.log("[v0] Profile exists for admin user:", profileCheck)
+      if (demoUser) {
+        console.log("[v0] Demo user login detected:", demoUser.name)
+
+        // Check if this demo user has signed up yet
+        const { data: authCheck, error: authError } = await supabase.auth.signInWithPassword({
+          email: demoUser.email,
+          password,
+        })
+
+        if (authError && authError.message.includes("Invalid login credentials")) {
           setError(
-            `Account profile found for ${profileCheck.first_name} ${profileCheck.last_name}. Please sign up first at /auth/signup with email: admin.user@qccgh.com and password: pa$$w0rd to activate your account.`,
+            `Demo Account: ${demoUser.name} needs activation. Please sign up first at /auth/signup with:\n\nEmail: ${demoUser.email}\nPassword: pa$$w0rd\n\nThen return here to login.`,
           )
+          console.log("[v0] Demo user needs to sign up first:", demoUser.email)
           return
         }
+
+        if (authError) {
+          console.log("[v0] Demo user login error:", authError)
+          setError(`Demo login error: ${authError.message}`)
+          return
+        }
+
+        console.log("[v0] Demo user authenticated successfully:", authCheck)
+        // Continue with normal approval check below
       }
 
       if (identifier === "QCC@qccgh.onmicrosoft.com") {
@@ -131,9 +153,10 @@ export default function LoginPage() {
 
       // If identifier doesn't contain @, it's a staff number - look up the email
       if (!identifier.includes("@")) {
-        if (identifier === "1000001") {
-          console.log("[v0] Test admin staff number detected")
-          email = "admin.user@qccgh.com"
+        const demoByStaff = demoUsers.find((user) => identifier === user.staff)
+        if (demoByStaff) {
+          email = demoByStaff.email
+          console.log("[v0] Demo staff number resolved to email:", email)
         } else {
           const response = await fetch("/api/auth/lookup-staff", {
             method: "POST",
@@ -242,10 +265,41 @@ export default function LoginPage() {
         body: JSON.stringify({ email: otpEmail }),
       })
 
-      const validateResult = await validateResponse.json()
+      console.log("[v0] Validate response status:", validateResponse.status)
+      console.log("[v0] Validate response headers:", validateResponse.headers.get("content-type"))
+
+      // Check if response is actually JSON
+      const contentType = validateResponse.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        console.error("[v0] Response is not JSON:", contentType)
+        setError("Server error: Invalid response format. Please try again.")
+        return
+      }
+
+      // Get response text first to debug
+      const responseText = await validateResponse.text()
+      console.log("[v0] Raw response text:", responseText)
+
+      if (!responseText) {
+        console.error("[v0] Empty response received")
+        setError("Server error: Empty response. Please try again.")
+        return
+      }
+
+      let validateResult
+      try {
+        validateResult = JSON.parse(responseText)
+      } catch (jsonError) {
+        console.error("[v0] JSON parsing error:", jsonError)
+        console.error("[v0] Response text that failed to parse:", responseText)
+        setError("Server error: Invalid response format. Please contact support.")
+        return
+      }
+
+      console.log("[v0] Parsed validation result:", validateResult)
 
       if (!validateResponse.ok) {
-        setError(validateResult.error)
+        setError(validateResult.error || "Email validation failed")
         return
       }
 
@@ -271,6 +325,7 @@ export default function LoginPage() {
       setOtpSent(true)
       setSuccessMessage("OTP sent to your email. Please check your inbox and enter the code below.")
     } catch (error: unknown) {
+      console.error("[v0] OTP send error:", error)
       setError(error instanceof Error ? error.message : "Failed to send OTP")
     } finally {
       setIsLoading(false)

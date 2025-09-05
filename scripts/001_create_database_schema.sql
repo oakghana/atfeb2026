@@ -274,24 +274,95 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-    INSERT INTO public.user_profiles (
-        id,
-        employee_id,
-        first_name,
-        last_name,
-        email,
-        role
-    )
-    VALUES (
-        NEW.id,
-        COALESCE(NEW.raw_user_meta_data ->> 'employee_id', 'EMP' || EXTRACT(EPOCH FROM NOW())::TEXT),
-        COALESCE(NEW.raw_user_meta_data ->> 'first_name', 'User'),
-        COALESCE(NEW.raw_user_meta_data ->> 'last_name', 'Name'),
-        NEW.email,
-        COALESCE(NEW.raw_user_meta_data ->> 'role', 'staff')
-    )
-    ON CONFLICT (id) DO NOTHING;
+    -- Try to create user profile, but don't fail if it errors
+    BEGIN
+        INSERT INTO public.user_profiles (
+            id,
+            employee_id,
+            first_name,
+            last_name,
+            email,
+            department_id,
+            position,
+            role,
+            is_active
+        )
+        VALUES (
+            NEW.id,
+            COALESCE(NEW.raw_user_meta_data ->> 'employee_id', 'EMP' || EXTRACT(EPOCH FROM NOW())::TEXT),
+            COALESCE(NEW.raw_user_meta_data ->> 'first_name', 'User'),
+            COALESCE(NEW.raw_user_meta_data ->> 'last_name', 'Name'),
+            NEW.email,
+            CASE 
+                WHEN NEW.raw_user_meta_data ->> 'department_id' IS NOT NULL 
+                AND NEW.raw_user_meta_data ->> 'department_id' != '' 
+                THEN (NEW.raw_user_meta_data ->> 'department_id')::UUID
+                ELSE NULL
+            END,
+            NEW.raw_user_meta_data ->> 'position',
+            COALESCE(NEW.raw_user_meta_data ->> 'role', 'staff'),
+            COALESCE((NEW.raw_user_meta_data ->> 'is_active')::BOOLEAN, false)
+        )
+        ON CONFLICT (id) DO UPDATE SET
+            employee_id = EXCLUDED.employee_id,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            email = EXCLUDED.email,
+            department_id = EXCLUDED.department_id,
+            position = EXCLUDED.position,
+            role = EXCLUDED.role,
+            is_active = EXCLUDED.is_active,
+            updated_at = NOW();
+        
+        -- Log successful user creation
+        INSERT INTO public.audit_logs (
+            user_id,
+            action,
+            table_name,
+            new_values,
+            created_at
+        )
+        VALUES (
+            NEW.id,
+            'user_signup_success',
+            'user_profiles',
+            jsonb_build_object(
+                'email', NEW.email,
+                'role', COALESCE(NEW.raw_user_meta_data ->> 'role', 'staff'),
+                'signup_method', 'email'
+            ),
+            NOW()
+        );
+        
+    EXCEPTION
+        WHEN OTHERS THEN
+            -- Log the error but don't fail the auth signup
+            BEGIN
+                INSERT INTO public.audit_logs (
+                    action,
+                    table_name,
+                    new_values,
+                    created_at
+                )
+                VALUES (
+                    'user_signup_error',
+                    'user_profiles',
+                    jsonb_build_object(
+                        'error', SQLERRM,
+                        'sqlstate', SQLSTATE,
+                        'email', NEW.email,
+                        'metadata', NEW.raw_user_meta_data
+                    ),
+                    NOW()
+                );
+            EXCEPTION
+                WHEN OTHERS THEN
+                    -- If even logging fails, just continue
+                    NULL;
+            END;
+    END;
     
+    -- Always return NEW to allow auth signup to succeed
     RETURN NEW;
 END;
 $$;

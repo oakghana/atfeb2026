@@ -1,0 +1,43 @@
+import { createClient } from "@/lib/supabase/server"
+import { redirect } from "next/navigation"
+import DashboardLayout from "@/components/dashboard/dashboard-layout"
+import UserManagementClient from "@/components/admin/user-management-client"
+
+export default async function UserManagementPage() {
+  const supabase = await createClient()
+
+  // Check authentication
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    redirect("/auth/login")
+  }
+
+  // Get user profile and check admin access
+  const { data: profile } = await supabase.from("user_profiles").select("*").eq("id", user.id).single()
+
+  if (!profile || !["admin", "department_head"].includes(profile.role)) {
+    redirect("/dashboard")
+  }
+
+  // Fetch unified user data
+  const { data: users, error: usersError } = await supabase
+    .from("unified_user_management")
+    .select("*")
+    .order("profile_created", { ascending: false })
+
+  // Fetch departments for user creation
+  const { data: departments } = await supabase
+    .from("departments")
+    .select("id, name, code")
+    .eq("is_active", true)
+    .order("name")
+
+  return (
+    <DashboardLayout user={profile}>
+      <UserManagementClient users={users || []} departments={departments || []} currentUserRole={profile.role} />
+    </DashboardLayout>
+  )
+}

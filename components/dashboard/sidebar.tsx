@@ -68,7 +68,7 @@ const navigationItems = [
     title: "Schedule",
     href: "/dashboard/schedule",
     icon: Calendar,
-    roles: ["admin", "department_head", "staff"],
+    roles: ["admin", "department_head"],
   },
   {
     title: "Reports",

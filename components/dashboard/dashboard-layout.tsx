@@ -37,3 +37,5 @@ export async function DashboardLayout({ children }: DashboardLayoutProps) {
     </div>
   )
 }
+
+export default DashboardLayout
