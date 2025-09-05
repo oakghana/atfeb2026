@@ -40,6 +40,7 @@ import {
   FileSpreadsheet,
   FileDown,
   MapPin,
+  Loader2,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -222,6 +223,8 @@ export function AttendanceReports() {
     setExportError(null)
 
     try {
+      console.log(`[v0] Starting ${format} export...`)
+
       if (format === "csv") {
         const csvContent = [
           [
@@ -239,60 +242,85 @@ export function AttendanceReports() {
           ...records.map((record) =>
             [
               new Date(record.check_in_time).toLocaleDateString(),
-              record.user_profiles.employee_id,
-              `${record.user_profiles.first_name} ${record.user_profiles.last_name}`,
-              record.user_profiles.departments?.name || "N/A",
-              record.user_profiles.districts?.name || "N/A",
-              record.geofence_locations?.name || "N/A",
-              new Date(record.check_in_time).toLocaleTimeString(),
-              record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : "N/A",
-              record.work_hours?.toFixed(2) || "N/A",
-              record.status,
+              `"${record.user_profiles.employee_id || "N/A"}"`,
+              `"${record.user_profiles.first_name} ${record.user_profiles.last_name}"`,
+              `"${record.user_profiles.departments?.name || "N/A"}"`,
+              `"${record.user_profiles.districts?.name || "N/A"}"`,
+              `"${record.geofence_locations?.name || "N/A"}"`,
+              `"${new Date(record.check_in_time).toLocaleTimeString()}"`,
+              `"${record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : "N/A"}"`,
+              record.work_hours?.toFixed(2) || "0",
+              `"${record.status}"`,
             ].join(","),
           ),
         ].join("\n")
 
-        const blob = new Blob([csvContent], { type: "text/csv" })
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement("a")
         a.href = url
         a.download = `qcc-attendance-report-${startDate.toISOString().split("T")[0]}-to-${endDate.toISOString().split("T")[0]}.csv`
+        document.body.appendChild(a)
         a.click()
+        document.body.removeChild(a)
         window.URL.revokeObjectURL(url)
+        console.log("[v0] CSV export completed successfully")
       } else {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
         const response = await fetch("/api/admin/reports/export", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
+          signal: controller.signal,
           body: JSON.stringify({
             format,
+            data: records,
+            summary,
             filters: {
               startDate: startDate.toISOString().split("T")[0],
               endDate: endDate.toISOString().split("T")[0],
               locationId: selectedLocation !== "all" ? selectedLocation : null,
               districtId: selectedDistrict !== "all" ? selectedDistrict : null,
               departmentId: selectedDepartment !== "all" ? selectedDepartment : null,
+              userId: selectedUser !== "all" ? selectedUser : null,
               reportType: "attendance",
             },
           }),
         })
 
+        clearTimeout(timeoutId)
+
         if (!response.ok) {
-          throw new Error("Export failed")
+          const errorText = await response.text()
+          console.error(`[v0] Export API error:`, errorText)
+          throw new Error(`Export failed: ${response.status} ${response.statusText}`)
         }
 
         const blob = await response.blob()
+        if (blob.size === 0) {
+          throw new Error("Export returned empty file")
+        }
+
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement("a")
         a.href = url
         a.download = `qcc-attendance-report-${startDate.toISOString().split("T")[0]}-to-${endDate.toISOString().split("T")[0]}.${format === "excel" ? "xlsx" : "pdf"}`
+        document.body.appendChild(a)
         a.click()
+        document.body.removeChild(a)
         window.URL.revokeObjectURL(url)
+        console.log(`[v0] ${format} export completed successfully`)
       }
     } catch (error) {
-      console.error("Export error:", error)
-      setExportError("Failed to export report. Please try again.")
+      console.error("[v0] Export error:", error)
+      if (error.name === "AbortError") {
+        setExportError("Export timed out. Please try again with a smaller date range.")
+      } else {
+        setExportError(`Failed to export ${format.toUpperCase()} report: ${error.message}`)
+      }
     } finally {
       setExporting(false)
     }
@@ -329,6 +357,7 @@ export function AttendanceReports() {
         <CardContent>
           {exportError && (
             <Alert variant="destructive" className="mb-4">
+              <AlertTriangle className="h-4 w-4" />
               <AlertDescription>{exportError}</AlertDescription>
             </Alert>
           )}
@@ -446,8 +475,17 @@ export function AttendanceReports() {
               <Label>Actions</Label>
               <div className="flex gap-1">
                 <Button onClick={fetchReport} size="sm" className="flex-1" disabled={loading}>
-                  <FileText className="mr-1 h-3 w-3" />
-                  {loading ? "Loading..." : "Generate"}
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="mr-1 h-3 w-3" />
+                      Generate
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -458,26 +496,31 @@ export function AttendanceReports() {
               onClick={() => exportReport("excel")}
               variant="outline"
               disabled={exporting || records.length === 0 || loading}
-              className="bg-green-50 hover:bg-green-100 border-green-200"
+              className="bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
             >
-              <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" />
+              {exporting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+              )}
               {exporting ? "Exporting..." : "Export Excel"}
             </Button>
             <Button
               onClick={() => exportReport("pdf")}
               variant="outline"
               disabled={exporting || records.length === 0 || loading}
-              className="bg-red-50 hover:bg-red-100 border-red-200"
+              className="bg-red-50 hover:bg-red-100 border-red-200 text-red-700"
             >
-              <FileDown className="mr-2 h-4 w-4 text-red-600" />
+              {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
               {exporting ? "Exporting..." : "Export PDF"}
             </Button>
             <Button
               onClick={() => exportReport("csv")}
               variant="outline"
               disabled={exporting || records.length === 0 || loading}
+              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
             >
-              <Download className="mr-2 h-4 w-4" />
+              {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               {exporting ? "Exporting..." : "Export CSV"}
             </Button>
           </div>
@@ -493,7 +536,6 @@ export function AttendanceReports() {
         </CardContent>
       </Card>
 
-      {/* Enhanced Summary Cards */}
       {summary && (
         <div className="grid gap-4 md:grid-cols-6">
           <Card>
@@ -510,11 +552,60 @@ export function AttendanceReports() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Records</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">{summary.totalRecords}</div>
               <p className="text-xs text-muted-foreground">Attendance entries</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-orange-50 to-yellow-50 border-orange-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-orange-800">Quick Select</CardTitle>
+              <CalendarIcon className="h-4 w-4 text-orange-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs h-6 text-orange-700 hover:bg-orange-100"
+                  onClick={() => {
+                    const today = new Date()
+                    setStartDate(today)
+                    setEndDate(today)
+                  }}
+                >
+                  Today
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs h-6 text-orange-700 hover:bg-orange-100"
+                  onClick={() => {
+                    const today = new Date()
+                    const weekStart = new Date(today.setDate(today.getDate() - today.getDay()))
+                    setStartDate(weekStart)
+                    setEndDate(new Date())
+                  }}
+                >
+                  This Week
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs h-6 text-orange-700 hover:bg-orange-100"
+                  onClick={() => {
+                    const today = new Date()
+                    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+                    setStartDate(monthStart)
+                    setEndDate(new Date())
+                  }}
+                >
+                  This Month
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -564,7 +655,6 @@ export function AttendanceReports() {
         </div>
       )}
 
-      {/* Enhanced Analytics with Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -739,7 +829,7 @@ export function AttendanceReports() {
                           <TableCell>
                             {record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : "N/A"}
                           </TableCell>
-                          <TableCell>{record.work_hours?.toFixed(2) || "N/A"}</TableCell>
+                          <TableCell>{record.work_hours?.toFixed(2) || "0"}</TableCell>
                           <TableCell>
                             <Badge variant={record.status === "present" ? "default" : "secondary"}>
                               {record.status.replace("_", " ")}

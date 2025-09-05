@@ -307,7 +307,7 @@ export default function LoginPage() {
         return
       }
 
-      console.log("[v0] Parsed validation result:", validateResult)
+      console.log("[v0] Parsed validation result:", validateResult.message)
 
       if (!validateResponse.ok) {
         setError(validateResult.error || "Email validation failed")
@@ -326,25 +326,58 @@ export default function LoginPage() {
 
       console.log("[v0] Email validated, sending OTP")
 
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: otpEmail,
-        options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
-        },
-      })
-      if (otpError) {
-        console.error("[v0] Supabase OTP error:", otpError)
-        throw otpError
+      try {
+        console.log("[v0] Calling Supabase signInWithOtp for email:", otpEmail)
+
+        const otpResult = await supabase.auth.signInWithOtp({
+          email: otpEmail,
+          options: {
+            emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
+          },
+        })
+
+        console.log("[v0] Supabase OTP result:", otpResult)
+
+        if (otpResult.error) {
+          console.error("[v0] Supabase OTP error details:", {
+            message: otpResult.error.message,
+            status: otpResult.error.status,
+            details: otpResult.error,
+          })
+
+          // Handle specific Supabase errors
+          if (otpResult.error.message.includes("Email rate limit exceeded")) {
+            throw new Error("Too many OTP requests. Please wait a few minutes before trying again.")
+          } else if (otpResult.error.message.includes("Invalid email")) {
+            throw new Error("Invalid email format. Please check your email address.")
+          } else if (otpResult.error.message.includes("User not found")) {
+            throw new Error("Email not found in the system. Please contact your administrator.")
+          } else {
+            throw new Error(`OTP sending failed: ${otpResult.error.message}`)
+          }
+        }
+
+        console.log("[v0] OTP sent successfully")
+        setOtpSent(true)
+        setSuccessMessage("OTP sent to your email. Please check your inbox and enter the code below.")
+      } catch (supabaseError) {
+        console.error("[v0] Supabase OTP call failed:", supabaseError)
+        throw supabaseError
       }
-      setOtpSent(true)
-      setSuccessMessage("OTP sent to your email. Please check your inbox and enter the code below.")
     } catch (error: unknown) {
       console.error("[v0] OTP send error:", error)
       if (error instanceof Error) {
         if (error.message.includes("Failed to fetch")) {
           setError("Network error: Unable to connect to server. Please check your internet connection and try again.")
-        } else {
+        } else if (
+          error.message.includes("OTP sending failed") ||
+          error.message.includes("Too many OTP requests") ||
+          error.message.includes("Invalid email") ||
+          error.message.includes("Email not found")
+        ) {
           setError(error.message)
+        } else {
+          setError(`Failed to send OTP: ${error.message}. Please try again or contact support.`)
         }
       } else {
         setError("Failed to send OTP. Please try again.")
