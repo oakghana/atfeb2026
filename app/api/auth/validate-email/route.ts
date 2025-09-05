@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
 const JSON_HEADERS = {
@@ -7,14 +6,18 @@ const JSON_HEADERS = {
 }
 
 export async function POST(request: NextRequest) {
+  const response = new NextResponse()
+  response.headers.set("Content-Type", "application/json")
+  response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate")
+
   try {
     console.log("[v0] Email validation API called")
 
-    // Parse request body with error handling
     let email: string
     try {
       const body = await request.json()
       email = body.email?.trim()?.toLowerCase()
+      console.log("[v0] Parsed email from request:", email)
     } catch (parseError) {
       console.error("[v0] Failed to parse request body:", parseError)
       return NextResponse.json({ error: "Invalid request body", exists: false }, { status: 400, headers: JSON_HEADERS })
@@ -27,7 +30,23 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Validating email:", email)
 
-    // Create Supabase client with error handling
+    let createClient
+    try {
+      const supabaseModule = await import("@/lib/supabase/server")
+      createClient = supabaseModule.createClient
+      console.log("[v0] Supabase module imported successfully")
+    } catch (importError) {
+      console.error("[v0] Failed to import Supabase module:", importError)
+      return NextResponse.json(
+        {
+          error: "Server configuration error",
+          exists: false,
+          details: "Failed to load database module",
+        },
+        { status: 500, headers: JSON_HEADERS },
+      )
+    }
+
     let supabase
     try {
       supabase = await createClient()
@@ -44,8 +63,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Query user profiles with comprehensive error handling
     try {
+      console.log("[v0] Querying user_profiles table for email:", email)
       const { data: user, error: queryError } = await supabase
         .from("user_profiles")
         .select("id, email, is_active, first_name, last_name")
@@ -119,4 +138,11 @@ export async function POST(request: NextRequest) {
       { status: 500, headers: JSON_HEADERS },
     )
   }
+}
+
+export async function GET() {
+  return NextResponse.json(
+    { error: "Method not allowed. Use POST to validate email." },
+    { status: 405, headers: JSON_HEADERS },
+  )
 }

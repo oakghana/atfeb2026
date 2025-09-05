@@ -2,6 +2,16 @@ import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 import { randomUUID } from "crypto"
 
+function createJSONResponse(data: any, status = 200) {
+  return new NextResponse(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-cache",
+    },
+  })
+}
+
 export async function GET(request: NextRequest) {
   try {
     console.log("[v0] Staff API - GET request received")
@@ -14,7 +24,12 @@ export async function GET(request: NextRequest) {
     } catch (error) {
       clientError = error
       console.error("[v0] Staff API - Failed to create Supabase client:", clientError)
-      return NextResponse.json({ error: "Database connection failed" }, { status: 500 })
+      return createJSONResponse({ error: "Database connection failed" }, 500)
+    }
+
+    if (!supabase) {
+      console.error("[v0] Staff API - Supabase client is null")
+      return createJSONResponse({ error: "Database client initialization failed" }, 500)
     }
 
     // Get authenticated user and check admin role
@@ -26,12 +41,12 @@ export async function GET(request: NextRequest) {
 
     if (authError) {
       console.error("[v0] Staff API - Auth error:", authError)
-      return NextResponse.json({ error: "Authentication failed" }, { status: 401 })
+      return createJSONResponse({ error: "Authentication failed" }, 401)
     }
 
     if (!user) {
       console.log("[v0] Staff API - No authenticated user")
-      return NextResponse.json({ error: "No authenticated user" }, { status: 401 })
+      return createJSONResponse({ error: "No authenticated user" }, 401)
     }
 
     console.log("[v0] Staff API - User authenticated:", user.id)
@@ -46,19 +61,19 @@ export async function GET(request: NextRequest) {
 
     if (profileFetchError) {
       console.error("[v0] Staff API - Profile fetch error:", profileFetchError)
-      return NextResponse.json({ error: "Failed to fetch user profile" }, { status: 500 })
+      return createJSONResponse({ error: "Failed to fetch user profile" }, 500)
     }
 
     if (!profile) {
       console.log("[v0] Staff API - No user profile found")
-      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
+      return createJSONResponse({ error: "User profile not found" }, 404)
     }
 
     console.log("[v0] Staff API - User role:", profile.role)
 
     if (!["admin", "department_head"].includes(profile.role)) {
       console.log("[v0] Staff API - Insufficient permissions for role:", profile.role)
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
+      return createJSONResponse({ error: "Insufficient permissions" }, 403)
     }
 
     // Get search parameters
@@ -99,7 +114,7 @@ export async function GET(request: NextRequest) {
 
     if (countError) {
       console.error("[v0] Staff API - Count query error:", countError)
-      return NextResponse.json({ error: "Failed to count staff records" }, { status: 500 })
+      return createJSONResponse({ error: "Failed to count staff records" }, 500)
     }
 
     console.log("[v0] Staff API - Total count:", count)
@@ -113,13 +128,13 @@ export async function GET(request: NextRequest) {
 
     if (staffError) {
       console.error("[v0] Staff fetch error:", staffError)
-      return NextResponse.json(
+      return createJSONResponse(
         {
           error: "Failed to fetch staff",
           details: staffError.message,
           code: staffError.code,
         },
-        { status: 500 },
+        500,
       )
     }
 
@@ -153,7 +168,7 @@ export async function GET(request: NextRequest) {
     )
 
     console.log("[v0] Staff API - Returning enriched data")
-    return NextResponse.json({
+    return createJSONResponse({
       success: true,
       data: staffWithDepartments,
       pagination: {
@@ -165,12 +180,14 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error("[v0] Staff API unexpected error:", error)
-    return NextResponse.json(
+    console.error("[v0] Staff API error stack:", error instanceof Error ? error.stack : "No stack trace")
+    return createJSONResponse(
       {
         error: "Internal server error",
         details: error instanceof Error ? error.message : "Unknown error",
+        timestamp: new Date().toISOString(),
       },
-      { status: 500 },
+      500,
     )
   }
 }
@@ -188,12 +205,12 @@ export async function POST(request: NextRequest) {
 
     if (authError) {
       console.error("[v0] Staff API - Auth error:", authError)
-      return NextResponse.json({ error: "Authentication failed" }, { status: 401 })
+      return createJSONResponse({ error: "Authentication failed" }, 401)
     }
 
     if (!user) {
       console.log("[v0] Staff API - No authenticated user")
-      return NextResponse.json({ error: "No authenticated user" }, { status: 401 })
+      return createJSONResponse({ error: "No authenticated user" }, 401)
     }
 
     console.log("[v0] Staff API - User authenticated:", user.id)
@@ -208,12 +225,12 @@ export async function POST(request: NextRequest) {
 
     if (profileFetchError) {
       console.error("[v0] Staff API - Profile fetch error:", profileFetchError)
-      return NextResponse.json({ error: "Failed to fetch user profile" }, { status: 500 })
+      return createJSONResponse({ error: "Failed to fetch user profile" }, 500)
     }
 
     if (!profile || profile.role !== "admin") {
       console.log("[v0] Staff API - Insufficient permissions for role:", profile.role)
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
+      return createJSONResponse({ error: "Insufficient permissions" }, 403)
     }
 
     const body = await request.json()
@@ -244,7 +261,7 @@ export async function POST(request: NextRequest) {
 
     if (insertProfileError) {
       console.error("Profile creation error:", insertProfileError)
-      return NextResponse.json({ error: "Failed to create user profile" }, { status: 400 })
+      return createJSONResponse({ error: "Failed to create user profile" }, 400)
     }
 
     console.log("[v0] Staff API - New user profile created:", newProfile)
@@ -259,19 +276,25 @@ export async function POST(request: NextRequest) {
     })
 
     console.log("[v0] Staff API - Staff member created successfully")
-    return NextResponse.json({
+    return createJSONResponse({
       success: true,
       data: newProfile,
       message: "Staff member created successfully. They need to sign up with their email to activate their account.",
     })
   } catch (error) {
     console.error("Create staff error:", error)
-    return NextResponse.json(
+    console.error("[v0] Staff API POST error stack:", error instanceof Error ? error.stack : "No stack trace")
+    return createJSONResponse(
       {
         error: "Internal server error",
         details: error instanceof Error ? error.message : "Unknown error",
+        timestamp: new Date().toISOString(),
       },
-      { status: 500 },
+      500,
     )
   }
+}
+
+export async function OPTIONS() {
+  return createJSONResponse({ message: "Method OPTIONS allowed" }, 200)
 }
