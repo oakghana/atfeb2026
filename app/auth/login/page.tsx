@@ -287,9 +287,20 @@ export default function LoginPage() {
 
       let validateResponse
       try {
+        // Test basic connectivity first
+        console.log("[v0] Testing API connectivity...")
+        const connectivityTest = await fetch("/api/auth/validate-email", {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        })
+        console.log("[v0] Connectivity test response:", connectivityTest.status)
+
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
+        console.log("[v0] Making POST request to validate email...")
         validateResponse = await fetch("/api/auth/validate-email", {
           method: "POST",
           headers: {
@@ -302,16 +313,26 @@ export default function LoginPage() {
         })
 
         clearTimeout(timeoutId)
-        console.log("[v0] Fetch completed successfully")
+        console.log("[v0] Fetch completed successfully, status:", validateResponse.status)
       } catch (fetchError) {
         console.error("[v0] Fetch failed:", fetchError)
-        if (fetchError instanceof Error && fetchError.name === "AbortError") {
-          showError("Request timeout. Please try again.", "Timeout Error")
+
+        if (fetchError instanceof Error) {
+          if (fetchError.name === "AbortError") {
+            showError("Request timeout. The server is taking too long to respond. Please try again.", "Timeout Error")
+          } else if (fetchError.message.includes("Failed to fetch")) {
+            // This is the specific error we're getting
+            showError(
+              "Unable to connect to the authentication server. This may be a temporary network issue. Please check your internet connection and try again in a few moments.",
+              "Connection Error",
+            )
+          } else if (fetchError.message.includes("NetworkError")) {
+            showError("Network error occurred. Please check your internet connection and try again.", "Network Error")
+          } else {
+            showError(`Connection failed: ${fetchError.message}. Please try again.`, "Connection Error")
+          }
         } else {
-          showError(
-            "Network error: Unable to connect to server. Please check your internet connection and try again.",
-            "Connection Error",
-          )
+          showError("Unknown network error. Please try again.", "Network Error")
         }
         return
       }
@@ -418,9 +439,9 @@ export default function LoginPage() {
     } catch (error: unknown) {
       console.error("[v0] OTP send error:", error)
       if (error instanceof Error) {
-        if (error.message.includes("Failed to fetch")) {
+        if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
           showError(
-            "Network error: Unable to connect to server. Please check your internet connection and try again.",
+            "Network connectivity issue. Please check your internet connection and try again. If the problem persists, contact IT support.",
             "Connection Error",
           )
         } else if (
