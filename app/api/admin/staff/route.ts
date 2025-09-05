@@ -39,10 +39,25 @@ export async function GET(request: NextRequest) {
 
     console.log("[v0] Staff API - User authenticated:", user.id)
 
-    // Simple query without complex joins
     const { data: staff, error: staffError } = await supabase
       .from("user_profiles")
-      .select("*")
+      .select(`
+        id,
+        employee_id,
+        first_name,
+        last_name,
+        email,
+        phone,
+        department_id,
+        position,
+        role,
+        hire_date,
+        is_active,
+        profile_image_url,
+        assigned_location_id,
+        created_at,
+        updated_at
+      `)
       .order("created_at", { ascending: false })
 
     if (staffError) {

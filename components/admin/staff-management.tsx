@@ -71,6 +71,9 @@ export function StaffManagement() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
+  const [notifications, setNotifications] = useState<Array<{ id: string; message: string; type: "success" | "error" }>>(
+    [],
+  )
 
   const [newStaff, setNewStaff] = useState({
     email: "",
@@ -164,6 +167,7 @@ export function StaffManagement() {
       console.log("[v0] Add staff result:", result)
 
       if (result.success) {
+        addNotification("Staff member added successfully", "success")
         setSuccess("Staff member added successfully")
         setIsAddDialogOpen(false)
         setNewStaff({
@@ -179,11 +183,14 @@ export function StaffManagement() {
         })
         fetchStaff()
       } else {
+        addNotification(result.error || "Failed to add staff member", "error")
         setError(result.error)
       }
     } catch (error) {
       console.error("[v0] Add staff exception:", error)
-      setError("Failed to add staff member")
+      const errorMessage = "Failed to add staff member"
+      addNotification(errorMessage, "error")
+      setError(errorMessage)
     }
   }
 
@@ -201,15 +208,18 @@ export function StaffManagement() {
       console.log("[v0] Update staff result:", result)
 
       if (result.success) {
+        addNotification("Staff member updated successfully", "success")
         setSuccess("Staff member updated successfully")
-        setEditingStaff(null)
         fetchStaff()
       } else {
+        addNotification(result.error || "Failed to update staff member", "error")
         setError(result.error)
       }
     } catch (error) {
-      console.error("[v0] Update staff exception:", error)
-      setError("Failed to update staff member")
+      console.error("[v0] Update exception:", error)
+      const errorMessage = "Failed to update staff member"
+      addNotification(errorMessage, "error")
+      setError(errorMessage)
     }
   }
 
@@ -225,13 +235,17 @@ export function StaffManagement() {
       const result = await response.json()
 
       if (result.success) {
+        addNotification("Staff member deactivated successfully", "success")
         setSuccess("Staff member deactivated successfully")
         fetchStaff()
       } else {
+        addNotification(result.error || "Failed to deactivate staff member", "error")
         setError(result.error)
       }
     } catch (error) {
-      setError("Failed to deactivate staff member")
+      const errorMessage = "Failed to deactivate staff member"
+      addNotification(errorMessage, "error")
+      setError(errorMessage)
     }
   }
 
@@ -240,6 +254,15 @@ export function StaffManagement() {
 
     try {
       setError(null)
+
+      if (!editingStaff.assigned_location_id || editingStaff.assigned_location_id === "none") {
+        const headOfficeLocation = locations.find((loc) => loc.name.toLowerCase().includes("head office"))
+        if (!headOfficeLocation) {
+          addNotification("Please assign a location to this staff member", "error")
+          return
+        }
+      }
+
       const updateData = {
         first_name: editingStaff.first_name,
         last_name: editingStaff.last_name,
@@ -261,25 +284,57 @@ export function StaffManagement() {
       })
 
       console.log("[v0] Update response status:", response.status)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("[v0] Update response error:", errorText)
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
       const result = await response.json()
       console.log("[v0] Update response data:", result)
 
       if (result.success) {
+        addNotification("Staff member updated successfully", "success")
         setSuccess("Staff member updated successfully")
         setEditingStaff(null)
         fetchStaff()
       } else {
         console.error("[v0] Update failed:", result.error)
-        setError(result.error || "Failed to update staff member")
+        const errorMessage = result.error || "Failed to update staff member"
+        addNotification(errorMessage, "error")
+        setError(errorMessage)
       }
     } catch (error) {
       console.error("[v0] Update exception:", error)
-      setError("Failed to update staff member")
+      const errorMessage = error instanceof Error ? error.message : "Failed to update staff member"
+      addNotification(errorMessage, "error")
+      setError(errorMessage)
     }
+  }
+
+  const addNotification = (message: string, type: "success" | "error") => {
+    const id = crypto.randomUUID()
+    setNotifications((prev) => [...prev, { id, message, type }])
+    setTimeout(() => {
+      setNotifications((prev) => prev.filter((n) => n.id !== id))
+    }, 5000)
   }
 
   return (
     <div className="space-y-6">
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {notifications.map((notification) => (
+          <Alert
+            key={notification.id}
+            variant={notification.type === "error" ? "destructive" : "default"}
+            className="w-80 shadow-lg"
+          >
+            <AlertDescription>{notification.message}</AlertDescription>
+          </Alert>
+        ))}
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -289,18 +344,7 @@ export function StaffManagement() {
           <CardDescription>Manage QCC staff members, roles, and location assignments</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {success && (
-            <Alert>
-              <AlertDescription>{success}</AlertDescription>
-            </Alert>
-          )}
-
+          {/* Removed error and success alerts as they are now handled by notifications */}
           {/* Filters and Actions */}
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="flex gap-2 flex-1">
@@ -460,22 +504,28 @@ export function StaffManagement() {
                       <Select
                         value={newStaff.assigned_location_id}
                         onValueChange={(value) => setNewStaff({ ...newStaff, assigned_location_id: value })}
+                        required
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Location (Optional)" />
+                        <SelectTrigger className="border-2 border-secondary/50">
+                          <SelectValue placeholder="Select Location (Required)" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">No Location Assigned</SelectItem>
-                          {locations.map((location) => (
-                            <SelectItem key={location.id} value={location.id}>
-                              <div className="flex items-center gap-2">
-                                <MapPin className="h-3 w-3" />
-                                {location.name} - {location.address}
-                              </div>
-                            </SelectItem>
-                          ))}
+                          {locations
+                            .filter((location) => !location.name.toLowerCase().includes("head office"))
+                            .map((location) => (
+                              <SelectItem key={location.id} value={location.id}>
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="h-3 w-3" />
+                                  {location.name} - {location.address}
+                                </div>
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Each staff member must be assigned to their actual work location for accurate attendance
+                        tracking
+                      </p>
                     </div>
                   </div>
                   <DialogFooter>
@@ -586,24 +636,32 @@ export function StaffManagement() {
                     <Select
                       value={editingStaff.assigned_location_id || "none"}
                       onValueChange={(value) => setEditingStaff({ ...editingStaff, assigned_location_id: value })}
+                      required
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Location (Optional)" />
+                      <SelectTrigger className="border-2 border-secondary/50">
+                        <SelectValue placeholder="Select Location (Required)" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">No Location Assigned</SelectItem>
-                        {locations.map((location) => (
-                          <SelectItem key={location.id} value={location.id}>
-                            <div className="flex items-center gap-1 text-sm">
-                              <MapPin className="h-3 w-3 text-muted-foreground" />
-                              <span className="truncate max-w-32" title={location.address}>
-                                {location.name}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="none" disabled>
+                          <span className="text-muted-foreground">Select a location</span>
+                        </SelectItem>
+                        {locations
+                          .filter((location) => !location.name.toLowerCase().includes("head office"))
+                          .map((location) => (
+                            <SelectItem key={location.id} value={location.id}>
+                              <div className="flex items-center gap-1 text-sm">
+                                <MapPin className="h-3 w-3 text-muted-foreground" />
+                                <span className="truncate max-w-32" title={location.address}>
+                                  {location.name}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Staff must be assigned to their actual work location
+                    </p>
                   </div>
                 </div>
                 <DialogFooter>

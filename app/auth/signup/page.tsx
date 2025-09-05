@@ -262,20 +262,26 @@ export default function SignupPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="region" className="text-sm font-medium text-foreground">
-                  QCC Location
+                  QCC Location *
                 </Label>
-                <Select onValueChange={(value) => handleInputChange("region", value)}>
+                <Select onValueChange={(value) => handleInputChange("region", value)} required>
                   <SelectTrigger className="h-11 border-2 focus:border-secondary">
-                    <SelectValue placeholder="Select your QCC location" />
+                    <SelectValue placeholder="Select your actual QCC work location" />
                   </SelectTrigger>
                   <SelectContent>
-                    {qccRegions.map((region) => (
-                      <SelectItem key={region} value={region}>
-                        {region}
-                      </SelectItem>
-                    ))}
+                    {qccRegions
+                      .filter((region) => region !== "Head Office")
+                      .map((region) => (
+                        <SelectItem key={region} value={region}>
+                          {region}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Select your actual work location for accurate attendance tracking. Head Office assignments are handled
+                  separately by administrators.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

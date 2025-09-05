@@ -1,9 +1,28 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("[v0] Admin password reset: Missing Supabase credentials")
+      return NextResponse.json({ error: "Server configuration error" }, { status: 500 })
+    }
+
+    // Create admin client with service role key
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    // Create regular client for user verification
+    const { createClient: createRegularClient } = await import("@/lib/supabase/server")
+    const supabase = await createRegularClient()
+
     const { userId, newPassword } = await request.json()
 
     console.log("[v0] Admin password reset: Received request for userId:", userId)
@@ -16,7 +35,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Password must be at least 6 characters long" }, { status: 400 })
     }
 
-    // Verify admin access
+    // Verify admin access using regular client
     const {
       data: { user },
       error: authError,
@@ -52,13 +71,18 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Admin password reset: Found target user:", targetUser.email)
 
-    const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       password: newPassword,
     })
 
     if (updateError) {
       console.error("[v0] Admin password reset: Update error:", updateError)
-      return NextResponse.json({ error: "Failed to update password" }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: `Failed to update password: ${updateError.message}`,
+        },
+        { status: 500 },
+      )
     }
 
     console.log("[v0] Admin password reset: Password updated successfully for:", targetUser.email)
