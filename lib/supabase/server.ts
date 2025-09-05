@@ -44,25 +44,15 @@ export async function createClient() {
 
     let cookieStore
     try {
-      const cookiePromise = cookies()
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Cookie timeout")), 5000))
-
-      cookieStore = await Promise.race([cookiePromise, timeoutPromise])
+      cookieStore = await cookies()
       console.log("[v0] Cookie store obtained successfully")
     } catch (cookieError) {
-      console.error("[v0] Failed to get cookie store, using fallback:", cookieError)
+      console.error("[v0] Failed to get cookie store:", cookieError)
+      // Create a fallback cookie store that doesn't throw errors
       cookieStore = {
-        getAll: () => {
-          console.log("[v0] Using fallback getAll for cookies")
-          return []
-        },
-        set: (name: string, value: string, options?: any) => {
-          console.log("[v0] Using fallback set for cookie:", name)
-        },
-        get: (name: string) => {
-          console.log("[v0] Using fallback get for cookie:", name)
-          return undefined
-        },
+        getAll: () => [],
+        set: () => {},
+        get: () => undefined,
       }
     }
 

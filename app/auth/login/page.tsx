@@ -259,11 +259,22 @@ export default function LoginPage() {
     try {
       console.log("[v0] Validating email before sending OTP:", otpEmail)
 
-      const validateResponse = await fetch("/api/auth/validate-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: otpEmail }),
-      })
+      let validateResponse
+      try {
+        validateResponse = await fetch("/api/auth/validate-email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ email: otpEmail }),
+        })
+        console.log("[v0] Fetch completed successfully")
+      } catch (fetchError) {
+        console.error("[v0] Fetch failed:", fetchError)
+        setError("Network error: Unable to connect to server. Please check your internet connection and try again.")
+        return
+      }
 
       console.log("[v0] Validate response status:", validateResponse.status)
       console.log("[v0] Validate response headers:", validateResponse.headers.get("content-type"))
@@ -315,18 +326,29 @@ export default function LoginPage() {
 
       console.log("[v0] Email validated, sending OTP")
 
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error: otpError } = await supabase.auth.signInWithOtp({
         email: otpEmail,
         options: {
           emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
         },
       })
-      if (error) throw error
+      if (otpError) {
+        console.error("[v0] Supabase OTP error:", otpError)
+        throw otpError
+      }
       setOtpSent(true)
       setSuccessMessage("OTP sent to your email. Please check your inbox and enter the code below.")
     } catch (error: unknown) {
       console.error("[v0] OTP send error:", error)
-      setError(error instanceof Error ? error.message : "Failed to send OTP")
+      if (error instanceof Error) {
+        if (error.message.includes("Failed to fetch")) {
+          setError("Network error: Unable to connect to server. Please check your internet connection and try again.")
+        } else {
+          setError(error.message)
+        }
+      } else {
+        setError("Failed to send OTP. Please try again.")
+      }
     } finally {
       setIsLoading(false)
     }

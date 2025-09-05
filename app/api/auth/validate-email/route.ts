@@ -6,10 +6,7 @@ const JSON_HEADERS = {
 }
 
 export async function POST(request: NextRequest) {
-  // Ensure we always return a JSON response, even if there are critical errors
   try {
-    console.log("[v0] Email validation API called - starting request processing")
-
     const response = new NextResponse()
     response.headers.set("Content-Type", "application/json")
     response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -148,22 +145,15 @@ export async function POST(request: NextRequest) {
         },
       )
     }
-  } catch (criticalError) {
-    console.error("[v0] Critical API error - returning emergency response:", criticalError)
-    // Emergency response to prevent "Failed to fetch"
-    return new Response(
-      JSON.stringify({
-        error: "Service temporarily unavailable",
-        exists: false,
-        details: "Please try again in a moment",
-      }),
+  } catch (error) {
+    console.error("[v0] Email validation unexpected error:", error)
+    return NextResponse.json(
       {
-        status: 503,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-        },
+        error: "Internal server error",
+        exists: false,
+        details: error instanceof Error ? error.message : "Unknown error",
       },
+      { status: 500, headers: JSON_HEADERS },
     )
   }
 }
@@ -173,15 +163,4 @@ export async function GET() {
     { error: "Method not allowed. Use POST to validate email." },
     { status: 405, headers: JSON_HEADERS },
   )
-}
-
-export async function OPTIONS() {
-  return new Response(null, {
-    status: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
-  })
 }
