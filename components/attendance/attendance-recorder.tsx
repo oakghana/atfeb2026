@@ -413,7 +413,7 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
             Location Status
           </CardTitle>
           <CardDescription>
-            Your current location relative to QCC campuses (20m precision required)
+            Your current location relative to QCC Stations/Locations (20m precision required)
             <br />
             <span className="text-sm text-muted-foreground">
               You can check in/out at any QCC location, not just your assigned one
