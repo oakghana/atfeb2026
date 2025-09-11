@@ -210,18 +210,18 @@ export function PersonalAttendanceHistory() {
     }
   }
 
-  const statusChartData = summary
+  const statusChartData = summary?.statusCounts
     ? Object.entries(summary.statusCounts).map(([status, count]) => ({
         name: status.replace("_", " "),
         value: count,
       }))
     : []
 
-  const monthlyChartData = summary
+  const monthlyChartData = summary?.monthlyStats
     ? Object.entries(summary.monthlyStats).map(([month, stats]) => ({
         name: month,
-        records: stats.count,
-        hours: Math.round(stats.totalHours * 100) / 100,
+        records: stats?.count || 0,
+        hours: Math.round((stats?.totalHours || 0) * 100) / 100,
       }))
     : []
 
@@ -394,7 +394,7 @@ export function PersonalAttendanceHistory() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">{summary.totalRecords}</div>
+              <div className="text-2xl font-bold text-primary">{summary?.totalRecords || 0}</div>
               <p className="text-xs text-muted-foreground">Attendance entries</p>
             </CardContent>
           </Card>
@@ -405,7 +405,7 @@ export function PersonalAttendanceHistory() {
               <CheckCircle className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{summary.statusCounts.present || 0}</div>
+              <div className="text-2xl font-bold text-green-600">{summary?.statusCounts?.present || 0}</div>
               <p className="text-xs text-muted-foreground">On time arrivals</p>
             </CardContent>
           </Card>
@@ -416,7 +416,7 @@ export function PersonalAttendanceHistory() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">{Math.round(summary.totalWorkHours)}</div>
+              <div className="text-2xl font-bold text-primary">{Math.round(summary?.totalWorkHours || 0)}</div>
               <p className="text-xs text-muted-foreground">Work hours logged</p>
             </CardContent>
           </Card>
@@ -427,7 +427,7 @@ export function PersonalAttendanceHistory() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">{summary.averageWorkHours.toFixed(1)}</div>
+              <div className="text-2xl font-bold text-primary">{(summary?.averageWorkHours || 0).toFixed(1)}</div>
               <p className="text-xs text-muted-foreground">Per day average</p>
             </CardContent>
           </Card>

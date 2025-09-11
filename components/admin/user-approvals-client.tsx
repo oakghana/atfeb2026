@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { UserCheck, UserX, Search, Filter, Clock, CheckCircle, XCircle } from "lucide-react"
+import { safeObjectAccess, createAbortController, safeAsyncOperation } from "@/lib/safe-utils"
 
 interface PendingUser {
   id: string
@@ -31,6 +32,7 @@ export function UserApprovalsClient() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [processingUsers, setProcessingUsers] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetchPendingUsers()
@@ -41,6 +43,8 @@ export function UserApprovalsClient() {
   }, [pendingUsers, searchTerm, statusFilter])
 
   const fetchPendingUsers = async () => {
+    const controller = createAbortController(15000)
+
     try {
       console.log("[v0] Fetching pending users...")
       const supabase = createClient()
@@ -61,6 +65,7 @@ export function UserApprovalsClient() {
         `)
         .eq("is_active", false)
         .order("created_at", { ascending: false })
+        .abortSignal(controller.signal)
 
       console.log("[v0] Query result:", { data, error })
 
@@ -72,7 +77,12 @@ export function UserApprovalsClient() {
       const formattedUsers =
         data?.map((user) => ({
           ...user,
-          department_name: user.departments?.name || "No Department",
+          first_name: user.first_name || "Unknown",
+          last_name: user.last_name || "User",
+          email: user.email || "No email",
+          employee_id: user.employee_id || "No ID",
+          position: user.position || "No position",
+          department_name: safeObjectAccess(user, "departments.name") || "No Department",
           region: "Ghana", // Default region since it's not in user_profiles
           approval_status: "pending" as const,
         })) || []
@@ -81,7 +91,12 @@ export function UserApprovalsClient() {
       setPendingUsers(formattedUsers)
     } catch (error) {
       console.error("[v0] Error fetching pending users:", error)
-      setError(`Failed to load pending users: ${error.message || "Unknown error"}`)
+      if (error instanceof Error && error.name === "AbortError") {
+        setError("Request timed out. Please refresh the page.")
+      } else {
+        const message = error instanceof Error ? error.message : "Unknown error"
+        setError(`Failed to load pending users: ${message}`)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -91,12 +106,13 @@ export function UserApprovalsClient() {
     let filtered = pendingUsers
 
     if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
       filtered = filtered.filter(
         (user) =>
-          user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.employee_id.toLowerCase().includes(searchTerm.toLowerCase()),
+          user.first_name?.toLowerCase().includes(searchLower) ||
+          user.last_name?.toLowerCase().includes(searchLower) ||
+          user.email?.toLowerCase().includes(searchLower) ||
+          user.employee_id?.toLowerCase().includes(searchLower),
       )
     }
 
@@ -108,6 +124,14 @@ export function UserApprovalsClient() {
   }
 
   const handleApproval = async (userId: string, approve: boolean) => {
+    if (processingUsers.has(userId)) {
+      return
+    }
+
+    setProcessingUsers((prev) => new Set(prev).add(userId))
+
+    const controller = createAbortController(10000)
+
     try {
       console.log(`[v0] ${approve ? "Approving" : "Rejecting"} user:`, userId)
       const supabase = createClient()
@@ -119,25 +143,30 @@ export function UserApprovalsClient() {
           updated_at: new Date().toISOString(),
         })
         .eq("id", userId)
+        .abortSignal(controller.signal)
 
       if (error) {
         console.error("[v0] Error updating user:", error)
         throw error
       }
 
-      try {
-        await supabase.from("audit_logs").insert({
-          user_id: userId,
-          action: approve ? "user_approved" : "user_rejected",
-          table_name: "user_profiles",
-          new_values: { is_active: approve },
-          ip_address: "admin_action",
-          user_agent: "admin_dashboard",
-        })
-      } catch (auditError) {
-        console.warn("[v0] Failed to log audit entry:", auditError)
-        // Don't fail the main operation if audit logging fails
-      }
+      await safeAsyncOperation(
+        async () => {
+          await supabase.from("audit_logs").insert({
+            user_id: userId,
+            action: approve ? "user_approved" : "user_rejected",
+            table_name: "user_profiles",
+            new_values: { is_active: approve },
+            ip_address: "admin_action",
+            user_agent: "admin_dashboard",
+          })
+        },
+        undefined,
+        (auditError) => {
+          console.warn("[v0] Failed to log audit entry:", auditError)
+          // Don't fail the main operation if audit logging fails
+        },
+      )
 
       // Refresh the list
       await fetchPendingUsers()
@@ -146,7 +175,18 @@ export function UserApprovalsClient() {
       console.log(`[v0] User ${approve ? "approved" : "rejected"} successfully`)
     } catch (error) {
       console.error(`[v0] Error ${approve ? "approving" : "rejecting"} user:`, error)
-      setError(`Failed to ${approve ? "approve" : "reject"} user: ${error.message || "Unknown error"}`)
+      if (error instanceof Error && error.name === "AbortError") {
+        setError("Request timed out. Please try again.")
+      } else {
+        const message = error instanceof Error ? error.message : "Unknown error"
+        setError(`Failed to ${approve ? "approve" : "reject"} user: ${message}`)
+      }
+    } finally {
+      setProcessingUsers((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(userId)
+        return newSet
+      })
     }
   }
 
@@ -197,6 +237,7 @@ export function UserApprovalsClient() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
+                maxLength={100}
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -231,40 +272,51 @@ export function UserApprovalsClient() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="font-medium">
-                          {user.first_name} {user.last_name}
+                {filteredUsers.map((user) => {
+                  const isProcessing = processingUsers.has(user.id)
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="font-medium">
+                            {user.first_name} {user.last_name}
+                          </div>
+                          <div className="text-sm text-muted-foreground">{user.email}</div>
+                          <div className="text-xs text-muted-foreground">
+                            ID: {user.employee_id} • {user.position}
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
-                        <div className="text-xs text-muted-foreground">
-                          ID: {user.employee_id} • {user.position}
+                      </TableCell>
+                      <TableCell>{user.department_name}</TableCell>
+                      <TableCell>{user.region}</TableCell>
+                      <TableCell>
+                        {user.created_at ? new Date(user.created_at).toLocaleDateString() : "Unknown"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleApproval(user.id, true)}
+                            className="bg-green-600 hover:bg-green-700"
+                            disabled={isProcessing}
+                          >
+                            <UserCheck className="h-4 w-4 mr-1" />
+                            {isProcessing ? "Processing..." : "Approve"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleApproval(user.id, false)}
+                            disabled={isProcessing}
+                          >
+                            <UserX className="h-4 w-4 mr-1" />
+                            {isProcessing ? "Processing..." : "Reject"}
+                          </Button>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{user.department_name}</TableCell>
-                    <TableCell>{user.region}</TableCell>
-                    <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => handleApproval(user.id, true)}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          <UserCheck className="h-4 w-4 mr-1" />
-                          Approve
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => handleApproval(user.id, false)}>
-                          <UserX className="h-4 w-4 mr-1" />
-                          Reject
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           )}

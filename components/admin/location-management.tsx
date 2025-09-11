@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-
+import { safeParseFloat, safeParseInt, createAbortController } from "@/lib/safe-utils"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -72,26 +72,64 @@ export function LocationManagement() {
     setLoading(true)
     setError(null)
 
+    const latitude = safeParseFloat(newLocation.latitude)
+    const longitude = safeParseFloat(newLocation.longitude)
+    const radiusMeters = safeParseInt(newLocation.radius_meters)
+
+    if (latitude === null || longitude === null || radiusMeters === null) {
+      setError("Please enter valid numeric values for coordinates and radius")
+      setLoading(false)
+      return
+    }
+
+    if (latitude < -90 || latitude > 90) {
+      setError("Latitude must be between -90 and 90 degrees")
+      setLoading(false)
+      return
+    }
+
+    if (longitude < -180 || longitude > 180) {
+      setError("Longitude must be between -180 and 180 degrees")
+      setLoading(false)
+      return
+    }
+
+    if (radiusMeters < 1 || radiusMeters > 10000) {
+      setError("Radius must be between 1 and 10,000 meters")
+      setLoading(false)
+      return
+    }
+
+    const controller = createAbortController(10000)
+
     try {
       const response = await fetch("/api/admin/locations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...newLocation,
-          latitude: Number.parseFloat(newLocation.latitude),
-          longitude: Number.parseFloat(newLocation.longitude),
-          radius_meters: Number.parseInt(newLocation.radius_meters),
+          latitude,
+          longitude,
+          radius_meters: radiusMeters,
         }),
+        signal: controller.signal,
       })
 
-      if (!response.ok) throw new Error("Failed to add location")
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Failed to add location" }))
+        throw new Error(errorData.error || "Failed to add location")
+      }
 
       setSuccess("Location added successfully")
       await fetchLocations()
       setIsAddingLocation(false)
       setNewLocation({ name: "", address: "", latitude: "", longitude: "", radius_meters: "100" })
     } catch (err) {
-      setError("Failed to add location")
+      if (err instanceof Error && err.name === "AbortError") {
+        setError("Request timed out. Please try again.")
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to add location")
+      }
     } finally {
       setLoading(false)
     }
@@ -160,32 +198,54 @@ export function LocationManagement() {
   }
 
   const getCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          if (editingLocation) {
-            setEditingLocation((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                  }
-                : null,
-            )
-          } else {
-            setNewLocation((prev) => ({
-              ...prev,
-              latitude: position.coords.latitude.toString(),
-              longitude: position.coords.longitude.toString(),
-            }))
-          }
-        },
-        () => {
-          setError("Failed to get current location")
-        },
-      )
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by this browser")
+      return
     }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+
+        if (editingLocation) {
+          setEditingLocation((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  latitude,
+                  longitude,
+                }
+              : null,
+          )
+        } else {
+          setNewLocation((prev) => ({
+            ...prev,
+            latitude: latitude.toString(),
+            longitude: longitude.toString(),
+          }))
+        }
+      },
+      (error) => {
+        let message = "Failed to get current location"
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            message = "Location access denied by user"
+            break
+          case error.POSITION_UNAVAILABLE:
+            message = "Location information unavailable"
+            break
+          case error.TIMEOUT:
+            message = "Location request timed out"
+            break
+        }
+        setError(message)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      },
+    )
   }
 
   if (loading) {
