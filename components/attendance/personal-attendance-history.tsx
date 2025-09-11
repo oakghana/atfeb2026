@@ -34,7 +34,6 @@ import {
   Loader2,
   Navigation,
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 
 interface AttendanceRecord {
   id: string
@@ -92,82 +91,27 @@ export function PersonalAttendanceHistory() {
     setError(null)
 
     try {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const response = await fetch(`/api/attendance/personal?startDate=${startDate}&endDate=${endDate}`)
 
-      if (!user) {
-        setError("User not authenticated")
-        return
+      if (!response.ok) {
+        throw new Error("Failed to fetch attendance data")
       }
 
-      const { data: attendanceData, error: attendanceError } = await supabase
-        .from("attendance_records")
-        .select(`
-          id,
-          check_in_time,
-          check_out_time,
-          work_hours,
-          status,
-          check_in_method,
-          check_out_method,
-          check_in_location_name,
-          check_out_location_name,
-          is_remote_location,
-          geofence_locations!check_in_location_id (
-            name,
-            address
-          ),
-          checkout_location:geofence_locations!check_out_location_id (
-            name,
-            address
-          )
-        `)
-        .eq("user_id", user.id)
-        .gte("check_in_time", `${startDate}T00:00:00`)
-        .lte("check_in_time", `${endDate}T23:59:59`)
-        .order("check_in_time", { ascending: false })
+      const data = await response.json()
 
-      if (attendanceError) throw attendanceError
+      if (data.error) {
+        throw new Error(data.error)
+      }
 
-      setRecords(attendanceData || [])
+      setRecords(data.records || [])
 
-      if (attendanceData && attendanceData.length > 0) {
-        const totalRecords = attendanceData.length
-        const totalWorkHours = attendanceData.reduce((sum, record) => sum + (record.work_hours || 0), 0)
-        const averageWorkHours = totalWorkHours / totalRecords
-
-        const statusCounts = attendanceData.reduce(
-          (acc, record) => {
-            acc[record.status] = (acc[record.status] || 0) + 1
-            return acc
-          },
-          {} as Record<string, number>,
-        )
-
-        const monthlyStats = attendanceData.reduce(
-          (acc, record) => {
-            const month = new Date(record.check_in_time).toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "short",
-            })
-            if (!acc[month]) {
-              acc[month] = { count: 0, totalHours: 0 }
-            }
-            acc[month].count += 1
-            acc[month].totalHours += record.work_hours || 0
-            return acc
-          },
-          {} as Record<string, { count: number; totalHours: number }>,
-        )
-
+      if (data.summary) {
         setSummary({
-          totalRecords,
-          totalWorkHours,
-          averageWorkHours,
-          statusCounts,
-          monthlyStats,
+          totalRecords: data.summary.totalDays,
+          totalWorkHours: data.summary.totalHours,
+          averageWorkHours: data.summary.averageHours,
+          statusCounts: data.summary.statusCounts,
+          monthlyStats: data.summary.monthlyStats,
         })
       } else {
         setSummary(null)

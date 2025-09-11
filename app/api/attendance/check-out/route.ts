@@ -68,7 +68,6 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
       check_out_method: qr_code_used ? "qr_code" : "gps",
       check_out_location_name: checkoutLocationData?.name || null,
-      different_checkout_location: attendanceRecord.check_in_location_id !== location_id,
     }
 
     // Add GPS coordinates only if available
@@ -81,6 +80,8 @@ export async function POST(request: NextRequest) {
     if (qr_code_used && qr_timestamp) {
       checkoutData.qr_check_out_timestamp = qr_timestamp
     }
+
+    const isDifferentLocation = attendanceRecord.check_in_location_id !== location_id
 
     // Update attendance record
     const { data: updatedRecord, error: updateError } = await supabase
@@ -116,14 +117,14 @@ export async function POST(request: NextRequest) {
         checkout_location_name: checkoutLocationData?.name,
         checkout_district_name: checkoutLocationData?.districts?.name,
         check_out_method: checkoutData.check_out_method,
-        different_checkout_location: checkoutData.different_checkout_location,
+        different_checkout_location: isDifferentLocation,
         work_hours_calculated: workHours,
       },
       ip_address: request.ip || null,
       user_agent: request.headers.get("user-agent"),
     })
 
-    const locationMessage = checkoutData.different_checkout_location
+    const locationMessage = isDifferentLocation
       ? `Checked out at ${checkoutLocationData?.name} (different from check-in location: ${attendanceRecord.geofence_locations?.name})`
       : `Checked out at ${checkoutLocationData?.name}`
 
@@ -134,7 +135,7 @@ export async function POST(request: NextRequest) {
         location_tracking: {
           check_in_location: attendanceRecord.geofence_locations?.name,
           check_out_location: checkoutLocationData?.name,
-          different_locations: checkoutData.different_checkout_location,
+          different_locations: isDifferentLocation,
           check_out_method: checkoutData.check_out_method,
           work_hours: workHours,
         },
