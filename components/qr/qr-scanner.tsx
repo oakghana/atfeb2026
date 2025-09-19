@@ -88,10 +88,10 @@ export function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Scan QR Code</CardTitle>
-            <CardDescription>Scan the location QR code to check in</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Scan QR Code</CardTitle>
+            <CardDescription className="text-sm">Scan the location QR code to check in</CardDescription>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={onClose} className="touch-manipulation">
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -99,20 +99,20 @@ export function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
       <CardContent className="space-y-4">
         {error && (
           <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="text-sm">{error}</AlertDescription>
           </Alert>
         )}
 
         {success && (
           <Alert>
             <CheckCircle className="h-4 w-4" />
-            <AlertDescription>{success}</AlertDescription>
+            <AlertDescription className="text-sm">{success}</AlertDescription>
           </Alert>
         )}
 
         {!isScanning ? (
           <div className="space-y-4">
-            <Button onClick={startScanning} className="w-full">
+            <Button onClick={startScanning} className="w-full touch-manipulation h-12">
               <Camera className="h-4 w-4 mr-2" />
               Start Camera
             </Button>
@@ -121,7 +121,7 @@ export function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
 
             <div>
               <label htmlFor="qr-upload" className="block">
-                <Button variant="outline" className="w-full bg-transparent" asChild>
+                <Button variant="outline" className="w-full bg-transparent touch-manipulation h-12" asChild>
                   <span>Upload QR Code Image</span>
                 </Button>
               </label>
@@ -133,11 +133,11 @@ export function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
             <div className="relative aspect-square bg-black rounded-lg overflow-hidden">
               <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
               <div className="absolute inset-0 border-2 border-primary/50 rounded-lg">
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-primary rounded-lg"></div>
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 sm:w-48 sm:h-48 border-2 border-primary rounded-lg"></div>
               </div>
             </div>
 
-            <Button onClick={stopScanning} variant="outline" className="w-full bg-transparent">
+            <Button onClick={stopScanning} variant="outline" className="w-full bg-transparent touch-manipulation h-12">
               Stop Scanning
             </Button>
           </div>

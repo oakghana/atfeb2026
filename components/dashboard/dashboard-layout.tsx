@@ -29,10 +29,15 @@ export async function DashboardLayout({ children }: DashboardLayoutProps) {
     .single()
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background/98 to-muted/10">
       <Sidebar user={data.user} profile={profile} />
       <div className="lg:pl-64">
-        <main className="p-6 lg:p-8">{children}</main>
+        <main className="p-6 lg:p-12 max-w-7xl mx-auto">
+          <div className="relative">
+            {children}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] via-transparent to-accent/[0.02] pointer-events-none -z-10 rounded-3xl" />
+          </div>
+        </main>
       </div>
     </div>
   )

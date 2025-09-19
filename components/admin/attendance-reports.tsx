@@ -46,6 +46,10 @@ interface AttendanceRecord {
   check_out_time?: string
   work_hours?: number
   status: string
+  check_in_location_name?: string
+  check_out_location_name?: string
+  is_check_in_outside_location?: boolean
+  is_check_out_outside_location?: boolean
   user_profiles: {
     first_name: string
     last_name: string
@@ -54,9 +58,21 @@ interface AttendanceRecord {
       name: string
       code: string
     }
+    assigned_location?: {
+      name: string
+      address: string
+    }
     districts?: {
       name: string
     }
+  }
+  check_in_location?: {
+    name: string
+    address: string
+  }
+  check_out_location?: {
+    name: string
+    address: string
   }
   geofence_locations?: {
     name: string
@@ -228,12 +244,16 @@ export function AttendanceReports() {
             "Employee ID",
             "Name",
             "Department",
-            "District",
-            "Location",
-            "Check In",
-            "Check Out",
+            "Assigned Location",
+            "Check In Time",
+            "Check In Location",
+            "Check In Status",
+            "Check Out Time",
+            "Check Out Location",
+            "Check Out Status",
             "Work Hours",
             "Status",
+            "Location Status",
           ].join(","),
           ...records.map((record) =>
             [
@@ -241,12 +261,16 @@ export function AttendanceReports() {
               `"${record.user_profiles.employee_id || "N/A"}"`,
               `"${record.user_profiles.first_name} ${record.user_profiles.last_name}"`,
               `"${record.user_profiles.departments?.name || "N/A"}"`,
-              `"${record.user_profiles.districts?.name || "N/A"}"`,
-              `"${record.geofence_locations?.name || "N/A"}"`,
+              `"${record.user_profiles.assigned_location?.name || "N/A"}"`,
               `"${new Date(record.check_in_time).toLocaleTimeString()}"`,
+              `"${record.check_in_location?.name || record.check_in_location_name || "N/A"}"`,
+              `"${record.is_check_in_outside_location ? "Outside Assigned Location" : "On-site"}"`,
               `"${record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : "N/A"}"`,
+              `"${record.check_out_location?.name || record.check_out_location_name || "N/A"}"`,
+              `"${record.is_check_out_outside_location ? "Outside Assigned Location" : "On-site"}"`,
               record.work_hours?.toFixed(2) || "0",
               `"${record.status}"`,
+              `"${record.is_check_in_outside_location || record.is_check_out_outside_location ? "Remote Work" : "On-site"}"`,
             ].join(","),
           ),
         ].join("\n")
@@ -777,7 +801,9 @@ export function AttendanceReports() {
           <Card>
             <CardHeader>
               <CardTitle>Detailed Attendance Records</CardTitle>
-              <CardDescription>Complete attendance entries for the selected period</CardDescription>
+              <CardDescription>
+                Complete attendance entries for the selected period with location tracking
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="border rounded-lg">
@@ -788,22 +814,24 @@ export function AttendanceReports() {
                       <TableHead>Employee</TableHead>
                       <TableHead>Department</TableHead>
                       <TableHead>Check In</TableHead>
+                      <TableHead>Check In Location</TableHead>
                       <TableHead>Check Out</TableHead>
+                      <TableHead>Check Out Location</TableHead>
                       <TableHead>Hours</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Location</TableHead>
+                      <TableHead>Location Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8">
+                        <TableCell colSpan={10} className="text-center py-8">
                           Loading records...
                         </TableCell>
                       </TableRow>
                     ) : records.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8">
+                        <TableCell colSpan={10} className="text-center py-8">
                           No records found for the selected period
                         </TableCell>
                       </TableRow>
@@ -817,12 +845,39 @@ export function AttendanceReports() {
                                 {record.user_profiles.first_name} {record.user_profiles.last_name}
                               </div>
                               <div className="text-sm text-muted-foreground">{record.user_profiles.employee_id}</div>
+                              {record.user_profiles.assigned_location && (
+                                <div className="text-xs text-blue-600">
+                                  Assigned: {record.user_profiles.assigned_location.name}
+                                </div>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>{record.user_profiles.departments?.name || "N/A"}</TableCell>
                           <TableCell>{new Date(record.check_in_time).toLocaleTimeString()}</TableCell>
                           <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span>{record.check_in_location?.name || record.check_in_location_name || "N/A"}</span>
+                              {record.is_check_in_outside_location && (
+                                <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
+                                  <MapPin className="h-3 w-3 mr-1" />
+                                  Outside
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
                             {record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span>{record.check_out_location?.name || record.check_out_location_name || "N/A"}</span>
+                              {record.is_check_out_outside_location && (
+                                <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
+                                  <MapPin className="h-3 w-3 mr-1" />
+                                  Outside
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>{record.work_hours?.toFixed(2) || "0"}</TableCell>
                           <TableCell>
@@ -830,7 +885,19 @@ export function AttendanceReports() {
                               {record.status.replace("_", " ")}
                             </Badge>
                           </TableCell>
-                          <TableCell>{record.geofence_locations?.name || "N/A"}</TableCell>
+                          <TableCell>
+                            {record.is_check_in_outside_location || record.is_check_out_outside_location ? (
+                              <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Remote Work
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                On-site
+                              </Badge>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))
                     )}

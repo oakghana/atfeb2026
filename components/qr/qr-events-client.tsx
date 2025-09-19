@@ -105,18 +105,17 @@ export function QREventsClient() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">QR Events</h1>
-          <p className="text-muted-foreground">Manage QR code-based event attendance</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">QR Events</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage QR code-based event attendance</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setShowScanner(true)} variant="outline">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button onClick={() => setShowScanner(true)} variant="outline" className="touch-manipulation">
             <QrCode className="h-4 w-4 mr-2" />
             Scan QR
           </Button>
-          <Button onClick={() => setShowCreateForm(true)}>
+          <Button onClick={() => setShowCreateForm(true)} className="touch-manipulation">
             <Plus className="h-4 w-4 mr-2" />
             Create Event
           </Button>
@@ -136,7 +135,7 @@ export function QREventsClient() {
                   placeholder="Search by title or location..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 touch-manipulation"
                 />
               </div>
             </div>
@@ -152,7 +151,7 @@ export function QREventsClient() {
             <CardDescription>Set up a new event with QR code attendance tracking</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="title">Event Title</Label>
                 <Input
@@ -160,6 +159,7 @@ export function QREventsClient() {
                   value={newEvent.title}
                   onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
                   placeholder="Enter event title"
+                  className="touch-manipulation"
                 />
               </div>
               <div>
@@ -169,6 +169,7 @@ export function QREventsClient() {
                   value={newEvent.location}
                   onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
                   placeholder="Event location"
+                  className="touch-manipulation"
                 />
               </div>
             </div>
@@ -180,6 +181,7 @@ export function QREventsClient() {
                 onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
                 placeholder="Event description"
                 rows={3}
+                className="touch-manipulation"
               />
             </div>
             <div>
@@ -189,11 +191,14 @@ export function QREventsClient() {
                 type="datetime-local"
                 value={newEvent.event_date}
                 onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
+                className="touch-manipulation"
               />
             </div>
-            <div className="flex gap-2">
-              <Button onClick={createEvent}>Create Event</Button>
-              <Button variant="outline" onClick={() => setShowCreateForm(false)}>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button onClick={createEvent} className="touch-manipulation">
+                Create Event
+              </Button>
+              <Button variant="outline" onClick={() => setShowCreateForm(false)} className="touch-manipulation">
                 Cancel
               </Button>
             </div>
@@ -201,17 +206,20 @@ export function QREventsClient() {
         </Card>
       )}
 
-      {/* QR Scanner Modal */}
       {showScanner && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Scan QR Code</CardTitle>
               <CardDescription>Position the QR code within the camera frame</CardDescription>
             </CardHeader>
             <CardContent>
               <QRScanner onScan={handleQRScan} />
-              <Button variant="outline" onClick={() => setShowScanner(false)} className="w-full mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowScanner(false)}
+                className="w-full mt-4 touch-manipulation"
+              >
                 Cancel
               </Button>
             </CardContent>
@@ -231,7 +239,7 @@ export function QREventsClient() {
                   {searchTerm ? "No events match your search criteria." : "Create your first QR event to get started."}
                 </p>
                 {!searchTerm && (
-                  <Button onClick={() => setShowCreateForm(true)}>
+                  <Button onClick={() => setShowCreateForm(true)} className="touch-manipulation">
                     <Plus className="h-4 w-4 mr-2" />
                     Create First Event
                   </Button>
@@ -243,38 +251,40 @@ export function QREventsClient() {
           filteredEvents.map((event) => (
             <Card key={event.id}>
               <CardContent className="pt-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-lg font-semibold">{event.title}</h3>
-                      <Badge variant={event.is_active ? "default" : "secondary"}>
-                        {event.is_active ? "Active" : "Inactive"}
-                      </Badge>
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                        <h3 className="text-lg font-semibold">{event.title}</h3>
+                        <Badge variant={event.is_active ? "default" : "secondary"}>
+                          {event.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                      <p className="text-muted-foreground text-sm sm:text-base">{event.description}</p>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          {new Date(event.event_date).toLocaleDateString()}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          {event.location}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Users className="h-4 w-4" />
+                          {event.attendees_count || 0} attendees
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-muted-foreground mb-3">{event.description}</p>
-                    <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {new Date(event.event_date).toLocaleDateString()}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        {event.location}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        {event.attendees_count || 0} attendees
-                      </div>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button variant="outline" size="sm" className="touch-manipulation bg-transparent">
+                        <QrCode className="h-4 w-4 mr-2" />
+                        View QR
+                      </Button>
+                      <Button variant="outline" size="sm" className="touch-manipulation bg-transparent">
+                        Edit
+                      </Button>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      <QrCode className="h-4 w-4 mr-2" />
-                      View QR
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      Edit
-                    </Button>
                   </div>
                 </div>
               </CardContent>

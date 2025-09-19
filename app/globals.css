@@ -4,125 +4,100 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* QCC Modern Theme - Enhanced with Dark Orange Variations */
-  --background: oklch(0.99 0.005 120); /* Subtle light green tint */
-  --foreground: oklch(0.15 0.02 140); /* Deep forest green */
-  --card: oklch(0.985 0.008 110); /* Very light green card background */
-  --card-foreground: oklch(0.2 0.015 135); /* Dark green-gray */
-  --popover: oklch(0.99 0.005 120); /* Light green popover */
-  --popover-foreground: oklch(0.15 0.02 140); /* Deep forest green */
+  /* QCC Professional Theme - Green and Orange */
+  --background: oklch(0.99 0.005 120); /* Clean white with subtle green tint */
+  --foreground: oklch(0.15 0.02 140); /* Dark gray-green for text */
+  --card: oklch(1 0 0); /* Pure white cards */
+  --card-foreground: oklch(0.15 0.02 140); /* Dark text on cards */
+  --popover: oklch(1 0 0); /* White popover */
+  --popover-foreground: oklch(0.15 0.02 140); /* Dark text */
 
-  /* Updated primary to use modern light green */
-  --primary: oklch(0.55 0.12 140); /* Modern light green #22C55E */
-  --primary-foreground: oklch(0.99 0.005 120); /* Light background */
+  /* Updated primary to QCC green from the image */
+  --primary: oklch(0.45 0.15 140); /* QCC Green #4A7C59 */
+  --primary-foreground: oklch(0.98 0 0); /* White text on green */
 
-  /* Updated secondary to use warm yellow */
-  --secondary: oklch(0.85 0.08 85); /* Warm yellow #FDE047 */
-  --secondary-foreground: oklch(0.2 0.015 135); /* Dark text */
+  /* Updated secondary to light gray */
+  --secondary: oklch(0.96 0.005 120); /* Light gray-green */
+  --secondary-foreground: oklch(0.15 0.02 140); /* Dark text */
 
-  --muted: oklch(0.96 0.01 115); /* Very light green-gray */
-  --muted-foreground: oklch(0.45 0.01 130); /* Medium gray-green */
+  --muted: oklch(0.96 0.005 120); /* Light muted background */
+  --muted-foreground: oklch(0.45 0.02 140); /* Medium gray text */
 
-  /* Enhanced dark orange accent variations */
-  --accent: oklch(0.65 0.15 45); /* Dark orange #EA580C */
-  --accent-foreground: oklch(0.99 0.005 120); /* Light text */
-  --accent-hover: oklch(0.7 0.18 45); /* Brighter orange on hover */
-  --accent-light: oklch(0.85 0.1 50); /* Light orange variant */
-  --accent-dark: oklch(0.55 0.2 40); /* Darker orange variant */
+  /* Updated accent to QCC orange from the image */
+  --accent: oklch(0.65 0.15 45); /* QCC Orange #E67E22 */
+  --accent-foreground: oklch(0.98 0 0); /* White text on orange */
+  --accent-hover: oklch(0.6 0.18 45); /* Darker orange on hover */
 
-  --destructive: oklch(0.577 0.245 27.325); /* Red for destructive actions */
-  --destructive-foreground: oklch(0.99 0.005 120); /* Light text */
-  --border: oklch(0.92 0.01 120); /* Light green border */
-  --input: oklch(0.98 0.005 115); /* Light input background */
-  --ring: oklch(0.55 0.12 140); /* Light green ring */
+  --destructive: oklch(0.55 0.2 25); /* Red for destructive actions */
+  --destructive-foreground: oklch(0.98 0 0); /* White text */
+  --border: oklch(0.92 0.01 120); /* Light border */
+  --input: oklch(0.98 0.005 120); /* Input background */
+  --ring: oklch(0.45 0.15 140); /* Green focus ring */
 
-  /* Enhanced chart colors with more orange variations */
-  --chart-1: oklch(0.55 0.12 140); /* Light green */
-  --chart-2: oklch(0.85 0.08 85); /* Yellow */
-  --chart-3: oklch(0.65 0.15 45); /* Dark orange */
-  --chart-4: oklch(0.7 0.18 50); /* Bright orange */
-  --chart-5: oklch(0.6 0.2 40); /* Deep orange */
-  --chart-6: oklch(0.8 0.12 55); /* Light orange */
+  /* Updated chart colors to match QCC theme */
+  --chart-1: oklch(0.45 0.15 140); /* QCC Green */
+  --chart-2: oklch(0.65 0.15 45); /* QCC Orange */
+  --chart-3: oklch(0.35 0.12 140); /* Dark green */
+  --chart-4: oklch(0.75 0.12 45); /* Light orange */
+  --chart-5: oklch(0.55 0.18 140); /* Medium green */
 
-  /* Increased border radius for ultra-modern look */
-  --radius: 1rem; /* More modern rounded corners */
+  --radius: 0.5rem; /* Standard border radius */
 
-  /* Enhanced sidebar with orange accents */
-  --sidebar: oklch(0.97 0.01 125); /* Light green sidebar */
-  --sidebar-foreground: oklch(0.2 0.015 135); /* Dark green text */
-  --sidebar-primary: oklch(0.55 0.12 140); /* Light green primary */
-  --sidebar-primary-foreground: oklch(0.99 0.005 120); /* Light text */
-  --sidebar-accent: oklch(0.65 0.15 45); /* Dark orange accent */
-  --sidebar-accent-foreground: oklch(0.99 0.005 120); /* Light text */
-  --sidebar-border: oklch(0.9 0.015 120); /* Light green border */
-  --sidebar-ring: oklch(0.65 0.15 45); /* Orange ring */
+  /* Updated sidebar colors to match the image */
+  --sidebar: oklch(0.98 0.005 120); /* Light sidebar background */
+  --sidebar-foreground: oklch(0.15 0.02 140); /* Dark text */
+  --sidebar-primary: oklch(0.45 0.15 140); /* Green primary */
+  --sidebar-primary-foreground: oklch(0.98 0 0); /* White text */
+  --sidebar-accent: oklch(0.65 0.15 45); /* Orange accent */
+  --sidebar-accent-foreground: oklch(0.98 0 0); /* White text */
+  --sidebar-border: oklch(0.92 0.01 120); /* Light border */
+  --sidebar-ring: oklch(0.45 0.15 140); /* Green ring */
 
-  /* Added modern glass and shadow effects */
-  --glass-bg: oklch(0.99 0.005 120 / 0.8); /* Glassmorphism background */
-  --shadow-sm: 0 2px 8px oklch(0.2 0.01 140 / 0.1);
-  --shadow-md: 0 4px 16px oklch(0.2 0.01 140 / 0.15);
-  --shadow-lg: 0 8px 32px oklch(0.2 0.01 140 / 0.2);
-  --shadow-orange: 0 4px 16px oklch(0.65 0.15 45 / 0.3);
+  /* Professional shadows */
+  --shadow-sm: 0 1px 3px oklch(0.2 0.01 140 / 0.1);
+  --shadow-md: 0 4px 12px oklch(0.2 0.01 140 / 0.15);
+  --shadow-lg: 0 8px 24px oklch(0.2 0.01 140 / 0.2);
 }
 
 .dark {
-  /* Enhanced dark theme with more orange elements */
-  --background: oklch(0.08 0.01 140); /* Dark green background */
-  --foreground: oklch(0.95 0.01 120); /* Light green foreground */
-  --card: oklch(0.12 0.015 135); /* Dark green card */
-  --card-foreground: oklch(0.95 0.01 120); /* Light text */
-  --popover: oklch(0.1 0.01 140); /* Dark popover */
-  --popover-foreground: oklch(0.95 0.01 120); /* Light text */
+  /* Dark theme with QCC colors */
+  --background: oklch(0.12 0.02 140); /* Dark green background */
+  --foreground: oklch(0.95 0.005 120); /* Light text */
+  --card: oklch(0.15 0.02 140); /* Dark cards */
+  --card-foreground: oklch(0.95 0.005 120); /* Light text */
+  --popover: oklch(0.15 0.02 140); /* Dark popover */
+  --popover-foreground: oklch(0.95 0.005 120); /* Light text */
 
-  --primary: oklch(0.6 0.15 140); /* Brighter light green for dark mode */
-  --primary-foreground: oklch(0.08 0.01 140); /* Dark background */
+  --primary: oklch(0.55 0.18 140); /* Brighter green for dark mode */
+  --primary-foreground: oklch(0.12 0.02 140); /* Dark text */
 
-  --secondary: oklch(0.75 0.12 85); /* Muted yellow for dark mode */
-  --secondary-foreground: oklch(0.08 0.01 140); /* Dark text */
+  --secondary: oklch(0.2 0.02 140); /* Dark secondary */
+  --secondary-foreground: oklch(0.95 0.005 120); /* Light text */
 
-  --muted: oklch(0.18 0.01 135); /* Dark muted */
-  --muted-foreground: oklch(0.65 0.01 125); /* Light muted text */
+  --muted: oklch(0.2 0.02 140); /* Dark muted */
+  --muted-foreground: oklch(0.65 0.02 140); /* Medium text */
 
-  /* Enhanced dark mode orange variations */
-  --accent: oklch(0.7 0.18 45); /* Brighter orange for dark mode */
-  --accent-foreground: oklch(0.08 0.01 140); /* Dark text */
-  --accent-hover: oklch(0.75 0.2 45); /* Even brighter on hover */
-  --accent-light: oklch(0.8 0.15 50); /* Light orange for dark mode */
-  --accent-dark: oklch(0.6 0.22 40); /* Darker orange variant */
+  --accent: oklch(0.7 0.18 45); /* Bright orange for dark mode */
+  --accent-foreground: oklch(0.12 0.02 140); /* Dark text */
 
-  --destructive: oklch(0.6 0.2 25); /* Brighter red for dark mode */
-  --destructive-foreground: oklch(0.95 0.01 120); /* Light text */
+  --destructive: oklch(0.6 0.22 25); /* Bright red */
+  --destructive-foreground: oklch(0.95 0.005 120); /* Light text */
 
-  --border: oklch(0.2 0.01 135); /* Dark border */
-  --input: oklch(0.15 0.01 135); /* Dark input */
-  --ring: oklch(0.7 0.18 45); /* Orange ring for dark mode */
+  --border: oklch(0.25 0.02 140); /* Dark border */
+  --input: oklch(0.18 0.02 140); /* Dark input */
+  --ring: oklch(0.55 0.18 140); /* Green ring */
 
-  --chart-1: oklch(0.6 0.15 140); /* Bright light green */
-  --chart-2: oklch(0.75 0.12 85); /* Muted yellow */
-  --chart-3: oklch(0.7 0.18 45); /* Bright orange */
-  --chart-4: oklch(0.75 0.2 50); /* Brighter orange */
-  --chart-5: oklch(0.65 0.22 40); /* Deep orange */
-  --chart-6: oklch(0.8 0.15 55); /* Light orange */
-
-  --sidebar: oklch(0.1 0.01 140); /* Dark sidebar */
-  --sidebar-foreground: oklch(0.9 0.01 120); /* Light text */
-  --sidebar-primary: oklch(0.6 0.15 140); /* Bright green */
-  --sidebar-primary-foreground: oklch(0.08 0.01 140); /* Dark text */
-  --sidebar-accent: oklch(0.7 0.18 45); /* Bright orange accent */
-  --sidebar-accent-foreground: oklch(0.08 0.01 140); /* Dark text */
-  --sidebar-border: oklch(0.2 0.01 135); /* Dark border */
-  --sidebar-ring: oklch(0.7 0.18 45); /* Orange ring */
-
-  /* Dark mode glass and shadow effects */
-  --glass-bg: oklch(0.12 0.015 135 / 0.8); /* Dark glassmorphism */
-  --shadow-sm: 0 2px 8px oklch(0.05 0.01 140 / 0.3);
-  --shadow-md: 0 4px 16px oklch(0.05 0.01 140 / 0.4);
-  --shadow-lg: 0 8px 32px oklch(0.05 0.01 140 / 0.5);
-  --shadow-orange: 0 4px 16px oklch(0.7 0.18 45 / 0.4);
+  --sidebar: oklch(0.15 0.02 140); /* Dark sidebar */
+  --sidebar-foreground: oklch(0.95 0.005 120); /* Light text */
+  --sidebar-primary: oklch(0.55 0.18 140); /* Bright green */
+  --sidebar-primary-foreground: oklch(0.12 0.02 140); /* Dark text */
+  --sidebar-accent: oklch(0.7 0.18 45); /* Bright orange */
+  --sidebar-accent-foreground: oklch(0.12 0.02 140); /* Dark text */
+  --sidebar-border: oklch(0.25 0.02 140); /* Dark border */
+  --sidebar-ring: oklch(0.55 0.18 140); /* Green ring */
 }
 
 @theme inline {
-  /* Added new color variables for enhanced theming */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -137,9 +112,6 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-light: var(--accent-light);
-  --color-accent-dark: var(--accent-dark);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
@@ -150,12 +122,10 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --color-chart-6: var(--chart-6);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -172,63 +142,5 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Added smooth transitions for modern feel */
-    transition: background-color 0.3s ease, color 0.3s ease;
-  }
-
-  /* Added modern utility classes for enhanced UI */
-  .glass-effect {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    border: 1px solid oklch(from var(--border) l c h / 0.2);
-  }
-
-  .shadow-modern {
-    box-shadow: var(--shadow-md);
-  }
-
-  .shadow-orange {
-    box-shadow: var(--shadow-orange);
-  }
-
-  .gradient-orange {
-    background: linear-gradient(135deg, var(--accent-light), var(--accent-dark));
-  }
-
-  .hover-lift {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .hover-lift:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-  }
-
-  /* Enhanced button styles with orange accents */
-  .btn-orange {
-    background: var(--accent);
-    color: var(--accent-foreground);
-    border-radius: var(--radius);
-    transition: all 0.2s ease;
-  }
-
-  .btn-orange:hover {
-    background: var(--accent-hover);
-    box-shadow: var(--shadow-orange);
-    transform: translateY(-1px);
-  }
-
-  /* Modern card enhancements */
-  .card-modern {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    transition: all 0.3s ease;
-  }
-
-  .card-modern:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
   }
 }

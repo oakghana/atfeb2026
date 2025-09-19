@@ -37,7 +37,11 @@ export async function GET(request: NextRequest) {
       .from("attendance_records")
       .select(`
         *,
-        geofence_locations!check_in_location_id (
+        check_in_location:geofence_locations!check_in_location_id (
+          name,
+          address
+        ),
+        check_out_location:geofence_locations!check_out_location_id (
           name,
           address
         )
@@ -59,6 +63,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userIds = [...new Set(attendanceRecords.map((record) => record.user_id))]
+
     const { data: userProfiles } = await supabase
       .from("user_profiles")
       .select(`
@@ -67,9 +72,14 @@ export async function GET(request: NextRequest) {
         last_name,
         employee_id,
         department_id,
+        assigned_location_id,
         departments (
           name,
           code
+        ),
+        assigned_location:geofence_locations!assigned_location_id (
+          name,
+          address
         )
       `)
       .in("id", userIds)
@@ -95,10 +105,27 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const enrichedRecords = filteredRecords.map((record) => ({
-      ...record,
-      user_profiles: userMap.get(record.user_id) || null,
-    }))
+    const enrichedRecords = filteredRecords.map((record) => {
+      const userProfile = userMap.get(record.user_id)
+
+      // Determine if check-in/check-out was outside assigned location
+      const isCheckInOutsideLocation =
+        userProfile?.assigned_location_id && record.check_in_location_id !== userProfile.assigned_location_id
+
+      const isCheckOutOutsideLocation =
+        userProfile?.assigned_location_id &&
+        record.check_out_location_id &&
+        record.check_out_location_id !== userProfile.assigned_location_id
+
+      return {
+        ...record,
+        user_profiles: userProfile || null,
+        is_check_in_outside_location: isCheckInOutsideLocation,
+        is_check_out_outside_location: isCheckOutOutsideLocation,
+        // Keep backward compatibility
+        geofence_locations: record.check_in_location,
+      }
+    })
 
     // Calculate summary statistics
     const totalRecords = enrichedRecords.length

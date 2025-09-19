@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
 import {
   Home,
   Clock,
@@ -29,6 +30,8 @@ import {
   Upload,
   Shield,
   UserCheck,
+  User,
+  ChevronRight,
 } from "lucide-react"
 import Image from "next/image"
 import { createClient } from "@/lib/supabase/client"
@@ -57,66 +60,77 @@ const navigationItems = [
     href: "/dashboard",
     icon: Home,
     roles: ["admin", "department_head", "staff"],
+    category: "main",
   },
   {
     title: "Attendance",
     href: "/dashboard/attendance",
     icon: Clock,
     roles: ["admin", "department_head", "staff"],
+    category: "main",
   },
   {
     title: "Schedule",
     href: "/dashboard/schedule",
     icon: Calendar,
     roles: ["admin", "department_head"],
+    category: "main",
   },
   {
     title: "Reports",
     href: "/dashboard/reports",
     icon: BarChart3,
     roles: ["admin", "department_head", "staff"],
+    category: "main",
   },
   {
     title: "Locations",
     href: "/dashboard/locations",
     icon: MapPin,
     roles: ["admin"],
+    category: "admin",
   },
   {
     title: "QR Events",
     href: "/dashboard/qr-events",
     icon: QrCode,
     roles: ["admin", "department_head"],
+    category: "admin",
   },
   {
     title: "Staff Management",
     href: "/dashboard/staff",
     icon: Users,
     roles: ["admin"],
+    category: "admin",
   },
   {
     title: "Staff Activation",
     href: "/dashboard/staff-activation",
     icon: UserCheck,
     roles: ["admin"],
+    category: "admin",
   },
   {
     title: "Data Management",
     href: "/dashboard/data-management",
     icon: Upload,
     roles: ["admin"],
+    category: "admin",
   },
   {
     title: "Audit Logs",
     href: "/dashboard/audit-logs",
     icon: Shield,
     roles: ["admin"],
+    category: "admin",
   },
   {
     title: "Settings",
     href: "/dashboard/settings",
     icon: Settings,
     roles: ["admin", "department_head", "staff"],
+    category: "settings",
   },
 ]
 
@@ -145,95 +159,218 @@ export function Sidebar({ user, profile }: SidebarProps) {
 
   const filteredNavItems = navigationItems.filter((item) => item.roles.includes(profile?.role || "staff"))
 
+  const mainItems = filteredNavItems.filter((item) => item.category === "main")
+  const adminItems = filteredNavItems.filter((item) => item.category === "admin")
+  const settingsItems = filteredNavItems.filter((item) => item.category === "settings")
+
   const userInitials = profile ? `${profile.first_name[0]}${profile.last_name[0]}` : "U"
 
   return (
     <>
-      {/* Mobile menu button */}
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <Button
           variant="outline"
           size="icon"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="bg-background/95 backdrop-blur"
+          className="bg-background/95 backdrop-blur-xl shadow-xl border-border/50 hover:bg-background hover:shadow-2xl transition-all duration-300"
         >
           {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </Button>
       </div>
 
-      {/* Sidebar */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 bg-sidebar border-r border-sidebar-border transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 w-64 bg-gradient-to-b from-sidebar to-sidebar/95 backdrop-blur-xl border-r border-sidebar-border/50 shadow-2xl transform transition-all duration-300 ease-out lg:translate-x-0",
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center gap-3 p-6 border-b border-sidebar-border">
-            <Image src="/images/qcc-logo.png" alt="QCC Logo" width={40} height={40} className="rounded-full" />
+          <div className="flex items-center gap-3 p-6 border-b border-sidebar-border/50 bg-gradient-to-r from-primary/5 to-accent/5">
+            <div className="relative p-2 bg-gradient-to-br from-primary/10 to-accent/10 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105">
+              <Image src="/images/qcc-logo.png" alt="QCC Logo" width={36} height={36} className="rounded-lg" />
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent rounded-xl opacity-0 hover:opacity-100 transition-opacity duration-300" />
+            </div>
             <div>
-              <h2 className="font-semibold text-sidebar-foreground">QCC Attendance</h2>
-              <p className="text-xs text-muted-foreground">Electronic System</p>
+              <h2 className="font-bold text-sidebar-foreground text-lg tracking-tight">QCC Attendance</h2>
+              <p className="text-xs text-muted-foreground font-medium">Electronic System</p>
             </div>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-2">
-            {filteredNavItems.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.title}
-                </Link>
-              )
-            })}
+          <nav className="flex-1 p-4 space-y-8 overflow-y-auto">
+            <div className="space-y-2">
+              <div className="px-3 mb-3">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Main</h3>
+              </div>
+              {mainItems.map((item) => {
+                const Icon = item.icon
+                const isActive = pathname === item.href
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={cn(
+                      "group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden",
+                      isActive
+                        ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/25 scale-[1.02]"
+                        : "text-sidebar-foreground hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 hover:text-foreground hover:shadow-md hover:scale-[1.01]",
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        "h-5 w-5 flex-shrink-0 transition-transform duration-300",
+                        isActive ? "scale-110" : "group-hover:scale-105",
+                      )}
+                    />
+                    <span className="flex-1">{item.title}</span>
+                    {isActive && <ChevronRight className="h-4 w-4 opacity-70" />}
+                    {isActive && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50" />
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
+
+            {adminItems.length > 0 && (
+              <div className="space-y-2">
+                <div className="px-3 mb-3 flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Administration
+                  </h3>
+                  <Badge
+                    variant="secondary"
+                    className="text-xs px-2 py-0.5 bg-primary/10 text-primary border-primary/20"
+                  >
+                    Admin
+                  </Badge>
+                </div>
+                {adminItems.map((item) => {
+                  const Icon = item.icon
+                  const isActive = pathname === item.href
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={cn(
+                        "group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden",
+                        isActive
+                          ? "bg-gradient-to-r from-accent to-accent/90 text-accent-foreground shadow-lg shadow-accent/25 scale-[1.02]"
+                          : "text-sidebar-foreground hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 hover:text-foreground hover:shadow-md hover:scale-[1.01]",
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "h-5 w-5 flex-shrink-0 transition-transform duration-300",
+                          isActive ? "scale-110" : "group-hover:scale-105",
+                        )}
+                      />
+                      <span className="flex-1">{item.title}</span>
+                      {isActive && <ChevronRight className="h-4 w-4 opacity-70" />}
+                      {isActive && (
+                        <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50" />
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <div className="px-3 mb-3">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Settings</h3>
+              </div>
+              {settingsItems.map((item) => {
+                const Icon = item.icon
+                const isActive = pathname === item.href
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={cn(
+                      "group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden",
+                      isActive
+                        ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/25 scale-[1.02]"
+                        : "text-sidebar-foreground hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 hover:text-foreground hover:shadow-md hover:scale-[1.01]",
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        "h-5 w-5 flex-shrink-0 transition-transform duration-300",
+                        isActive ? "scale-110" : "group-hover:scale-105",
+                      )}
+                    />
+                    <span className="flex-1">{item.title}</span>
+                    {isActive && <ChevronRight className="h-4 w-4 opacity-70" />}
+                    {isActive && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50" />
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
           </nav>
 
-          {/* User menu */}
-          <div className="p-4 border-t border-sidebar-border">
+          <div className="p-4 border-t border-sidebar-border/50 bg-gradient-to-r from-muted/20 to-transparent">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="w-full justify-start gap-3 h-auto p-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={profile?.profile_image_url || "/placeholder.svg"} />
-                    <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                      {userInitials}
-                    </AvatarFallback>
-                  </Avatar>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-auto p-4 hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02]"
+                >
+                  <div className="relative">
+                    <Avatar className="h-10 w-10 ring-2 ring-primary/20 transition-all duration-300 hover:ring-primary/40">
+                      <AvatarImage src={profile?.profile_image_url || "/placeholder.svg"} />
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-sm font-bold">
+                        {userInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-sidebar shadow-sm" />
+                  </div>
                   <div className="flex-1 text-left">
-                    <p className="text-sm font-medium text-sidebar-foreground">
+                    <p className="text-sm font-semibold text-sidebar-foreground">
                       {profile ? `${profile.first_name} ${profile.last_name}` : "Loading..."}
                     </p>
-                    <p className="text-xs text-muted-foreground">{profile?.departments?.name || "No department"}</p>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      {profile?.departments?.name || "No department"}
+                    </p>
                   </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
+              <DropdownMenuContent
+                align="end"
+                className="w-64 shadow-xl border-border/50 bg-background/95 backdrop-blur-xl"
+              >
+                <DropdownMenuLabel className="font-semibold">My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-border/50" />
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard/profile">Profile Settings</Link>
+                  <Link
+                    href="/dashboard/profile"
+                    className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 rounded-lg transition-all duration-200"
+                  >
+                    <User className="h-4 w-4" />
+                    <span className="font-medium">Profile Settings</span>
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard/settings">Preferences</Link>
+                  <Link
+                    href="/dashboard/settings"
+                    className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 rounded-lg transition-all duration-200"
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span className="font-medium">Preferences</span>
+                  </Link>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sign Out
+                <DropdownMenuSeparator className="bg-border/50" />
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10 flex items-center gap-3 px-3 py-2 cursor-pointer rounded-lg transition-all duration-200"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="font-medium">Sign Out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -241,9 +378,11 @@ export function Sidebar({ user, profile }: SidebarProps) {
         </div>
       </div>
 
-      {/* Mobile overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden transition-all duration-300"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
       )}
     </>
   )

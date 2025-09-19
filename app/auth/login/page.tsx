@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import Image from "next/image"
@@ -519,72 +518,96 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md">
-        <Card className="shadow-lg border-0 bg-card/95 backdrop-blur">
-          <CardHeader className="text-center space-y-4">
+        <Card className="shadow-lg border border-gray-200 bg-white">
+          <CardHeader className="text-center space-y-6 pb-8">
             <div className="flex justify-center">
-              <Image src="/images/qcc-logo.png" alt="QCC Logo" width={80} height={80} className="rounded-full" />
+              <div className="w-24 h-24 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center shadow-sm">
+                <Image
+                  src="/images/qcc-logo.png"
+                  alt="QCC Logo - Quality Control Company Limited"
+                  width={80}
+                  height={80}
+                  className="rounded-full object-contain"
+                />
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-2xl font-bold text-primary">QCC ELECTRONIC ATTENDANCE</CardTitle>
-              <CardDescription className="text-muted-foreground">
+            <div className="space-y-2">
+              <CardTitle className="text-2xl font-bold text-[#4A7C59] tracking-wide">
+                QCC ELECTRONIC ATTENDANCE
+              </CardTitle>
+              <CardDescription className="text-gray-600 text-sm">
                 Sign in with your Staff Number, Email or use OTP
               </CardDescription>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-8 pb-8">
             <Tabs defaultValue="password" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="password">Staff Login</TabsTrigger>
-                <TabsTrigger value="otp">OTP Login</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 rounded-lg">
+                <TabsTrigger
+                  value="password"
+                  className="data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm"
+                >
+                  Staff Login
+                </TabsTrigger>
+                <TabsTrigger
+                  value="otp"
+                  className="data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm"
+                >
+                  OTP Login
+                </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="password" className="space-y-4 mt-4">
-                <form onSubmit={handleLogin} className="space-y-4">
+              <TabsContent value="password" className="space-y-6 mt-6">
+                <form onSubmit={handleLogin} className="space-y-6">
                   <div className="space-y-2">
-                    <Label htmlFor="identifier" className="text-sm font-medium">
+                    <Label htmlFor="identifier" className="text-sm font-medium text-gray-700">
                       Staff Number or Email Address
                     </Label>
                     <Input
                       id="identifier"
                       type="text"
-                      placeholder="1234567 or your.email@qccgh.com"
+                      placeholder="ohemengappiah@qccgh.com"
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
                       required
-                      className="h-11"
+                      className="h-12 border-gray-300 focus:border-[#4A7C59] focus:ring-[#4A7C59] bg-gray-50"
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-gray-500">
                       Enter your 7-digit staff number (e.g., 1234567) or corporate email address
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm font-medium">
+                    <Label htmlFor="password" className="text-sm font-medium text-gray-700">
                       Password
                     </Label>
                     <Input
                       id="password"
                       type="password"
-                      placeholder="Enter your password"
+                      placeholder="••••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      className="h-11"
+                      className="h-12 border-gray-300 focus:border-[#4A7C59] focus:ring-[#4A7C59] bg-gray-50"
                     />
                   </div>
 
-                  <Button type="submit" className="w-full h-11 bg-primary hover:bg-primary/90" disabled={isLoading}>
+                  <Button
+                    type="submit"
+                    className="w-full h-12 bg-[#4A7C59] hover:bg-[#3d6b4a] text-white font-medium rounded-lg"
+                    disabled={isLoading}
+                  >
                     {isLoading ? "Signing in..." : "Sign In"}
                   </Button>
                 </form>
               </TabsContent>
 
-              <TabsContent value="otp" className="space-y-4 mt-4">
+              <TabsContent value="otp" className="space-y-6 mt-6">
                 {!otpSent ? (
-                  <form onSubmit={handleSendOtp} className="space-y-4">
+                  <form onSubmit={handleSendOtp} className="space-y-6">
                     <div className="space-y-2">
-                      <Label htmlFor="otpEmail" className="text-sm font-medium">
+                      <Label htmlFor="otpEmail" className="text-sm font-medium text-gray-700">
                         Corporate Email Address
                       </Label>
                       <Input
@@ -594,18 +617,22 @@ export default function LoginPage() {
                         value={otpEmail}
                         onChange={(e) => setOtpEmail(e.target.value)}
                         required
-                        className="h-11"
+                        className="h-12 border-gray-300 focus:border-[#4A7C59] focus:ring-[#4A7C59] bg-gray-50"
                       />
-                      <p className="text-xs text-muted-foreground">OTP will be sent to your registered email address</p>
+                      <p className="text-xs text-gray-500">OTP will be sent to your registered email address</p>
                     </div>
-                    <Button type="submit" className="w-full h-11 bg-primary hover:bg-primary/90" disabled={isLoading}>
+                    <Button
+                      type="submit"
+                      className="w-full h-12 bg-[#4A7C59] hover:bg-[#3d6b4a] text-white font-medium rounded-lg"
+                      disabled={isLoading}
+                    >
                       {isLoading ? "Sending OTP..." : "Send OTP Code"}
                     </Button>
                   </form>
                 ) : (
-                  <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <form onSubmit={handleVerifyOtp} className="space-y-6">
                     <div className="space-y-2">
-                      <Label htmlFor="otp" className="text-sm font-medium">
+                      <Label htmlFor="otp" className="text-sm font-medium text-gray-700">
                         Enter OTP Code
                       </Label>
                       <Input
@@ -616,16 +643,20 @@ export default function LoginPage() {
                         onChange={(e) => setOtp(e.target.value)}
                         required
                         maxLength={6}
-                        className="h-11 text-center text-lg tracking-widest"
+                        className="h-12 text-center text-lg tracking-widest border-gray-300 focus:border-[#4A7C59] focus:ring-[#4A7C59] bg-gray-50"
                       />
                     </div>
-                    <Button type="submit" className="w-full h-11 bg-primary hover:bg-primary/90" disabled={isLoading}>
+                    <Button
+                      type="submit"
+                      className="w-full h-12 bg-[#4A7C59] hover:bg-[#3d6b4a] text-white font-medium rounded-lg"
+                      disabled={isLoading}
+                    >
                       {isLoading ? "Verifying..." : "Verify OTP"}
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full h-11 bg-transparent"
+                      className="w-full h-12 border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
                       onClick={() => {
                         setOtpSent(false)
                         setOtp("")
@@ -639,21 +670,13 @@ export default function LoginPage() {
               </TabsContent>
             </Tabs>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Don't have an account?{" "}
-                <Link
-                  href="/auth/staff-request"
-                  className="font-medium text-primary hover:text-primary/80 underline underline-offset-4"
-                >
-                  
-                </Link>
-              </p>
+            <div className="mt-8 text-center">
+              <p className="text-sm text-gray-600">Don't have an account?</p>
             </div>
 
-            <div className="mt-4 text-center border-t pt-4">
-              <p className="text-xs text-muted-foreground font-medium">QEAA</p>
-              <p className="text-xs text-muted-foreground/70 mt-1">Powered by the IT Department</p>
+            <div className="mt-6 text-center border-t border-gray-200 pt-6">
+              <p className="text-sm font-medium text-gray-700">Quality Control Company Limited</p>
+              <p className="text-xs text-gray-500 mt-1">Intranet Portal - Powered by IT Department</p>
             </div>
           </CardContent>
         </Card>

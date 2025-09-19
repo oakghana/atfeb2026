@@ -18,7 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Users, Plus, Search, Edit, Trash2, UserCheck, UserX, Key, MapPin } from "lucide-react"
+import { Users, Plus, Search, Edit, Trash2, UserCheck, UserX, Key, MapPin, Filter, Building2 } from "lucide-react"
 import { PasswordManagement } from "./password-management"
 import { useNotifications } from "@/components/ui/notification-system"
 
@@ -328,36 +328,41 @@ export function StaffManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Staff Management
+    <div className="space-y-8">
+      <Card className="shadow-sm border-0 bg-gradient-to-br from-card to-card/50">
+        <CardHeader className="pb-6">
+          <CardTitle className="text-xl font-heading font-semibold flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
+            Staff Directory
           </CardTitle>
-          <CardDescription>Manage QCC staff members, roles, and location assignments</CardDescription>
+          <CardDescription className="text-base">
+            Manage QCC staff members, roles, and location assignments
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
+            <Alert variant="destructive" className="border-destructive/20 bg-destructive/5">
+              <AlertDescription className="font-medium">{error}</AlertDescription>
             </Alert>
           )}
 
-          {/* Filters and Actions */}
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex gap-2 flex-1">
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between p-4 bg-muted/30 rounded-xl border border-border/50">
+            <div className="flex flex-col sm:flex-row gap-3 flex-1">
+              {/* Search Input */}
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search staff..."
+                  placeholder="Search by name, email, or ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 bg-background/50 border-border/50 focus:bg-background"
                 />
               </div>
+
+              {/* Department Filter */}
               <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-48 bg-background/50 border-border/50">
+                  <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>
@@ -369,8 +374,11 @@ export function StaffManagement() {
                   ))}
                 </SelectContent>
               </Select>
+
+              {/* Role Filter */}
               <Select value={selectedRole} onValueChange={setSelectedRole}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-40 bg-background/50 border-border/50">
+                  <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
                   <SelectValue placeholder="All Roles" />
                 </SelectTrigger>
                 <SelectContent>
@@ -382,17 +390,18 @@ export function StaffManagement() {
               </Select>
             </div>
 
-            <div className="flex gap-2">
+            {/* Action Buttons */}
+            <div className="flex gap-3">
               <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" className="shadow-sm hover:shadow-md transition-shadow bg-transparent">
                     <Key className="mr-2 h-4 w-4" />
                     Reset Passwords
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl">
                   <DialogHeader>
-                    <DialogTitle>Password Management</DialogTitle>
+                    <DialogTitle className="font-heading">Password Management</DialogTitle>
                     <DialogDescription>Reset passwords for staff members</DialogDescription>
                   </DialogHeader>
                   <PasswordManagement isAdmin={true} />
@@ -401,76 +410,96 @@ export function StaffManagement() {
 
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button className="shadow-sm hover:shadow-md transition-shadow">
                     <Plus className="mr-2 h-4 w-4" />
                     Add Staff
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-w-lg">
                   <DialogHeader>
-                    <DialogTitle>Add New Staff Member</DialogTitle>
+                    <DialogTitle className="font-heading">Add New Staff Member</DialogTitle>
                     <DialogDescription>Create a new staff account for QCC</DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-4">
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="firstName">First Name</Label>
+                        <Label htmlFor="firstName" className="font-medium">
+                          First Name
+                        </Label>
                         <Input
                           id="firstName"
                           value={newStaff.first_name}
                           onChange={(e) => setNewStaff({ ...newStaff, first_name: e.target.value })}
+                          className="mt-1"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="lastName">Last Name</Label>
+                        <Label htmlFor="lastName" className="font-medium">
+                          Last Name
+                        </Label>
                         <Input
                           id="lastName"
                           value={newStaff.last_name}
                           onChange={(e) => setNewStaff({ ...newStaff, last_name: e.target.value })}
+                          className="mt-1"
                         />
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="email">Email</Label>
+                      <Label htmlFor="email" className="font-medium">
+                        Email
+                      </Label>
                       <Input
                         id="email"
                         type="email"
                         value={newStaff.email}
                         onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="password">Password</Label>
+                      <Label htmlFor="password" className="font-medium">
+                        Password
+                      </Label>
                       <Input
                         id="password"
                         type="password"
                         value={newStaff.password}
                         onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="employeeId">Employee ID</Label>
+                      <Label htmlFor="employeeId" className="font-medium">
+                        Employee ID
+                      </Label>
                       <Input
                         id="employeeId"
                         value={newStaff.employee_id}
                         onChange={(e) => setNewStaff({ ...newStaff, employee_id: e.target.value })}
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="position">Position</Label>
+                      <Label htmlFor="position" className="font-medium">
+                        Position
+                      </Label>
                       <Input
                         id="position"
                         value={newStaff.position}
                         onChange={(e) => setNewStaff({ ...newStaff, position: e.target.value })}
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="department">Department</Label>
+                      <Label htmlFor="department" className="font-medium">
+                        Department
+                      </Label>
                       <Select
                         value={newStaff.department_id}
                         onValueChange={(value) => setNewStaff({ ...newStaff, department_id: value })}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="mt-1">
                           <SelectValue placeholder="Select Department" />
                         </SelectTrigger>
                         <SelectContent>
@@ -483,12 +512,14 @@ export function StaffManagement() {
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="role">Role</Label>
+                      <Label htmlFor="role" className="font-medium">
+                        Role
+                      </Label>
                       <Select
                         value={newStaff.role}
                         onValueChange={(value) => setNewStaff({ ...newStaff, role: value })}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="mt-1">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -499,39 +530,41 @@ export function StaffManagement() {
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="assignedLocation">Assigned Location</Label>
+                      <Label htmlFor="assignedLocation" className="font-medium">
+                        Assigned Location
+                      </Label>
                       <Select
                         value={newStaff.assigned_location_id}
                         onValueChange={(value) => setNewStaff({ ...newStaff, assigned_location_id: value })}
                         required
                       >
-                        <SelectTrigger className="border-2 border-secondary/50">
+                        <SelectTrigger className="mt-1 border-2 border-primary/20">
                           <SelectValue placeholder="Select Location (Required)" />
                         </SelectTrigger>
                         <SelectContent>
-                          {locations
-                            .filter((location) => !location.name.toLowerCase().includes("head office"))
-                            .map((location) => (
-                              <SelectItem key={location.id} value={location.id}>
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="h-3 w-3" />
-                                  {location.name} - {location.address}
-                                </div>
-                              </SelectItem>
-                            ))}
+                          {locations.map((location) => (
+                            <SelectItem key={location.id} value={location.id}>
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-3 w-3" />
+                                {location.name} - {location.address}
+                              </div>
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
                         Each staff member must be assigned to their actual work location for accurate attendance
                         tracking
                       </p>
                     </div>
                   </div>
-                  <DialogFooter>
+                  <DialogFooter className="gap-2">
                     <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                       Cancel
                     </Button>
-                    <Button onClick={handleAddStaff}>Add Staff</Button>
+                    <Button onClick={handleAddStaff} className="shadow-sm">
+                      Add Staff
+                    </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -543,55 +576,72 @@ export function StaffManagement() {
             <Dialog open={!!editingStaff} onOpenChange={() => setEditingStaff(null)}>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Edit Staff Member</DialogTitle>
+                  <DialogTitle className="font-heading">Edit Staff Member</DialogTitle>
                   <DialogDescription>Update staff member information and assignments</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="editFirstName">First Name</Label>
+                      <Label htmlFor="editFirstName" className="font-medium">
+                        First Name
+                      </Label>
                       <Input
                         id="editFirstName"
                         value={editingStaff.first_name}
                         onChange={(e) => setEditingStaff({ ...editingStaff, first_name: e.target.value })}
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="editLastName">Last Name</Label>
+                      <Label htmlFor="editLastName" className="font-medium">
+                        Last Name
+                      </Label>
                       <Input
                         id="editLastName"
                         value={editingStaff.last_name}
                         onChange={(e) => setEditingStaff({ ...editingStaff, last_name: e.target.value })}
+                        className="mt-1"
                       />
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="editEmail">Email</Label>
+                    <Label htmlFor="editEmail" className="font-medium">
+                      Email
+                    </Label>
                     <Input
                       id="editEmail"
                       type="email"
                       value={editingStaff.email}
                       onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
+                      className="mt-1"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="editEmployeeId">Employee ID</Label>
+                    <Label htmlFor="editEmployeeId" className="font-medium">
+                      Employee ID
+                    </Label>
                     <Input
                       id="editEmployeeId"
                       value={editingStaff.employee_id}
                       onChange={(e) => setEditingStaff({ ...editingStaff, employee_id: e.target.value })}
+                      className="mt-1"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="editPosition">Position</Label>
+                    <Label htmlFor="editPosition" className="font-medium">
+                      Position
+                    </Label>
                     <Input
                       id="editPosition"
                       value={editingStaff.position}
                       onChange={(e) => setEditingStaff({ ...editingStaff, position: e.target.value })}
+                      className="mt-1"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="editDepartment">Department</Label>
+                    <Label htmlFor="editDepartment" className="font-medium">
+                      Department
+                    </Label>
                     <Select
                       value={editingStaff.department_id || editingStaff.departments?.id || "none"}
                       onValueChange={(value) =>
@@ -615,7 +665,9 @@ export function StaffManagement() {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="editRole">Role</Label>
+                    <Label htmlFor="editRole" className="font-medium">
+                      Role
+                    </Label>
                     <Select
                       value={editingStaff.role}
                       onValueChange={(value) => setEditingStaff({ ...editingStaff, role: value })}
@@ -631,31 +683,31 @@ export function StaffManagement() {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="editAssignedLocation">Assigned Location</Label>
+                    <Label htmlFor="editAssignedLocation" className="font-medium">
+                      Assigned Location
+                    </Label>
                     <Select
                       value={editingStaff.assigned_location_id || "none"}
                       onValueChange={(value) => setEditingStaff({ ...editingStaff, assigned_location_id: value })}
                       required
                     >
-                      <SelectTrigger className="border-2 border-secondary/50">
+                      <SelectTrigger className="border-2 border-primary/20">
                         <SelectValue placeholder="Select Location (Required)" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none" disabled>
                           <span className="text-muted-foreground">Select a location</span>
                         </SelectItem>
-                        {locations
-                          .filter((location) => !location.name.toLowerCase().includes("head office"))
-                          .map((location) => (
-                            <SelectItem key={location.id} value={location.id}>
-                              <div className="flex items-center gap-1 text-sm">
-                                <MapPin className="h-3 w-3 text-muted-foreground" />
-                                <span className="truncate max-w-32" title={location.address}>
-                                  {location.name}
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
+                        {locations.map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            <div className="flex items-center gap-1 text-sm">
+                              <MapPin className="h-3 w-3 text-muted-foreground" />
+                              <span className="truncate max-w-32" title={location.address}>
+                                {location.name}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -673,53 +725,70 @@ export function StaffManagement() {
             </Dialog>
           )}
 
-          {/* Staff Table */}
-          <div className="border rounded-lg">
+          <div className="border-0 rounded-xl overflow-hidden shadow-sm bg-background/50">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Employee ID</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Assigned Location</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
+                <TableRow className="bg-muted/50 hover:bg-muted/50 border-border/50">
+                  <TableHead className="font-semibold text-foreground">Name</TableHead>
+                  <TableHead className="font-semibold text-foreground">Employee ID</TableHead>
+                  <TableHead className="font-semibold text-foreground">Email</TableHead>
+                  <TableHead className="font-semibold text-foreground">Department</TableHead>
+                  <TableHead className="font-semibold text-foreground">Role</TableHead>
+                  <TableHead className="font-semibold text-foreground">Assigned Location</TableHead>
+                  <TableHead className="font-semibold text-foreground">Status</TableHead>
+                  <TableHead className="font-semibold text-foreground">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
-                      Loading staff...
+                    <TableCell colSpan={8} className="text-center py-12">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-muted-foreground font-medium">Loading staff...</span>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : staff.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
-                      No staff members found
+                    <TableCell colSpan={8} className="text-center py-12">
+                      <div className="space-y-2">
+                        <Users className="h-12 w-12 text-muted-foreground mx-auto" />
+                        <p className="text-muted-foreground font-medium">No staff members found</p>
+                        <p className="text-sm text-muted-foreground">Try adjusting your search filters</p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   staff.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell className="font-medium">
+                    <TableRow key={member.id} className="hover:bg-muted/30 transition-colors">
+                      <TableCell className="font-semibold">
                         {member.first_name} {member.last_name}
                       </TableCell>
-                      <TableCell>{member.employee_id}</TableCell>
-                      <TableCell>{member.email}</TableCell>
-                      <TableCell>{member.departments?.name || "N/A"}</TableCell>
+                      <TableCell className="font-mono text-sm">{member.employee_id}</TableCell>
+                      <TableCell className="text-sm">{member.email}</TableCell>
                       <TableCell>
-                        <Badge variant={member.role === "admin" ? "default" : "secondary"}>
+                        <span className="text-sm font-medium">{member.departments?.name || "N/A"}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            member.role === "admin"
+                              ? "default"
+                              : member.role === "department_head"
+                                ? "secondary"
+                                : "outline"
+                          }
+                          className="font-medium"
+                        >
                           {member.role.replace("_", " ")}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         {member.geofence_locations ? (
-                          <div className="flex items-center gap-1 text-sm">
+                          <div className="flex items-center gap-2 text-sm">
                             <MapPin className="h-3 w-3 text-muted-foreground" />
-                            <span className="truncate max-w-32" title={member.geofence_locations.address}>
+                            <span className="truncate max-w-32 font-medium" title={member.geofence_locations.address}>
                               {member.geofence_locations.name}
                             </span>
                           </div>
@@ -728,23 +797,34 @@ export function StaffManagement() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={member.is_active ? "default" : "destructive"}>
+                        <Badge variant={member.is_active ? "default" : "destructive"} className="font-medium">
                           {member.is_active ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => setEditingStaff(member)}>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setEditingStaff(member)}
+                            className="h-8 w-8 p-0 hover:bg-primary/10 hover:border-primary/20"
+                          >
                             <Edit className="h-3 w-3" />
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleUpdateStaff(member.id, { is_active: !member.is_active })}
+                            className="h-8 w-8 p-0 hover:bg-chart-2/10 hover:border-chart-2/20"
                           >
                             {member.is_active ? <UserX className="h-3 w-3" /> : <UserCheck className="h-3 w-3" />}
                           </Button>
-                          <Button size="sm" variant="destructive" onClick={() => handleDeactivateStaff(member.id)}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeactivateStaff(member.id)}
+                            className="h-8 w-8 p-0 hover:bg-destructive/10 hover:border-destructive/20"
+                          >
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>

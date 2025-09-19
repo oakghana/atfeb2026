@@ -20,9 +20,9 @@ export default async function StaffPage() {
   return (
     <DashboardLayout>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-primary">Staff Management</h1>
-          <p className="text-muted-foreground mt-2">Manage QCC staff members, roles, and permissions</p>
+        <div className="space-y-4">
+          <h1 className="text-4xl font-bold text-primary tracking-tight">Staff Management</h1>
+          <p className="text-lg text-muted-foreground">Manage QCC staff members, roles, and permissions</p>
         </div>
 
         <StaffManagement />

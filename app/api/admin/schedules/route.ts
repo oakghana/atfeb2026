@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
 
     let query = supabase.from("schedules").select(`
         *,
-        assigned_user:user_profiles(first_name, last_name, email),
-        department:departments(name)
+        user_profiles!schedules_user_id_fkey(first_name, last_name, email),
+        departments!schedules_department_id_fkey(name)
       `)
 
     if (date) {
