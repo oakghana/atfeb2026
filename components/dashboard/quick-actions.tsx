@@ -73,23 +73,23 @@ export function QuickActions() {
             <Button
               key={action.href}
               asChild
-              className={`h-auto flex-col gap-4 p-6 bg-gradient-to-br ${action.gradient} ${action.hoverGradient} border ${action.border} transition-all duration-300 hover:shadow-lg hover:-translate-y-2 hover:scale-[1.02] touch-manipulation group relative overflow-hidden`}
+              className={`h-auto flex-col gap-4 p-6 bg-gradient-to-br ${action.gradient} ${action.hoverGradient} border ${action.border} transition-all duration-300 hover:shadow-lg hover:-translate-y-2 hover:scale-[1.02] touch-manipulation group relative overflow-hidden min-h-[120px] sm:min-h-[140px]`}
               variant="outline"
             >
               <Link href={action.href}>
                 <div
-                  className={`p-4 ${action.iconBg} rounded-2xl shadow-sm transition-all duration-300 group-hover:shadow-md group-hover:scale-110`}
+                  className={`p-4 sm:p-5 ${action.iconBg} rounded-2xl shadow-sm transition-all duration-300 group-hover:shadow-md group-hover:scale-110`}
                 >
                   <Icon
-                    className={`h-6 w-6 ${action.iconColor} transition-transform duration-300 group-hover:rotate-3`}
+                    className={`h-6 w-6 sm:h-7 sm:w-7 ${action.iconColor} transition-transform duration-300 group-hover:rotate-3`}
                   />
                 </div>
                 <div className="text-center space-y-2">
-                  <div className="font-bold text-foreground text-base flex items-center gap-2 justify-center">
+                  <div className="font-bold text-foreground text-base sm:text-lg flex items-center gap-2 justify-center">
                     {action.title}
                     <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:translate-x-1" />
                   </div>
-                  <div className="text-sm text-muted-foreground font-medium">{action.description}</div>
+                  <div className="text-sm sm:text-base text-muted-foreground font-medium">{action.description}</div>
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </Link>

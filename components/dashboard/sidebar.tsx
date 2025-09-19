@@ -173,9 +173,9 @@ export function Sidebar({ user, profile }: SidebarProps) {
           variant="outline"
           size="icon"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="bg-background/95 backdrop-blur-xl shadow-xl border-border/50 hover:bg-background hover:shadow-2xl transition-all duration-300"
+          className="h-12 w-12 bg-background/95 backdrop-blur-xl shadow-xl border-border/50 hover:bg-background hover:shadow-2xl transition-all duration-300 touch-manipulation"
         >
-          {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
       </div>
 
@@ -211,7 +211,7 @@ export function Sidebar({ user, profile }: SidebarProps) {
                     href={item.href}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className={cn(
-                      "group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden",
+                      "group flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px]",
                       isActive
                         ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/25 scale-[1.02]"
                         : "text-sidebar-foreground hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 hover:text-foreground hover:shadow-md hover:scale-[1.01]",
@@ -255,7 +255,7 @@ export function Sidebar({ user, profile }: SidebarProps) {
                       href={item.href}
                       onClick={() => setIsMobileMenuOpen(false)}
                       className={cn(
-                        "group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden",
+                        "group flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px]",
                         isActive
                           ? "bg-gradient-to-r from-accent to-accent/90 text-accent-foreground shadow-lg shadow-accent/25 scale-[1.02]"
                           : "text-sidebar-foreground hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 hover:text-foreground hover:shadow-md hover:scale-[1.01]",
@@ -291,7 +291,7 @@ export function Sidebar({ user, profile }: SidebarProps) {
                     href={item.href}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className={cn(
-                      "group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden",
+                      "group flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px]",
                       isActive
                         ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/25 scale-[1.02]"
                         : "text-sidebar-foreground hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 hover:text-foreground hover:shadow-md hover:scale-[1.01]",
@@ -323,7 +323,7 @@ export function Sidebar({ user, profile }: SidebarProps) {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="w-full justify-start gap-3 h-auto p-4 hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02]"
+                  className="w-full justify-start gap-3 h-auto p-4 hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02] touch-manipulation min-h-[56px]"
                 >
                   <div className="relative">
                     <Avatar className="h-10 w-10 ring-2 ring-primary/20 transition-all duration-300 hover:ring-primary/40">
@@ -354,7 +354,7 @@ export function Sidebar({ user, profile }: SidebarProps) {
                 <DropdownMenuItem asChild>
                   <Link
                     href="/dashboard/profile"
-                    className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 rounded-lg transition-all duration-200"
+                    className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-muted/50 rounded-lg transition-all duration-200 touch-manipulation min-h-[44px]"
                   >
                     <User className="h-4 w-4" />
                     <span className="font-medium">Profile Settings</span>
@@ -363,7 +363,7 @@ export function Sidebar({ user, profile }: SidebarProps) {
                 <DropdownMenuItem asChild>
                   <Link
                     href="/dashboard/settings"
-                    className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 rounded-lg transition-all duration-200"
+                    className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-muted/50 rounded-lg transition-all duration-200 touch-manipulation min-h-[44px]"
                   >
                     <Settings className="h-4 w-4" />
                     <span className="font-medium">Preferences</span>
@@ -372,7 +372,7 @@ export function Sidebar({ user, profile }: SidebarProps) {
                 <DropdownMenuSeparator className="bg-border/50" />
                 <DropdownMenuItem
                   onClick={handleSignOut}
-                  className="text-destructive focus:text-destructive focus:bg-destructive/10 flex items-center gap-3 px-3 py-2 cursor-pointer rounded-lg transition-all duration-200"
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10 flex items-center gap-3 px-3 py-3 cursor-pointer rounded-lg transition-all duration-200 touch-manipulation min-h-[44px]"
                 >
                   <LogOut className="h-4 w-4" />
                   <span className="font-medium">Sign Out</span>
@@ -385,8 +385,9 @@ export function Sidebar({ user, profile }: SidebarProps) {
 
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden transition-all duration-300"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden transition-all duration-300 touch-manipulation"
           onClick={() => setIsMobileMenuOpen(false)}
+          onTouchStart={() => setIsMobileMenuOpen(false)}
         />
       )}
     </>
