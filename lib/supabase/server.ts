@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr"
+import { cookies } from "next/headers"
 
 /**
  * Especially important if using Fluid compute: Don't put this client in a
@@ -43,20 +44,8 @@ export async function createClient() {
 
     let cookieStore
     try {
-      // Only import cookies when we're in a server context
-      if (typeof window === "undefined") {
-        const { cookies } = await import("next/headers")
-        cookieStore = await cookies()
-        console.log("[v0] Cookie store obtained successfully")
-      } else {
-        // We're in a client context, provide a no-op cookie store
-        cookieStore = {
-          getAll: () => [],
-          set: () => {},
-          get: () => undefined,
-        }
-        console.log("[v0] Using client-side fallback cookie store")
-      }
+      cookieStore = await cookies()
+      console.log("[v0] Cookie store obtained successfully")
     } catch (cookieError) {
       console.error("[v0] Failed to get cookie store:", cookieError)
       // Create a fallback cookie store that doesn't throw errors

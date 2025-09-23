@@ -1,5 +1,3 @@
-"use client"
-
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { StatsCard } from "@/components/dashboard/stats-card"
 import { QuickActions } from "@/components/dashboard/quick-actions"
@@ -7,18 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createClient } from "@/lib/supabase/server"
-import {
-  Clock,
-  Calendar,
-  MapPin,
-  Users,
-  TrendingUp,
-  UserCheck,
-  AlertCircle,
-  Activity,
-  Download,
-  Smartphone,
-} from "lucide-react"
+import { Clock, Calendar, MapPin, Users, TrendingUp, UserCheck, AlertCircle, Activity } from "lucide-react"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 
@@ -125,39 +112,6 @@ export default async function DashboardPage() {
             {profile?.last_name || ""}
           </p>
         </div>
-
-        <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-primary">
-              <Smartphone className="h-5 w-5" />
-              Mobile App Available
-            </CardTitle>
-            <CardDescription>Download the QCC Attendance mobile app for easier access on your phone</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                className="flex items-center gap-2 bg-primary hover:bg-primary/90"
-                onClick={() => {
-                  // Create a PWA-style download experience
-                  const link = document.createElement("a")
-                  link.href = window.location.origin
-                  link.download = "qcc-attendance-app"
-                  link.click()
-                }}
-              >
-                <Download className="h-4 w-4" />
-                Download Mobile App
-              </Button>
-              <Button variant="outline" className="bg-transparent">
-                <span className="text-sm">Add to Home Screen for quick access</span>
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Works on all mobile devices. Add to your home screen for the best experience.
-            </p>
-          </CardContent>
-        </Card>
 
         {profile?.role === "admin" && pendingApprovals > 0 && (
           <Alert className="border-primary/20 bg-primary/5 shadow-sm">

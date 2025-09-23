@@ -152,48 +152,23 @@ export function validateAttendanceLocation(
     }
   }
 
-  const PROXIMITY_LIMIT = 50 // Changed from 20 to 50 meters
+  const validation = isWithinGeofence(userLocation, nearest.location)
 
-  // Check if user is within 50m of any QCC location
-  const nearbyLocation = qccLocations.find((location) => {
-    const distance = calculateDistance(
-      userLocation.latitude,
-      userLocation.longitude,
-      location.latitude,
-      location.longitude,
-    )
-    return distance <= PROXIMITY_LIMIT
-  })
-
-  if (nearbyLocation) {
-    const distance = calculateDistance(
-      userLocation.latitude,
-      userLocation.longitude,
-      nearbyLocation.latitude,
-      nearbyLocation.longitude,
-    )
-
+  if (validation.isWithin) {
     return {
       canCheckIn: true,
-      nearestLocation: nearbyLocation,
-      distance: Math.round(distance),
-      message: `You are at ${nearbyLocation.name}. Check-in allowed.`,
-      accuracyWarning:
-        userLocation.accuracy > 10
-          ? "GPS accuracy is low. Please ensure you have a clear view of the sky for better location precision."
-          : undefined,
+      nearestLocation: nearest.location,
+      distance: validation.distance,
+      message: `You are within ${nearest.location.name} (${validation.distance}m away). You can check in.`,
+      accuracyWarning: validation.accuracyWarning,
     }
   } else {
-    // User is not within 50m of any QCC location
     return {
       canCheckIn: false,
       nearestLocation: nearest.location,
-      distance: nearest.distance,
-      message: `Outside ${PROXIMITY_LIMIT}m range - Cannot check in. Nearest location: ${nearest.location.name} (${nearest.distance}m away)`,
-      accuracyWarning:
-        userLocation.accuracy > 10
-          ? "GPS accuracy is low. Move closer to a QCC location for check-in."
-          : "You must be within 50 meters of any registered QCC location to check in.",
+      distance: validation.distance,
+      message: `You are ${validation.distance}m away from ${nearest.location.name}. You must be within 20 meters to check in.`,
+      accuracyWarning: validation.accuracyWarning,
     }
   }
 }
@@ -217,45 +192,13 @@ export function validateCheckoutLocation(
     }
   }
 
-  const PROXIMITY_LIMIT = 50
-
-  // Check if user is within 50m of any QCC location
-  const nearbyLocation = qccLocations.find((location) => {
-    const distance = calculateDistance(
-      userLocation.latitude,
-      userLocation.longitude,
-      location.latitude,
-      location.longitude,
-    )
-    return distance <= PROXIMITY_LIMIT
-  })
-
-  if (nearbyLocation) {
-    const distance = calculateDistance(
-      userLocation.latitude,
-      userLocation.longitude,
-      nearbyLocation.latitude,
-      nearbyLocation.longitude,
-    )
-
-    return {
-      canCheckOut: true,
-      nearestLocation: nearbyLocation,
-      distance: Math.round(distance),
-      message: `Check-out allowed at ${nearbyLocation.name}.`,
-      accuracyWarning: userLocation.accuracy > 10 ? "GPS accuracy is low, but check-out is allowed." : undefined,
-    }
-  } else {
-    return {
-      canCheckOut: false,
-      nearestLocation: nearest.location,
-      distance: nearest.distance,
-      message: `Outside ${PROXIMITY_LIMIT}m range - Cannot check out. Nearest location: ${nearest.location.name} (${nearest.distance}m away)`,
-      accuracyWarning:
-        userLocation.accuracy > 10
-          ? "GPS accuracy is low. Move closer to a QCC location for check-out."
-          : "You must be within 50 meters of any registered QCC location to check out.",
-    }
+  return {
+    canCheckOut: true,
+    nearestLocation: nearest.location,
+    distance: nearest.distance,
+    message: `Check-out allowed from any location. Nearest QCC location: ${nearest.location.name} (${nearest.distance}m away)`,
+    accuracyWarning:
+      userLocation.accuracy > 10 ? "GPS accuracy is low, but check-out is still allowed from any location." : undefined,
   }
 }
 

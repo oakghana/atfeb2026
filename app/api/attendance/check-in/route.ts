@@ -83,18 +83,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: userProfile } = await supabase
-      .from("user_profiles")
-      .select("assigned_location_id")
-      .eq("id", user.id)
-      .single()
-
-    // Check if user is checking in at a different location than assigned
-    let isRemoteLocation = false
-    if (userProfile?.assigned_location_id && userProfile.assigned_location_id !== location_id) {
-      isRemoteLocation = true
-    }
-
     const attendanceData = {
       user_id: user.id,
       check_in_time: new Date().toISOString(),
@@ -103,7 +91,7 @@ export async function POST(request: NextRequest) {
       status: "present",
       check_in_method: qr_code_used ? "qr_code" : "gps",
       check_in_location_name: locationData?.name || null,
-      is_remote_location: isRemoteLocation,
+      is_remote_location: false, // Will be calculated based on user's assigned location
     }
 
     // Add GPS coordinates only if available
@@ -115,6 +103,16 @@ export async function POST(request: NextRequest) {
     // Add QR code timestamp if used
     if (qr_code_used && qr_timestamp) {
       attendanceData.qr_check_in_timestamp = qr_timestamp
+    }
+
+    const { data: userProfile } = await supabase
+      .from("user_profiles")
+      .select("assigned_location_id")
+      .eq("id", user.id)
+      .single()
+
+    if (userProfile?.assigned_location_id && userProfile.assigned_location_id !== location_id) {
+      attendanceData.is_remote_location = true
     }
 
     const { data: attendanceRecord, error: attendanceError } = await supabase
@@ -162,12 +160,12 @@ export async function POST(request: NextRequest) {
           location_tracking: {
             location_name: locationData?.name,
             district_name: districtName,
-            is_remote_location: isRemoteLocation,
+            is_remote_location: attendanceData.is_remote_location,
             check_in_method: attendanceData.check_in_method,
           },
         },
-        message: isRemoteLocation
-          ? `Successfully checked in at ${locationData?.name} (On Trek - different from your assigned location)`
+        message: attendanceData.is_remote_location
+          ? `Successfully checked in at ${locationData?.name} (different from your assigned location)`
           : `Successfully checked in at ${locationData?.name}`,
       },
       {
