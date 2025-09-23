@@ -287,94 +287,56 @@ export default function LoginPage() {
 
       let validateResponse
       try {
-        // Test basic connectivity first
-        console.log("[v0] Testing API connectivity...")
-        const connectivityTest = await fetch("/api/auth/validate-email", {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-        })
-        console.log("[v0] Connectivity test response:", connectivityTest.status)
-
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
-
         console.log("[v0] Making POST request to validate email...")
         validateResponse = await fetch("/api/auth/validate-email", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
-            "Cache-Control": "no-cache",
           },
           body: JSON.stringify({ email: otpEmail }),
-          signal: controller.signal,
         })
 
-        clearTimeout(timeoutId)
-        console.log("[v0] Fetch completed successfully, status:", validateResponse.status)
+        console.log("[v0] Validate response status:", validateResponse.status)
       } catch (fetchError) {
         console.error("[v0] Fetch failed:", fetchError)
 
         if (fetchError instanceof Error) {
-          if (fetchError.name === "AbortError") {
-            showError("Request timeout. The server is taking too long to respond. Please try again.", "Timeout Error")
-          } else if (fetchError.message.includes("Failed to fetch")) {
-            // This is the specific error we're getting
+          if (fetchError.message.includes("Failed to fetch")) {
             showError(
-              "Unable to connect to the authentication server. This may be a temporary network issue. Please check your internet connection and try again in a few moments.",
+              "Unable to connect to the server. Please check your internet connection and try again.",
               "Connection Error",
             )
-          } else if (fetchError.message.includes("NetworkError")) {
-            showError("Network error occurred. Please check your internet connection and try again.", "Network Error")
           } else {
             showError(`Connection failed: ${fetchError.message}. Please try again.`, "Connection Error")
           }
         } else {
-          showError("Unknown network error. Please try again.", "Network Error")
+          showError("Network error. Please try again.", "Network Error")
         }
-        return
-      }
-
-      console.log("[v0] Validate response status:", validateResponse.status)
-      console.log("[v0] Validate response headers:", validateResponse.headers.get("content-type"))
-
-      const contentType = validateResponse.headers.get("content-type")
-
-      // Get response text first to debug
-      const responseText = await validateResponse.text()
-      console.log("[v0] Raw response text:", responseText.substring(0, 200)) // Log first 200 chars
-
-      if (!responseText) {
-        console.error("[v0] Empty response received")
-        showError("Server error: Empty response. Please try again.", "Server Error")
-        return
-      }
-
-      // Check if response looks like HTML (common on deployed domains when there's an error)
-      if (responseText.trim().startsWith("<!DOCTYPE") || responseText.trim().startsWith("<html")) {
-        console.error("[v0] Received HTML instead of JSON - likely server error")
-        showError("Server configuration error. Please contact support or try again later.", "Server Error")
         return
       }
 
       let validateResult
       try {
-        validateResult = JSON.parse(responseText)
-      } catch (jsonError) {
-        console.error("[v0] JSON parsing error:", jsonError)
-        console.error("[v0] Response text that failed to parse:", responseText.substring(0, 500))
+        const responseText = await validateResponse.text()
+        console.log("[v0] Raw response:", responseText.substring(0, 200))
 
-        if (responseText.includes("Internal Server Error") || responseText.includes("500")) {
-          showError("Server is temporarily unavailable. Please try again in a few minutes.", "Server Error")
-        } else {
-          showError("Server error: Invalid response format. Please contact support.", "Server Error")
+        if (!responseText) {
+          throw new Error("Empty response from server")
         }
+
+        if (responseText.trim().startsWith("<!DOCTYPE") || responseText.trim().startsWith("<html")) {
+          throw new Error("Server returned HTML instead of JSON - likely a server error")
+        }
+
+        validateResult = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error("[v0] Response parsing error:", parseError)
+        showError("Server error: Invalid response format. Please try again or contact support.", "Server Error")
         return
       }
 
-      console.log("[v0] Parsed validation result:", validateResult.message)
+      console.log("[v0] Parsed validation result:", validateResult)
 
       if (!validateResponse.ok) {
         showFieldError("Email", validateResult.error || "Email validation failed")
@@ -388,10 +350,10 @@ export default function LoginPage() {
 
       if (!validateResult.approved) {
         showWarning(
-          "Your account is pending admin approval. Please wait for activation before using OTP login.",
+          "Your account is pending admin approval. OTP will be sent but login may be restricted.",
           "Account Approval Required",
         )
-        return
+        // Continue with OTP sending even for unapproved accounts
       }
 
       console.log("[v0] Email validated, sending OTP")
@@ -424,6 +386,8 @@ export default function LoginPage() {
             throw new Error("Email not found in the system. Please contact your administrator.")
           } else if (otpResult.error.message.includes("Signup not allowed")) {
             throw new Error("OTP login is not available for this email. Please use password login.")
+          } else if (otpResult.error.message.includes("Unable to validate email address")) {
+            throw new Error("Email validation failed. Please check your email address and try again.")
           } else {
             throw new Error(`OTP sending failed: ${otpResult.error.message}`)
           }
@@ -441,7 +405,7 @@ export default function LoginPage() {
       if (error instanceof Error) {
         if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
           showError(
-            "Network connectivity issue. Please check your internet connection and try again. If the problem persists, contact IT support.",
+            "Network connectivity issue. Please check your internet connection and try again.",
             "Connection Error",
           )
         } else if (

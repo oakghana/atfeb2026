@@ -16,17 +16,19 @@ export async function OPTIONS() {
   })
 }
 
-export async function POST(request: NextRequest) {
-  const response = NextResponse.json(
-    { error: "Processing request...", exists: false },
+export async function GET() {
+  return NextResponse.json(
+    { message: "Email validation API is running", status: "ok" },
     { status: 200, headers: JSON_HEADERS },
   )
+}
 
+export async function POST(request: NextRequest) {
   try {
     const clientId = getClientIdentifier(request)
     const isAllowed = rateLimit(clientId, {
       windowMs: 5 * 60 * 1000, // 5 minutes
-      maxRequests: 10, // Max 10 email validation attempts per 5 minutes
+      maxRequests: 20, // Increased from 10 to 20 attempts per 5 minutes
     })
 
     if (!isAllowed) {
@@ -62,25 +64,9 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Validating email:", email)
 
-    let createClient
-    try {
-      const supabaseModule = await import("@/lib/supabase/server")
-      createClient = supabaseModule.createClient
-      console.log("[v0] Supabase module imported successfully")
-    } catch (importError) {
-      console.error("[v0] Failed to import Supabase module:", importError)
-      return NextResponse.json(
-        {
-          error: "Server configuration error",
-          exists: false,
-          details: "Failed to load database module",
-        },
-        { status: 500, headers: JSON_HEADERS },
-      )
-    }
-
     let supabase
     try {
+      const { createClient } = await import("@/lib/supabase/server")
       supabase = await createClient()
       console.log("[v0] Supabase client created successfully")
     } catch (clientError) {
@@ -170,11 +156,4 @@ export async function POST(request: NextRequest) {
       { status: 500, headers: JSON_HEADERS },
     )
   }
-}
-
-export async function GET() {
-  return NextResponse.json(
-    { error: "Method not allowed. Use POST to validate email." },
-    { status: 405, headers: JSON_HEADERS },
-  )
 }

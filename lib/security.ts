@@ -13,6 +13,15 @@ export function rateLimit(identifier: string, config: RateLimitConfig): boolean 
   const key = identifier
   const existing = rateLimitStore.get(key)
 
+  // Clean up expired entries periodically
+  if (rateLimitStore.size > 1000) {
+    for (const [k, v] of rateLimitStore.entries()) {
+      if (now > v.resetTime) {
+        rateLimitStore.delete(k)
+      }
+    }
+  }
+
   if (!existing || now > existing.resetTime) {
     // Reset or create new entry
     rateLimitStore.set(key, {
