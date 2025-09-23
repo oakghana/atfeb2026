@@ -1,7 +1,7 @@
 {
   "name": "QCC Electronic Attendance System",
   "short_name": "QCC Attendance",
-  "description": "Quality Control Company Limited Electronic Attendance System - Intranet Portal",
+  "description": "Quality Control Company Limited Electronic Attendance System - Intranet Portal with Real-time Location Tracking",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#0f0f0f",
@@ -10,6 +10,7 @@
   "scope": "/",
   "lang": "en",
   "categories": ["business", "productivity"],
+  "permissions": ["geolocation"],
   "icons": [
     {
       "src": "/images/qcc-logo.png",
@@ -26,9 +27,21 @@
   ],
   "shortcuts": [
     {
+      "name": "Quick Check-in",
+      "short_name": "Check-in",
+      "description": "Quick GPS-based attendance check-in",
+      "url": "/dashboard/attendance?quick=true",
+      "icons": [
+        {
+          "src": "/images/qcc-logo.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
       "name": "Check Attendance",
       "short_name": "Attendance",
-      "description": "Quick access to attendance recording",
+      "description": "View attendance records and history",
       "url": "/dashboard/attendance",
       "icons": [
         {

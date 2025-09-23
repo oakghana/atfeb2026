@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { Smartphone, Download, Apple, Play, Globe } from "lucide-react"
+import { Smartphone, Download, Apple, Play, Globe, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface MobileAppDownloadProps {
@@ -38,7 +38,7 @@ export function MobileAppDownload({ className, variant = "sidebar" }: MobileAppD
     } else {
       // Show manual install instructions
       alert(
-        "To install the app:\n\n1. Tap the share button in your browser\n2. Select 'Add to Home Screen'\n3. Tap 'Add' to install",
+        "To install the app:\n\n1. Tap the share button in your browser\n2. Select 'Add to Home Screen'\n3. Tap 'Add' to install\n\nThe app includes real-time location tracking for accurate attendance recording.",
       )
     }
 
@@ -97,14 +97,19 @@ export function MobileAppDownload({ className, variant = "sidebar" }: MobileAppD
               </div>
               <div className="flex-1">
                 <span className="font-medium">{isStandalone() ? "App Already Installed" : "Install Web App"}</span>
-                <p className="text-xs text-muted-foreground">
-                  {isStandalone() ? "You're using the installed app" : "Add to home screen for quick access"}
-                </p>
+                <div className="flex items-center gap-1 mt-1">
+                  <MapPin className="h-3 w-3 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">
+                    {isStandalone() ? "Real-time location tracking active" : "Includes real-time location tracking"}
+                  </p>
+                </div>
               </div>
               {isInstalling && (
                 <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               )}
             </DropdownMenuItem>
+
+            <DropdownMenuSeparator className="bg-border/50" />
 
             <DropdownMenuItem disabled className="flex items-center gap-3 px-3 py-3 opacity-50 rounded-lg min-h-[44px]">
               <div className="p-1.5 bg-muted/20 rounded-md">
@@ -136,7 +141,8 @@ export function MobileAppDownload({ className, variant = "sidebar" }: MobileAppD
 
             <div className="px-3 py-2">
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Install the mobile app for offline access, push notifications, and a native mobile experience.
+                Install the mobile app for offline access, push notifications, real-time location updates, and a native
+                mobile experience.
               </p>
             </div>
           </DropdownMenuContent>
@@ -179,9 +185,12 @@ export function MobileAppDownload({ className, variant = "sidebar" }: MobileAppD
               <span className="font-medium text-base">
                 {isStandalone() ? "App Already Installed" : "Install Web App"}
               </span>
-              <p className="text-sm text-muted-foreground">
-                {isStandalone() ? "You're using the installed app" : "Add to home screen for quick access"}
-              </p>
+              <div className="flex items-center gap-1 mt-1">
+                <MapPin className="h-3 w-3 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  {isStandalone() ? "Real-time location tracking active" : "Includes real-time location tracking"}
+                </p>
+              </div>
             </div>
             {isInstalling && (
               <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />

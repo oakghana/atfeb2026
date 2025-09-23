@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Download, X, Smartphone } from "lucide-react"
+import { Download, X, Smartphone, MapPin } from "lucide-react"
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[]
@@ -100,7 +100,7 @@ export function PWAInstallPrompt() {
               <div>
                 <CardTitle className="text-lg">Install QCC Attendance</CardTitle>
                 <CardDescription className="text-primary-foreground/80 text-sm">
-                  Get the full app experience
+                  Get the full app experience with real-time location tracking
                 </CardDescription>
               </div>
             </div>
@@ -115,9 +115,13 @@ export function PWAInstallPrompt() {
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <p className="text-sm text-primary-foreground/90 mb-4">
-            Install the QCC Attendance app for faster access, offline functionality, and a native mobile experience.
-          </p>
+          <div className="flex items-start gap-3 mb-4">
+            <MapPin className="h-4 w-4 text-primary-foreground/90 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-primary-foreground/90">
+              Install the QCC Attendance app for faster access, offline functionality, real-time location updates, and a
+              native mobile experience.
+            </p>
+          </div>
           <div className="flex gap-2">
             <Button
               onClick={handleInstallClick}

@@ -140,10 +140,14 @@ self.addEventListener("fetch", (event) => {
 })
 
 self.addEventListener("sync", (event) => {
-  console.log("[SW] Background sync triggered:", event.tag)
+  console.log("[v0] [SW] Background sync triggered:", event.tag)
 
   if (event.tag === "attendance-sync") {
     event.waitUntil(syncAttendanceData())
+  }
+
+  if (event.tag === "location-sync") {
+    event.waitUntil(syncLocationData())
   }
 })
 
@@ -255,4 +259,38 @@ async function removePendingAttendanceRecord(id) {
       deleteRequest.onerror = () => reject(deleteRequest.error)
     }
   })
+}
+
+async function syncLocationData() {
+  try {
+    console.log("[v0] [SW] Syncing location data...")
+
+    // Fetch latest location data and cache it
+    const response = await fetch("/api/attendance/locations")
+    if (response.ok) {
+      const locations = await response.json()
+
+      // Cache the location data for offline access
+      const cache = await caches.open(DYNAMIC_CACHE)
+      await cache.put(
+        "/api/attendance/locations",
+        new Response(JSON.stringify(locations), {
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+
+      console.log("[v0] [SW] Location data synced and cached")
+
+      // Notify all clients about location updates
+      const clients = await self.clients.matchAll()
+      clients.forEach((client) => {
+        client.postMessage({
+          type: "LOCATION_UPDATE",
+          data: locations,
+        })
+      })
+    }
+  } catch (error) {
+    console.error("[v0] [SW] Location sync failed:", error)
+  }
 }

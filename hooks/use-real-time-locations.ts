@@ -48,6 +48,17 @@ export function useRealTimeLocations() {
     // Initial fetch
     fetchLocations()
 
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type === "LOCATION_UPDATE") {
+        console.log("[v0] Real-time locations - Service worker update received")
+        setLocations(event.data.data || [])
+      }
+    }
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage)
+    }
+
     // Set up real-time subscription for location changes
     const channel = supabase
       .channel("locations_realtime")
@@ -67,6 +78,16 @@ export function useRealTimeLocations() {
 
           // Refetch locations when any change occurs
           fetchLocations()
+
+          if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready
+              .then((registration) => {
+                return registration.sync.register("location-sync")
+              })
+              .catch((error) => {
+                console.error("[v0] Failed to register location sync:", error)
+              })
+          }
         },
       )
       .subscribe((status) => {
@@ -77,6 +98,10 @@ export function useRealTimeLocations() {
     return () => {
       console.log("[v0] Real-time locations - Cleaning up subscription")
       supabase.removeChannel(channel)
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage)
+      }
     }
   }, [fetchLocations, supabase])
 
