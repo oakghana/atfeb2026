@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createClient } from "@/lib/supabase/server"
-import { Clock, Calendar, MapPin, Users, TrendingUp, UserCheck, AlertCircle, Activity } from "lucide-react"
+import { Clock, Calendar, Users, TrendingUp, UserCheck, AlertCircle, Activity } from "lucide-react"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 
@@ -130,7 +130,7 @@ export default async function DashboardPage() {
           </Alert>
         )}
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <StatsCard
             title="Today's Status"
             value={todayAttendance ? "Checked In" : "Not Checked In"}
@@ -150,8 +150,6 @@ export default async function DashboardPage() {
             icon={Calendar}
             trend={{ value: 5, isPositive: true }}
           />
-
-          <StatsCard title="QCC Locations" value={totalLocations || 0} description="Active campuses" icon={MapPin} />
 
           <StatsCard
             title="Department"

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Clock, MapPin, QrCode, Calendar, Zap, ArrowRight } from "lucide-react"
+import { Clock, QrCode, Calendar, Zap, ArrowRight } from "lucide-react"
 import Link from "next/link"
 
 export function QuickActions() {
@@ -17,17 +17,6 @@ export function QuickActions() {
       border: "border-primary/20 hover:border-primary/30",
       iconBg: "bg-gradient-to-br from-primary/10 to-primary/20",
       iconColor: "text-primary",
-    },
-    {
-      title: "View Locations",
-      description: "QCC campus locations",
-      href: "/dashboard/locations",
-      icon: MapPin,
-      gradient: "from-chart-2/5 via-chart-2/8 to-chart-2/12",
-      hoverGradient: "hover:from-chart-2/10 hover:via-chart-2/15 hover:to-chart-2/20",
-      border: "border-chart-2/20 hover:border-chart-2/30",
-      iconBg: "bg-gradient-to-br from-chart-2/10 to-chart-2/20",
-      iconColor: "text-chart-2",
     },
     {
       title: "Scan QR Code",
@@ -66,7 +55,7 @@ export function QuickActions() {
           Common tasks and shortcuts for daily operations
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-2">
+      <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {actions.map((action) => {
           const Icon = action.icon
           return (
