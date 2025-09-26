@@ -4,6 +4,7 @@ import "./globals.css"
 import { NotificationProvider } from "@/components/ui/notification-system"
 import { PWAServiceWorker } from "@/components/ui/pwa-service-worker"
 import { TimeBasedThemeProvider } from "@/components/theme/time-based-theme-provider"
+import { MobileInstallPrompt } from "@/components/ui/install-app-button"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -69,6 +70,7 @@ export default function RootLayout({
         <TimeBasedThemeProvider>
           <NotificationProvider>{children}</NotificationProvider>
           <PWAServiceWorker />
+          <MobileInstallPrompt />
         </TimeBasedThemeProvider>
       </body>
     </html>
