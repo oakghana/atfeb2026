@@ -21,26 +21,41 @@ export function PWAInstallPrompt() {
 
   useEffect(() => {
     const checkInstalled = () => {
-      if (window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone === true) {
+      const isStandalone =
+        window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone === true
+      const wasDismissed = localStorage.getItem("pwa-install-dismissed") === "true"
+
+      if (isStandalone) {
         setIsInstalled(true)
+        setShowPrompt(false)
+        // Clear dismissed flag if app is now installed
+        localStorage.removeItem("pwa-install-dismissed")
       }
+
+      return isStandalone
     }
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
-      setDeferredPrompt(e as BeforeInstallPromptEvent)
+      const installed = checkInstalled()
 
-      // Show prompt after a delay if not dismissed before
-      setTimeout(() => {
-        const dismissed = localStorage.getItem("pwa-install-dismissed")
-        if (!dismissed && !isInstalled) {
-          setShowPrompt(true)
-        }
-      }, 5000)
+      // Only set deferred prompt if not already installed
+      if (!installed) {
+        setDeferredPrompt(e as BeforeInstallPromptEvent)
+
+        // Show prompt after a delay if not dismissed before and not installed
+        setTimeout(() => {
+          const dismissed = localStorage.getItem("pwa-install-dismissed")
+          if (!dismissed && !checkInstalled()) {
+            setShowPrompt(true)
+          }
+        }, 5000)
+      }
     }
 
     const handleShowPWAInstall = () => {
-      if (deferredPrompt && !isInstalled) {
+      const installed = checkInstalled()
+      if (deferredPrompt && !installed) {
         setShowPrompt(true)
       }
     }
@@ -50,17 +65,28 @@ export function PWAInstallPrompt() {
       setShowPrompt(false)
       setIsInstalled(true)
       setDeferredPrompt(null)
+      // Clear dismissed flag since app is now installed
+      localStorage.removeItem("pwa-install-dismissed")
     }
 
     checkInstalled()
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkInstalled()
+      }
+    }
+
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
     window.addEventListener("appinstalled", handleAppInstalled)
     window.addEventListener("show-pwa-install", handleShowPWAInstall)
+    document.addEventListener("visibilitychange", handleVisibilityChange)
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
       window.removeEventListener("appinstalled", handleAppInstalled)
       window.removeEventListener("show-pwa-install", handleShowPWAInstall)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
   }, [isInstalled, deferredPrompt])
 

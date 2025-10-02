@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { User, Mail, Phone, MapPin, Building, Save, Camera, Lock, Key, Calendar } from "lucide-react"
+import { User, Mail, Phone, MapPin, Building, Save, Camera, Lock, Key, Calendar, Eye, EyeOff } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { PersonalAttendanceHistory } from "@/components/attendance/personal-attendance-history"
 import { SecureInput } from "@/components/ui/secure-input"
@@ -66,6 +66,9 @@ export function ProfileClient() {
     confirmPassword: "",
   })
   const [showPasswordChange, setShowPasswordChange] = useState(false)
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
     fetchProfile()
@@ -233,6 +236,9 @@ export function ProfileClient() {
       setSuccess("Password updated successfully")
       setShowPasswordChange(false)
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
+      setShowCurrentPassword(false)
+      setShowNewPassword(false)
+      setShowConfirmPassword(false)
       setTimeout(() => setSuccess(null), 3000)
     } catch (error) {
       setError(error instanceof Error ? error.message : "Failed to update password")
@@ -448,39 +454,87 @@ export function ProfileClient() {
                   <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
                     <div>
                       <Label htmlFor="currentPassword">Current Password</Label>
-                      <SecureInput
-                        id="currentPassword"
-                        type="password"
-                        value={passwordForm.currentPassword}
-                        onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                        placeholder="Enter current password"
-                        sanitize={false} // Don't sanitize passwords
-                      />
+                      <div className="relative">
+                        <SecureInput
+                          id="currentPassword"
+                          type={showCurrentPassword ? "text" : "password"}
+                          value={passwordForm.currentPassword}
+                          onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                          placeholder="Enter current password"
+                          sanitize={false}
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        >
+                          {showCurrentPassword ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                     <div>
                       <Label htmlFor="newPassword">New Password</Label>
-                      <SecureInput
-                        id="newPassword"
-                        type="password"
-                        value={passwordForm.newPassword}
-                        onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                        placeholder="Enter new password"
-                        sanitize={false} // Don't sanitize passwords
-                      />
+                      <div className="relative">
+                        <SecureInput
+                          id="newPassword"
+                          type={showNewPassword ? "text" : "password"}
+                          value={passwordForm.newPassword}
+                          onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                          placeholder="Enter new password"
+                          sanitize={false}
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                        >
+                          {showNewPassword ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         Password must be at least 8 characters with uppercase, lowercase, number, and special character
                       </p>
                     </div>
                     <div>
                       <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                      <SecureInput
-                        id="confirmPassword"
-                        type="password"
-                        value={passwordForm.confirmPassword}
-                        onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                        placeholder="Confirm new password"
-                        sanitize={false} // Don't sanitize passwords
-                      />
+                      <div className="relative">
+                        <SecureInput
+                          id="confirmPassword"
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={passwordForm.confirmPassword}
+                          onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                          placeholder="Confirm new password"
+                          sanitize={false}
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <Button onClick={handlePasswordChange} disabled={saving}>
@@ -491,6 +545,9 @@ export function ProfileClient() {
                         onClick={() => {
                           setShowPasswordChange(false)
                           setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
+                          setShowCurrentPassword(false)
+                          setShowNewPassword(false)
+                          setShowConfirmPassword(false)
                         }}
                       >
                         Cancel

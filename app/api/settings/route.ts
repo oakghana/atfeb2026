@@ -102,7 +102,7 @@ export async function PUT(request: NextRequest) {
         user_id: user.id,
         action: "update_user_settings",
         details: { updated_fields: Object.keys(userSettings) },
-        ip_address: request.headers.get("x-forwarded-for") || "unknown",
+        ip_address: request.headers.get("x-forwarded-for") || null,
         user_agent: request.headers.get("user-agent") || "unknown",
       })
     }
@@ -144,7 +144,7 @@ export async function PUT(request: NextRequest) {
             systemSettings.geo_settings?.globalProximityDistance || systemSettings.geo_settings?.checkInProximityRange,
           message: "Global proximity distance updated - applies to all staff members",
         },
-        ip_address: request.headers.get("x-forwarded-for") || "unknown",
+        ip_address: request.headers.get("x-forwarded-for") || null,
         user_agent: request.headers.get("user-agent") || "unknown",
       })
     }

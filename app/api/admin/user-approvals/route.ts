@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         action: "user_approved",
         details: { approved_user_id: userId },
-        ip_address: request.headers.get("x-forwarded-for") || "unknown",
+        ip_address: request.headers.get("x-forwarded-for") || null,
       })
 
       return NextResponse.json(
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         action: "user_rejected",
         details: { rejected_user_id: userId },
-        ip_address: request.headers.get("x-forwarded-for") || "unknown",
+        ip_address: request.headers.get("x-forwarded-for") || null,
       })
 
       return NextResponse.json(

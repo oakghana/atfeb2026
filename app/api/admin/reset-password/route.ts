@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
         target_user_email: targetUser.email,
         target_user_name: `${targetUser.first_name} ${targetUser.last_name}`,
       },
-      ip_address: request.headers.get("x-forwarded-for") || "unknown",
+      ip_address: request.headers.get("x-forwarded-for") || null,
       user_agent: request.headers.get("user-agent") || "unknown",
     })
 

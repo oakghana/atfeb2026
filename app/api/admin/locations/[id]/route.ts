@@ -60,7 +60,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       table_name: "geofence_locations",
       record_id: params.id,
       new_values: { name, address, latitude, longitude, radius_meters, is_active },
-      ip_address: request.headers.get("x-forwarded-for") || "unknown",
+      ip_address: request.headers.get("x-forwarded-for") || null,
     })
 
     return NextResponse.json({

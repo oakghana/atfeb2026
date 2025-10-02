@@ -38,12 +38,18 @@ export function MobileAppDownload({ className, variant = "sidebar" }: MobileAppD
       const standalone =
         window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone === true
       setIsInstalled(standalone)
+      return standalone
     }
 
     const handleBeforeInstallPrompt = (e: Event) => {
-      console.log("[PWA] Install prompt available")
-      e.preventDefault()
-      setDeferredPrompt(e as BeforeInstallPromptEvent)
+      const installed = checkInstalled()
+
+      // Only handle prompt if not already installed
+      if (!installed) {
+        console.log("[PWA] Install prompt available")
+        e.preventDefault()
+        setDeferredPrompt(e as BeforeInstallPromptEvent)
+      }
     }
 
     const handleAppInstalled = () => {
@@ -55,12 +61,20 @@ export function MobileAppDownload({ className, variant = "sidebar" }: MobileAppD
 
     checkInstalled()
 
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkInstalled()
+      }
+    }
+
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
     window.addEventListener("appinstalled", handleAppInstalled)
+    document.addEventListener("visibilitychange", handleVisibilityChange)
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
       window.removeEventListener("appinstalled", handleAppInstalled)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
   }, [])
 
@@ -160,13 +174,13 @@ export function MobileAppDownload({ className, variant = "sidebar" }: MobileAppD
           >
             <DropdownMenuLabel className="font-semibold flex items-center gap-2">
               <Smartphone className="h-4 w-4 text-accent" />
-              QCC Attendance Mobile App
+              {isInstalled ? "QCC Attendance App Installed" : "QCC Attendance Mobile App"}
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-border/50" />
 
             <DropdownMenuItem
               onClick={handlePWAInstall}
-              disabled={isInstalling}
+              disabled={isInstalling || isInstalled}
               className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-muted/50 rounded-lg transition-all duration-200 touch-manipulation min-h-[44px]"
             >
               <div className="p-1.5 bg-primary/10 rounded-md">
@@ -260,7 +274,7 @@ export function MobileAppDownload({ className, variant = "sidebar" }: MobileAppD
 
           <DropdownMenuItem
             onClick={handlePWAInstall}
-            disabled={isInstalling}
+            disabled={isInstalling || isInstalled}
             className="flex items-center gap-3 px-3 py-4 cursor-pointer hover:bg-muted/50 rounded-lg transition-all duration-200 touch-manipulation"
           >
             <div className="p-2 bg-primary/10 rounded-lg">
