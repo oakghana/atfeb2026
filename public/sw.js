@@ -2,6 +2,8 @@ const CACHE_NAME = "qcc-attendance-v1"
 const STATIC_CACHE = "qcc-static-v1"
 const DYNAMIC_CACHE = "qcc-dynamic-v1"
 
+const APP_VERSION = "1.0.1"
+
 const STATIC_ASSETS = [
   "/",
   "/dashboard",
@@ -13,7 +15,7 @@ const STATIC_ASSETS = [
 ]
 
 self.addEventListener("install", (event) => {
-  console.log("[SW] Installing service worker")
+  console.log("[SW] Installing service worker version:", APP_VERSION)
   event.waitUntil(
     caches
       .open(STATIC_CACHE)
@@ -32,7 +34,7 @@ self.addEventListener("install", (event) => {
 })
 
 self.addEventListener("activate", (event) => {
-  console.log("[SW] Activating service worker")
+  console.log("[SW] Activating service worker version:", APP_VERSION)
   event.waitUntil(
     caches
       .keys()
@@ -49,8 +51,26 @@ self.addEventListener("activate", (event) => {
       .then(() => {
         console.log("[SW] Service worker activated")
         return self.clients.claim()
+      })
+      .then(() => {
+        return self.clients.matchAll().then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({
+              type: "SW_ACTIVATED",
+              version: APP_VERSION,
+              timestamp: Date.now(),
+            })
+          })
+        })
       }),
   )
+})
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    console.log("[SW] Received SKIP_WAITING message, activating new version")
+    self.skipWaiting()
+  }
 })
 
 self.addEventListener("fetch", (event) => {

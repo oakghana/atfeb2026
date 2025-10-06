@@ -276,7 +276,11 @@ export default function LoginPage() {
 
       console.log("[v0] Login successful, redirecting to dashboard")
       showSuccess("Login successful! Redirecting to dashboard...", "Welcome Back")
-      router.push("/dashboard")
+
+      // Wait a moment for the success message to show, then do a full page reload
+      setTimeout(() => {
+        window.location.href = "/dashboard"
+      }, 500)
     } catch (error: unknown) {
       console.log("[v0] Caught error:", error)
       showError(error instanceof Error ? error.message : "An error occurred during login", "Login Error")
@@ -546,7 +550,11 @@ export default function LoginPage() {
 
       console.log("[v0] OTP verification successful")
       showSuccess("OTP verified successfully! Redirecting to dashboard...", "Login Successful")
-      router.push("/dashboard")
+
+      // Wait a moment for the success message to show, then do a full page reload
+      setTimeout(() => {
+        window.location.href = "/dashboard"
+      }, 500)
     } catch (error: unknown) {
       console.error("[v0] OTP verification exception:", error)
       showFieldError("OTP Code", error instanceof Error ? error.message : "Invalid OTP code")

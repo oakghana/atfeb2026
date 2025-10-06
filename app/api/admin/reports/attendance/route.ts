@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest) {
   try {
+    console.log("[v0] Reports API - Starting request")
     const supabase = await createClient()
 
     // Get authenticated user and check role
@@ -12,8 +13,11 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
+      console.error("[v0] Reports API - Auth error:", authError)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    console.log("[v0] Reports API - User authenticated:", user.id)
 
     const { data: profile } = await supabase
       .from("user_profiles")
@@ -22,8 +26,11 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (!profile || !["admin", "department_head", "staff"].includes(profile.role)) {
+      console.error("[v0] Reports API - Insufficient permissions:", profile?.role)
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
     }
+
+    console.log("[v0] Reports API - User role:", profile.role)
 
     // Get query parameters
     const { searchParams } = new URL(request.url)
@@ -32,6 +39,17 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get("end_date") || new Date().toISOString().split("T")[0]
     const departmentId = searchParams.get("department_id")
     const userId = searchParams.get("user_id")
+    const locationId = searchParams.get("location_id")
+    const districtId = searchParams.get("district_id")
+
+    console.log("[v0] Reports API - Filters:", {
+      startDate,
+      endDate,
+      departmentId,
+      userId,
+      locationId,
+      districtId,
+    })
 
     let query = supabase
       .from("attendance_records")
@@ -39,11 +57,13 @@ export async function GET(request: NextRequest) {
         *,
         check_in_location:geofence_locations!check_in_location_id (
           name,
-          address
+          address,
+          district_id
         ),
         check_out_location:geofence_locations!check_out_location_id (
           name,
-          address
+          address,
+          district_id
         )
       `)
       .gte("check_in_time", `${startDate}T00:00:00`)
@@ -55,12 +75,18 @@ export async function GET(request: NextRequest) {
       query = query.eq("user_id", userId)
     }
 
+    if (locationId) {
+      query = query.eq("check_in_location_id", locationId)
+    }
+
     const { data: attendanceRecords, error } = await query.order("check_in_time", { ascending: false })
 
     if (error) {
-      console.error("Attendance report error:", error)
+      console.error("[v0] Reports API - Attendance query error:", error)
       return NextResponse.json({ error: "Failed to fetch attendance report" }, { status: 500 })
     }
+
+    console.log("[v0] Reports API - Found", attendanceRecords.length, "attendance records")
 
     const userIds = [...new Set(attendanceRecords.map((record) => record.user_id))]
 
@@ -79,7 +105,12 @@ export async function GET(request: NextRequest) {
         ),
         assigned_location:geofence_locations!assigned_location_id (
           name,
-          address
+          address,
+          district_id
+        ),
+        districts (
+          id,
+          name
         )
       `)
       .in("id", userIds)
@@ -104,6 +135,20 @@ export async function GET(request: NextRequest) {
         return user?.department_id === departmentId
       })
     }
+
+    if (districtId) {
+      filteredRecords = filteredRecords.filter((record) => {
+        const user = userMap.get(record.user_id)
+        // Check if user's assigned location is in the selected district
+        return (
+          user?.assigned_location?.district_id === districtId ||
+          // Or if the check-in location is in the selected district
+          record.check_in_location?.district_id === districtId
+        )
+      })
+    }
+
+    console.log("[v0] Reports API - After filtering:", filteredRecords.length, "records")
 
     const enrichedRecords = filteredRecords.map((record) => {
       const userProfile = userMap.get(record.user_id)
@@ -155,6 +200,8 @@ export async function GET(request: NextRequest) {
       {} as Record<string, { count: number; totalHours: number }>,
     )
 
+    console.log("[v0] Reports API - Returning", totalRecords, "records with summary")
+
     return NextResponse.json(
       {
         success: true,
@@ -181,9 +228,13 @@ export async function GET(request: NextRequest) {
       },
     )
   } catch (error) {
-    console.error("Attendance report API error:", error)
+    console.error("[v0] Reports API - Unexpected error:", error)
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        success: false,
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
       {
         status: 500,
         headers: {

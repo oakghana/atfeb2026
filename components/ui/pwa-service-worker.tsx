@@ -70,11 +70,19 @@ export function PWAServiceWorker() {
         window.addEventListener("online", handleOnline)
         window.addEventListener("offline", handleOffline)
 
+        const handleControllerChange = () => {
+          console.log("[PWA] Service worker controller changed, reloading page")
+          window.location.reload()
+        }
+
+        navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange)
+
         return () => {
           window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
           window.removeEventListener("appinstalled", handleAppInstalled)
           window.removeEventListener("online", handleOnline)
           window.removeEventListener("offline", handleOffline)
+          navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange)
         }
       }
 
@@ -94,19 +102,28 @@ export function PWAServiceWorker() {
 
           console.log("[PWA] Service Worker registered successfully:", registration)
 
-          // Listen for updates
           registration.addEventListener("updatefound", () => {
             console.log("[PWA] Service Worker update found")
             const newWorker = registration.installing
 
             if (newWorker) {
               newWorker.addEventListener("statechange", () => {
+                console.log("[PWA] New service worker state:", newWorker.state)
                 if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                  console.log("[PWA] New service worker installed, refresh available")
+                  console.log("[PWA] New service worker installed and ready")
+                  // Dispatch custom event for update notification component
+                  window.dispatchEvent(new CustomEvent("pwa-update-available"))
                 }
               })
             }
           })
+
+          setInterval(
+            () => {
+              registration.update()
+            },
+            5 * 60 * 1000,
+          )
 
           navigator.serviceWorker.addEventListener("message", (event) => {
             console.log("[PWA] Message from service worker:", event.data)
