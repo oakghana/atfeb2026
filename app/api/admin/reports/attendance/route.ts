@@ -106,11 +106,11 @@ export async function GET(request: NextRequest) {
         assigned_location:geofence_locations!assigned_location_id (
           name,
           address,
-          district_id
-        ),
-        districts (
-          id,
-          name
+          district_id,
+          districts (
+            id,
+            name
+          )
         )
       `)
       .in("id", userIds)

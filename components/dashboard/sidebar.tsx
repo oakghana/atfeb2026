@@ -148,13 +148,6 @@ const navigationItems = [
     roles: ["admin", "department_head", "staff"],
     category: "settings",
   },
-  {
-    title: "HR Excuse Duty Portal",
-    href: "/dashboard/hr-excuse-duty",
-    icon: UserCheck,
-    roles: ["admin"],
-    category: "admin",
-  },
 ]
 
 export function Sidebar({ user, profile }: SidebarProps) {
@@ -180,7 +173,28 @@ export function Sidebar({ user, profile }: SidebarProps) {
     router.push("/auth/login")
   }
 
-  const filteredNavItems = navigationItems.filter((item) => item.roles.includes(profile?.role || "staff"))
+  const isHRDepartmentHead =
+    profile?.role === "department_head" &&
+    (profile?.departments?.name?.toLowerCase().includes("hr") ||
+      profile?.departments?.name?.toLowerCase().includes("human resource") ||
+      profile?.departments?.code?.toLowerCase() === "hr")
+
+  const shouldShowHRPortal = profile?.role === "admin" || isHRDepartmentHead
+
+  const allNavigationItems = shouldShowHRPortal
+    ? [
+        ...navigationItems,
+        {
+          title: "HR Excuse Duty Portal",
+          href: "/dashboard/hr-excuse-duty",
+          icon: UserCheck,
+          roles: ["admin", "department_head"],
+          category: "admin" as const,
+        },
+      ]
+    : navigationItems
+
+  const filteredNavItems = allNavigationItems.filter((item) => item.roles.includes(profile?.role || "staff"))
 
   const mainItems = filteredNavItems.filter((item) => item.category === "main")
   const adminItems = filteredNavItems.filter((item) => item.category === "admin")
