@@ -415,7 +415,6 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
           }, 4000) // Show warning for 4 seconds
           return
         }
-        // </CHANGE>
 
         if (locationInfo?.is_remote_location) {
           message += " (Note: This is different from your assigned location)"
@@ -531,7 +530,23 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
         body: JSON.stringify(requestBody),
       })
 
-      const result = await response.json()
+      let result
+      const responseText = await response.text()
+
+      try {
+        result = JSON.parse(responseText)
+      } catch {
+        // If not JSON, treat as error message
+        result = { error: responseText || `Server error (${response.status})` }
+      }
+
+      if (!response.ok) {
+        setError(result.error || result.message || "Failed to check out")
+        setIsLoading(false)
+        return
+      }
+      // </CHANGE>
+
       console.log("[v0] Check-out response:", result)
 
       if (result.success) {
@@ -545,7 +560,7 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
             setTimeout(() => {
               window.location.reload()
             }, 2000)
-          }, 7000) // Show warning for 7 seconds
+          }, 7000)
           return
         }
         // </CHANGE>
@@ -619,7 +634,6 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
           }, 4000) // Show warning for 4 seconds
           return
         }
-        // </CHANGE>
 
         setSuccess(message)
         setTimeout(() => {
@@ -740,7 +754,6 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
   const isCheckedOut = todayAttendance?.check_out_time
   const canCheckIn = !todayAttendance?.check_in_time || isFromPreviousDay
   const canCheckOut = isCheckedIn && !isFromPreviousDay
-  // </CHANGE>
 
   const defaultMode = canCheckIn ? "checkin" : canCheckOut ? "checkout" : "completed"
 

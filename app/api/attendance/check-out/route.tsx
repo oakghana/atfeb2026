@@ -6,7 +6,6 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
 
-    // Get authenticated user
     const {
       data: { user },
       error: authError,
@@ -19,8 +18,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { latitude, longitude, location_id, qr_code_used, qr_timestamp } = body
 
-    console.log("[v0] Check-out request:", { latitude, longitude, location_id, qr_code_used })
-
     if (!qr_code_used && (!latitude || !longitude)) {
       return NextResponse.json({ error: "Location coordinates are required for GPS check-out" }, { status: 400 })
     }
@@ -28,7 +25,6 @@ export async function POST(request: NextRequest) {
     const now = new Date()
     const today = new Date().toISOString().split("T")[0]
 
-    // Find today's attendance record
     const { data: attendanceRecord, error: findError } = await supabase
       .from("attendance_records")
       .select(`
@@ -44,25 +40,21 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (findError || !attendanceRecord) {
-      console.log("[v0] No attendance record found:", findError)
       return NextResponse.json({ error: "No check-in record found for today" }, { status: 400 })
     }
 
     if (attendanceRecord.check_out_time) {
-      console.log("[v0] Already checked out:", attendanceRecord.check_out_time)
       return NextResponse.json({ error: "Already checked out today" }, { status: 400 })
     }
 
-    // Check if check-in was from a previous day (after midnight has passed)
     const checkInDate = new Date(attendanceRecord.check_in_time).toISOString().split("T")[0]
     const currentDate = now.toISOString().split("T")[0]
 
     if (checkInDate !== currentDate) {
-      console.log("[v0] Check-out attempted after midnight:", { checkInDate, currentDate })
       return NextResponse.json(
         {
           error:
-            "Check-out must be done before 11:59 PM on the same day. The system has switched to check-in mode for the new day. Your previous day's attendance will be auto-closed.",
+            "Check-out must be done before 11:59 PM on the same day. The system has switched to check-in mode for the new day.",
           requiresNewCheckIn: true,
         },
         { status: 400 },
@@ -78,7 +70,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No active QCC locations found" }, { status: 400 })
     }
 
-    const { data: settingsData } = await supabase.from("system_settings").select("geo_settings").single()
+    const { data: settingsData } = await supabase.from("system_settings").select("geo_settings").maybeSingle()
 
     const proximitySettings = {
       checkInProximityRange: settingsData?.geo_settings?.checkInProximityRange || 50,
@@ -88,13 +80,12 @@ export async function POST(request: NextRequest) {
     }
 
     let checkoutLocationData = null
-    const isRemoteCheckout = false
 
     if (!qr_code_used && latitude && longitude) {
       const userLocation: LocationData = {
         latitude,
         longitude,
-        accuracy: 10, // Assume reasonable accuracy for API validation
+        accuracy: 10,
       }
 
       const validation = validateCheckoutLocation(userLocation, qccLocations, proximitySettings)
@@ -109,9 +100,7 @@ export async function POST(request: NextRequest) {
       }
 
       checkoutLocationData = validation.nearestLocation
-      console.log("[v0] Proximity validation passed for check-out at:", checkoutLocationData?.name)
     } else if (location_id) {
-      // For QR code check-out, use the provided location
       const { data: locationData, error: locationError } = await supabase
         .from("geofence_locations")
         .select("id, name, address, district_id, districts(name)")
@@ -120,67 +109,53 @@ export async function POST(request: NextRequest) {
 
       if (!locationError && locationData) {
         checkoutLocationData = locationData
-        console.log("[v0] Using QR code location:", locationData.name)
       }
     }
 
     if (!checkoutLocationData) {
       return NextResponse.json(
         {
-          error:
-            "Unable to determine check-out location. Please ensure you are within 50m of a QCC location or use a QR code.",
+          error: "Unable to determine check-out location. Please ensure you are within 50m of a QCC location.",
         },
         { status: 400 },
       )
     }
 
-    // Calculate work hours
     const checkInTime = new Date(attendanceRecord.check_in_time)
     const checkOutTime = new Date()
     const workHours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
 
     const checkOutHour = checkOutTime.getHours()
-    const isEarlyCheckout = checkOutHour < 17 // Before 5 PM (17:00)
+    const isEarlyCheckout = checkOutHour < 17
     let earlyCheckoutWarning = null
 
     if (isEarlyCheckout) {
       earlyCheckoutWarning = {
-        message: `Early checkout detected at ${checkOutTime.toLocaleTimeString()}. Standard work hours end at 5:00 PM. This will be visible to your department head.`,
+        message: `Early checkout detected at ${checkOutTime.toLocaleTimeString()}. Standard work hours end at 5:00 PM.`,
         checkoutTime: checkOutTime.toISOString(),
         standardEndTime: "17:00:00",
       }
-      console.log("[v0] Early checkout warning:", earlyCheckoutWarning)
     }
 
-    const checkoutData = {
+    const checkoutData: Record<string, any> = {
       check_out_time: checkOutTime.toISOString(),
       check_out_location_id: checkoutLocationData?.id || null,
       work_hours: Math.round(workHours * 100) / 100,
       updated_at: new Date().toISOString(),
       check_out_method: qr_code_used ? "qr_code" : "gps",
-      check_out_location_name: checkoutLocationData?.name || "Remote Location",
-      is_remote_checkout: isRemoteCheckout,
+      check_out_location_name: checkoutLocationData?.name || "Unknown Location",
+      is_remote_checkout: false,
     }
 
-    // Add GPS coordinates only if available
     if (latitude && longitude) {
       checkoutData.check_out_latitude = latitude
       checkoutData.check_out_longitude = longitude
-      console.log("[v0] GPS coordinates recorded")
-    } else {
-      console.log("[v0] No GPS coordinates available")
     }
 
-    // Add QR code timestamp if used
     if (qr_code_used && qr_timestamp) {
       checkoutData.qr_check_out_timestamp = qr_timestamp
     }
 
-    const isDifferentLocation = attendanceRecord.check_in_location_id !== (checkoutLocationData?.id || null)
-
-    console.log("[v0] Updating attendance record with:", checkoutData)
-
-    // Update attendance record
     const { data: updatedRecord, error: updateError } = await supabase
       .from("attendance_records")
       .update(checkoutData)
@@ -200,20 +175,8 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error("[v0] Update error:", updateError)
-      return NextResponse.json(
-        { error: `Failed to record check-out: ${updateError.message}` },
-        {
-          status: 500,
-          headers: {
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            Pragma: "no-cache",
-            Expires: "0",
-          },
-        },
-      )
+      return NextResponse.json({ error: `Failed to record check-out: ${updateError.message}` }, { status: 500 })
     }
-
-    console.log("[v0] Successfully updated attendance record")
 
     try {
       await supabase.from("audit_logs").insert({
@@ -222,73 +185,25 @@ export async function POST(request: NextRequest) {
         table_name: "attendance_records",
         record_id: attendanceRecord.id,
         old_values: attendanceRecord,
-        new_values: {
-          ...updatedRecord,
-          checkout_location_name: checkoutLocationData?.name,
-          checkout_district_name: checkoutLocationData?.districts?.name,
-          check_out_method: checkoutData.check_out_method,
-          different_checkout_location: isDifferentLocation,
-          is_remote_checkout: isRemoteCheckout,
-          work_hours_calculated: workHours,
-        },
+        new_values: updatedRecord,
         ip_address: request.ip || null,
         user_agent: request.headers.get("user-agent"),
       })
-      console.log("[v0] Audit log created successfully")
     } catch (auditError) {
       console.error("[v0] Audit log error (non-critical):", auditError)
     }
 
-    let locationMessage = ""
-    if (isRemoteCheckout) {
-      locationMessage = `Checked out remotely (reference: ${checkoutLocationData?.name || "Unknown"})`
-    } else if (isDifferentLocation) {
-      locationMessage = `Checked out at ${checkoutLocationData?.name} (different from check-in location: ${attendanceRecord.geofence_locations?.name})`
-    } else {
-      locationMessage = `Checked out at ${checkoutLocationData?.name || "Unknown Location"}`
-    }
-
-    console.log("[v0] Check-out successful:", locationMessage)
-
-    return NextResponse.json(
-      {
-        success: true,
-        earlyCheckoutWarning,
-        data: {
-          ...updatedRecord,
-          location_tracking: {
-            check_in_location: attendanceRecord.geofence_locations?.name,
-            check_out_location: checkoutLocationData?.name,
-            different_locations: isDifferentLocation,
-            is_remote_checkout: isRemoteCheckout,
-            check_out_method: checkoutData.check_out_method,
-            work_hours: workHours,
-          },
-        },
-        message: `Successfully checked out. ${locationMessage}. Work hours: ${workHours.toFixed(2)}`,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache, no-store, must-revalidate, private",
-          Pragma: "no-cache",
-          Expires: "0",
-          "X-Content-Type-Options": "nosniff",
-        },
-      },
-    )
+    return NextResponse.json({
+      success: true,
+      earlyCheckoutWarning,
+      data: updatedRecord,
+      message: `Successfully checked out at ${checkoutLocationData?.name}. Work hours: ${workHours.toFixed(2)}`,
+    })
   } catch (error) {
     console.error("[v0] Check-out error:", error)
     return NextResponse.json(
       { error: `Internal server error: ${error instanceof Error ? error.message : "Unknown error"}` },
-      {
-        status: 500,
-        headers: {
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-      },
+      { status: 500 },
     )
   }
 }
