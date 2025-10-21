@@ -97,6 +97,8 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [successDialogMessage, setSuccessDialogMessage] = useState("")
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [qrScanMode, setQrScanMode] = useState<"checkin" | "checkout">("checkin")
   const [locationPermissionStatus, setLocationPermissionStatus] = useState<{
@@ -441,11 +443,12 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
             if (locationInfo?.is_remote_location) {
               message += " (Note: This is different from your assigned location)"
             }
-            setSuccess(message)
+            setSuccessDialogMessage(message)
+            setShowSuccessDialog(true)
             setTimeout(() => {
               window.location.reload()
-            }, 2000)
-          }, 30000) // Changed from 4000 to 30000 (30 seconds)
+            }, 70000)
+          }, 70000)
           return
         }
 
@@ -453,10 +456,11 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
           message += " (Note: This is different from your assigned location)"
         }
 
-        setSuccess(message)
+        setSuccessDialogMessage(message)
+        setShowSuccessDialog(true)
         setTimeout(() => {
           window.location.reload()
-        }, 1500)
+        }, 70000)
       } else {
         setError(result.error || "Failed to check in")
       }
@@ -599,18 +603,20 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
           )
           setTimeout(() => {
             setError(null)
-            setSuccess(result.message)
+            setSuccessDialogMessage(result.message)
+            setShowSuccessDialog(true)
             setTimeout(() => {
               window.location.reload()
-            }, 2000)
-          }, 30000) // Changed from 7000 to 30000 (30 seconds)
+            }, 70000)
+          }, 70000)
           return
         }
 
-        setSuccess(result.message)
+        setSuccessDialogMessage(result.message)
+        setShowSuccessDialog(true)
         setTimeout(() => {
           window.location.reload()
-        }, 1500)
+        }, 70000)
       } else {
         setError(result.error || "Failed to check out")
       }
@@ -696,18 +702,20 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
           )
           setTimeout(() => {
             setError(null)
-            setSuccess(message)
+            setSuccessDialogMessage(message)
+            setShowSuccessDialog(true)
             setTimeout(() => {
               window.location.reload()
-            }, 2000)
-          }, 30000) // Changed from 4000 to 30000 (30 seconds)
+            }, 70000)
+          }, 70000)
           return
         }
 
-        setSuccess(message)
+        setSuccessDialogMessage(message)
+        setShowSuccessDialog(true)
         setTimeout(() => {
           window.location.reload()
-        }, 1500)
+        }, 70000)
       } else {
         setError(result.error || "Failed to check in with QR code")
       }
@@ -1317,6 +1325,31 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
             </Button>
             <Button onClick={handleEarlyCheckoutConfirm} disabled={!earlyCheckoutReason.trim()}>
               Confirm Check Out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <Clock className="h-5 w-5" />
+              Success!
+            </DialogTitle>
+            <DialogDescription className="text-base pt-4">{successDialogMessage}</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-4">
+            <Alert className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800/50">
+              <AlertDescription className="text-green-700 dark:text-green-300 text-sm">
+                Your attendance status will automatically update in a moment. The page will refresh in 70 seconds to
+                show your updated status.
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => window.location.reload()} className="w-full">
+              Refresh Now
             </Button>
           </DialogFooter>
         </DialogContent>
