@@ -125,6 +125,11 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
   const videoRef = useRef<HTMLVideoElement>(null)
   const qrResultRef = useRef<string | null>(null)
 
+  const handleUseQRCode = (mode: "checkin" | "checkout") => {
+    // Redirect to QR Events page with mode parameter
+    window.location.href = `/dashboard/qr-events?mode=${mode}`
+  }
+
   useEffect(() => {
     fetchUserProfile()
     loadProximitySettings()
@@ -1359,10 +1364,7 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
                 You must be within {proximitySettings.checkInProximityRange}m of a QCC location to check in
               </div>
               <Button
-                onClick={() => {
-                  setQrScanMode("checkin")
-                  setShowQRScanner(true)
-                }}
+                onClick={() => handleUseQRCode("checkin")}
                 variant="outline"
                 className="w-full bg-transparent"
                 disabled={isLoading}
@@ -1379,10 +1381,7 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
                 You must be within {proximitySettings.checkInProximityRange}m of a QCC location to check out
               </div>
               <Button
-                onClick={() => {
-                  setQrScanMode("checkout")
-                  setShowQRScanner(true)
-                }}
+                onClick={() => handleUseQRCode("checkout")}
                 variant="outline"
                 className="w-full bg-transparent"
                 disabled={isLoading}
@@ -1464,64 +1463,6 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
           <DialogFooter>
             <Button onClick={() => window.location.reload()} className="w-full">
               Refresh Now
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showQRScanner} onOpenChange={setShowQRScanner}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <QrCode className="h-5 w-5" />
-              Scan QR Code
-            </DialogTitle>
-            <DialogDescription>
-              {qrScanMode === "checkin"
-                ? "Scan the QR code at your location to check in"
-                : "Scan the QR code at your location to check out"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Alert className="mb-4">
-              <AlertDescription className="text-sm">
-                Position the QR code within your camera view. The system will automatically detect and process it.
-              </AlertDescription>
-            </Alert>
-            <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
-              <video
-                ref={videoRef}
-                className="w-full h-full object-cover rounded-lg"
-                autoPlay
-                playsInline
-                muted
-              ></video>
-            </div>
-            <Button
-              onClick={() => {
-                const qrData = prompt("Enter QR code data (for testing):")
-                if (qrData) {
-                  try {
-                    const parsedData = JSON.parse(qrData)
-                    if (qrScanMode === "checkin") {
-                      handleQRCheckIn(parsedData)
-                    } else {
-                      handleQRCheckOut(parsedData)
-                    }
-                  } catch {
-                    setError("Invalid QR code format")
-                  }
-                }
-              }}
-              variant="outline"
-              className="w-full bg-transparent mt-4"
-            >
-              Manual Input (Testing)
-            </Button>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowQRScanner(false)} className="bg-transparent">
-              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>
