@@ -24,6 +24,12 @@ export default async function ScanPage() {
     redirect("/auth/pending-approval")
   }
 
+  const { data: locations } = await supabase
+    .from("geofence_locations")
+    .select("id, name, location_code")
+    .eq("is_active", true)
+    .order("name")
+
   return (
     <div className="container mx-auto py-4 px-4 sm:py-6">
       <div className="mb-6 space-y-2">
@@ -33,7 +39,7 @@ export default async function ScanPage() {
         </p>
       </div>
       <div className="flex justify-center">
-        <QRScanner />
+        <QRScanner locations={locations || []} />
       </div>
     </div>
   )

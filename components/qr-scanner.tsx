@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Camera, CameraOff, QrCode, MapPin, Clock, CheckCircle, AlertCircle } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Camera, CameraOff, QrCode, MapPin, Clock, CheckCircle, AlertCircle, KeyRound, Copy, Check } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useNotifications } from "@/components/ui/notification-system"
 
@@ -25,13 +27,23 @@ interface AttendanceRecord {
   status: string
 }
 
-export function QRScanner() {
+interface Location {
+  id: string
+  name: string
+  location_code: string
+}
+
+export function QRScanner({ locations = [] }: { locations: Location[] }) {
   const [isScanning, setIsScanning] = useState(false)
   const [scanResult, setScanResult] = useState<ScanResult | null>(null)
   const [recentAttendance, setRecentAttendance] = useState<AttendanceRecord[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null)
+
+  const [showManualInput, setShowManualInput] = useState(false)
+  const [manualCode, setManualCode] = useState("")
+  const [copiedCode, setCopiedCode] = useState<string | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -108,8 +120,9 @@ export function QRScanner() {
     try {
       setIsLoading(true)
       setScanResult(null)
+      console.log("[v0] Requesting camera access...")
 
-      // Request camera permission
+      // Request camera permission with better error handling
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment", // Use back camera if available
@@ -118,21 +131,34 @@ export function QRScanner() {
         },
       })
 
+      console.log("[v0] Camera access granted")
       setHasPermission(true)
       streamRef.current = stream
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        videoRef.current.play()
-        setIsScanning(true)
 
-        // Start scanning for QR codes
-        scanIntervalRef.current = setInterval(scanForQRCode, 500)
+        // Wait for video to be ready before starting scan
+        videoRef.current.onloadedmetadata = () => {
+          console.log("[v0] Video loaded, starting playback")
+          videoRef.current
+            ?.play()
+            .then(() => {
+              console.log("[v0] Video playing, starting QR scan interval")
+              setIsScanning(true)
+              // Start scanning for QR codes
+              scanIntervalRef.current = setInterval(scanForQRCode, 500)
+            })
+            .catch((err) => {
+              console.error("[v0] Video play error:", err)
+              showError("Failed to start video playback")
+            })
+        }
       }
     } catch (error) {
-      console.error("Camera access error:", error)
+      console.error("[v0] Camera access error:", error)
       setHasPermission(false)
-      showError("Camera access is required for QR code scanning")
+      showError("Camera access denied. Please allow camera permissions or use manual code input.")
     } finally {
       setIsLoading(false)
     }
@@ -340,12 +366,78 @@ export function QRScanner() {
     return R * c
   }
 
-  // Manual QR input for testing/fallback
-  const handleManualInput = () => {
-    const qrData = prompt("Enter QR code data for testing:")
-    if (qrData) {
-      processQRCode(qrData)
+  const handleManualInput = async () => {
+    if (!manualCode.trim()) {
+      showError("Please enter a location code")
+      return
     }
+
+    try {
+      setIsLoading(true)
+      console.log("[v0] Processing manual code:", manualCode)
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        showError("Authentication required")
+        return
+      }
+
+      // Check if code matches a location
+      const { data: location, error: locationError } = await supabase
+        .from("geofence_locations")
+        .select("*")
+        .eq("location_code", manualCode.toUpperCase())
+        .single()
+
+      if (locationError || !location) {
+        showError("Invalid location code. Please check and try again.")
+        return
+      }
+
+      // Record attendance via check-in API
+      const response = await fetch("/api/attendance/check-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          locationId: location.id,
+          manualEntry: true,
+          locationCode: manualCode.toUpperCase(),
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to record attendance")
+      }
+
+      setScanResult({
+        success: true,
+        message: "Attendance recorded successfully!",
+        eventName: "Check-in",
+        location: location.name,
+        timestamp: new Date().toLocaleString(),
+      })
+
+      showSuccess(`Checked in to ${location.name}`)
+      setManualCode("")
+      setShowManualInput(false)
+      loadRecentAttendance()
+    } catch (error: any) {
+      console.error("[v0] Manual input error:", error)
+      showError(error.message || "Failed to record attendance")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const copyToClipboard = (code: string) => {
+    navigator.clipboard.writeText(code)
+    setCopiedCode(code)
+    showSuccess(`Copied ${code} to clipboard`)
+    setTimeout(() => setCopiedCode(null), 2000)
   }
 
   return (
@@ -364,7 +456,7 @@ export function QRScanner() {
           <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
             {isScanning ? (
               <>
-                <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+                <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
                 <canvas ref={canvasRef} className="hidden" />
                 {/* Scanning overlay */}
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -376,7 +468,7 @@ export function QRScanner() {
                   </div>
                 </div>
                 <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-                  <p className="text-white text-sm bg-black/50 px-3 py-1 rounded">Position QR code within the frame</p>
+                  <p className="text-white text-sm bg-black/70 px-3 py-1 rounded">Position QR code within the frame</p>
                 </div>
               </>
             ) : (
@@ -391,29 +483,79 @@ export function QRScanner() {
           </div>
 
           {/* Controls */}
-          <div className="flex gap-2">
-            {!isScanning ? (
-              <Button onClick={startScanning} disabled={isLoading} className="flex-1">
-                <Camera className="h-4 w-4 mr-2" />
-                {isLoading ? "Starting..." : "Start Scanning"}
-              </Button>
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              {!isScanning ? (
+                <Button onClick={startScanning} disabled={isLoading} className="flex-1 h-16">
+                  <Camera className="h-5 w-5 mr-2" />
+                  {isLoading ? "Starting Camera..." : "Start Scanning"}
+                </Button>
+              ) : (
+                <Button onClick={stopScanning} variant="destructive" className="flex-1 h-16">
+                  <CameraOff className="h-5 w-5 mr-2" />
+                  Stop Scanning
+                </Button>
+              )}
+            </div>
+
+            {/* Manual Code Input */}
+            {showManualInput ? (
+              <div className="space-y-3 p-4 border rounded-lg bg-muted/50">
+                <div className="space-y-2">
+                  <Label htmlFor="manual-code" className="flex items-center gap-2">
+                    <KeyRound className="h-4 w-4" />
+                    Enter Location Code
+                  </Label>
+                  <Input
+                    id="manual-code"
+                    placeholder="e.g., HO-SWZ-001"
+                    value={manualCode}
+                    onChange={(e) => setManualCode(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleManualInput()
+                      }
+                    }}
+                    className="font-mono text-lg"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter the location code displayed at your work location or choose from the list below
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleManualInput} disabled={isLoading || !manualCode.trim()} className="flex-1">
+                    {isLoading ? "Processing..." : "Submit Code"}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowManualInput(false)
+                      setManualCode("")
+                    }}
+                    variant="outline"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
             ) : (
-              <Button onClick={stopScanning} variant="destructive" className="flex-1">
-                <CameraOff className="h-4 w-4 mr-2" />
-                Stop Scanning
+              <Button
+                onClick={() => setShowManualInput(true)}
+                variant="outline"
+                className="w-full h-16 bg-transparent border-dashed"
+              >
+                <KeyRound className="h-5 w-5 mr-2" />
+                Enter Location Code Manually
               </Button>
             )}
-            <Button onClick={handleManualInput} variant="outline" className="flex-1 bg-transparent">
-              Manual Input
-            </Button>
           </div>
 
           {/* Permission Status */}
           {hasPermission === false && (
-            <Alert>
+            <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Camera permission is required for QR code scanning. Please allow camera access and try again.
+                Camera permission denied. Please enable camera access in your browser settings or use the Manual Code
+                Input option above.
               </AlertDescription>
             </Alert>
           )}
@@ -442,6 +584,51 @@ export function QRScanner() {
           )}
         </CardContent>
       </Card>
+
+      {locations.length > 0 && (
+        <Card className="border-2 border-primary">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              Available Location Codes
+            </CardTitle>
+            <CardDescription>
+              If camera scanning is not working, tap any code below to copy it, then use "Enter Location Code Manually"
+              button above and paste or type the code to check in/out.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {locations.map((location) => (
+                <button
+                  key={location.id}
+                  onClick={() => copyToClipboard(location.location_code)}
+                  className="flex items-center justify-between p-4 border-2 rounded-lg hover:border-primary hover:bg-primary/5 transition-all group"
+                >
+                  <div className="text-left flex-1">
+                    <p className="text-sm text-muted-foreground mb-1">{location.name}</p>
+                    <p className="text-2xl font-bold font-mono text-primary">{location.location_code}</p>
+                  </div>
+                  <div className="ml-3">
+                    {copiedCode === location.location_code ? (
+                      <Check className="h-6 w-6 text-green-500" />
+                    ) : (
+                      <Copy className="h-6 w-6 text-muted-foreground group-hover:text-primary" />
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <Alert className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                <strong>How to use:</strong> Tap any location code to copy it, then click "Enter Location Code Manually"
+                button above and paste or type the code to check in/out.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recent Attendance */}
       <Card>
