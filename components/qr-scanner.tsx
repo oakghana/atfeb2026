@@ -75,26 +75,27 @@ export function QRScanner() {
       if (!user) return
 
       const { data, error } = await supabase
-        .from("attendance_records")
+        .from("qr_event_scans")
         .select(`
           id,
-          check_in_time,
-          status,
-          check_in_location_name,
-          qr_events!inner(name)
+          scanned_at,
+          qr_events!inner(
+            name,
+            geofence_locations(name)
+          )
         `)
         .eq("user_id", user.id)
-        .order("check_in_time", { ascending: false })
+        .order("scanned_at", { ascending: false })
         .limit(5)
 
       if (error) throw error
 
-      const formattedData = data.map((record) => ({
+      const formattedData = data.map((record: any) => ({
         id: record.id,
         event_name: record.qr_events?.name || "Unknown Event",
-        location_name: record.check_in_location_name || "Unknown Location",
-        check_in_time: record.check_in_time,
-        status: record.status,
+        location_name: record.qr_events?.geofence_locations?.name || "Unknown Location",
+        check_in_time: record.scanned_at,
+        status: "present",
       }))
 
       setRecentAttendance(formattedData)

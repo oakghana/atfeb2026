@@ -99,22 +99,13 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log("[v0] Sign-in button clicked - handleLogin triggered")
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
 
     try {
       console.log("[v0] Attempting login with identifier:", identifier)
-
-      if (!identifier.trim()) {
-        showFieldError("Staff Number/Email", "Please enter your staff number or email address")
-        return
-      }
-
-      if (!password.trim()) {
-        showFieldError("Password", "Please enter your password")
-        return
-      }
 
       const demoUsers = [
         { email: "admin.system@qccgh.com", staff: "5000001", name: "System Admin" },
@@ -572,7 +563,13 @@ export default function LoginPage() {
 
                   <Button
                     type="submit"
-                    className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                    onClick={(e) => {
+                      console.log("[v0] Sign-in button clicked directly")
+                      console.log("[v0] Button disabled state:", isLoading)
+                      console.log("[v0] Identifier:", identifier)
+                      console.log("[v0] Password length:", password.length)
+                    }}
+                    className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
                     disabled={isLoading}
                   >
                     {isLoading ? "Signing in..." : "Sign In"}
@@ -688,7 +685,7 @@ export default function LoginPage() {
             <div className="mt-6 text-center border-t border-border pt-6">
               <p className="text-sm font-medium text-foreground">Quality Control Company Limited</p>
               <p className="text-xs text-muted-foreground mt-1">Intranet Portal - Powered by IT Department</p>
-              <p className="text-xs text-muted-foreground mt-2 font-mono">v.1.9.77 21/10/25</p>
+              <p className="text-xs text-muted-foreground mt-2 font-mono">v.1.9.113 22/11/25</p>
             </div>
           </CardContent>
         </Card>

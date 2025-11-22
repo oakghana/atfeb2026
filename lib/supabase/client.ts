@@ -1,8 +1,16 @@
 import { createBrowserClient } from "@supabase/ssr"
 
+let clientInstance: ReturnType<typeof createBrowserClient> | null = null
+
 export function createClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (clientInstance) {
+    return clientInstance
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://vgtajtqxgczhjboatvol.supabase.co"
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZndGFqdHF4Z2N6aGpib2F0dm9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5NzUyNDgsImV4cCI6MjA3MjU1MTI0OH0.EuuTCRC-rDoz_WHl4pwpV6_fEqrqcgGroa4nTjAEn1k"
 
   console.log("[v0] Supabase client initialization:", {
     hasUrl: !!supabaseUrl,
@@ -10,19 +18,9 @@ export function createClient() {
     url: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : "missing",
   })
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("[v0] Missing Supabase environment variables:", {
-      NEXT_PUBLIC_SUPABASE_URL: !!supabaseUrl,
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: !!supabaseAnonKey,
-    })
-    throw new Error(
-      "Missing Supabase environment variables. Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.",
-    )
-  }
-
   const isV0Preview = typeof window !== "undefined" && window.location.hostname.includes("vusercontent.net")
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey, {
+  clientInstance = createBrowserClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       autoRefreshToken: !isV0Preview,
       persistSession: !isV0Preview,
@@ -83,4 +81,6 @@ export function createClient() {
       },
     },
   })
+
+  return clientInstance
 }

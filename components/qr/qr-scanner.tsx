@@ -19,7 +19,9 @@ export function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const startScanning = async () => {
     try {
@@ -27,20 +29,88 @@ export function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
       setIsScanning(true)
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       })
 
       streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        await videoRef.current.play()
+
+        // Start scanning for QR codes
+        scanIntervalRef.current = setInterval(scanForQRCode, 200) // Scan 5 times per second
       }
     } catch (err) {
+      console.error("[v0] Camera access error:", err)
       setError("Camera access denied or not available")
       setIsScanning(false)
     }
   }
 
+  const scanForQRCode = async () => {
+    if (!videoRef.current || !canvasRef.current || !isScanning) return
+
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    const context = canvas.getContext("2d")
+
+    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) return
+
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    try {
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+
+      // Use jsQR library to detect QR codes
+      const jsQR = (await import("jsqr")).default
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "dontInvert",
+      })
+
+      if (code) {
+        console.log("[v0] QR code detected:", code.data)
+        await processQRCode(code.data)
+      }
+    } catch (error) {
+      console.error("[v0] QR scanning error:", error)
+    }
+  }
+
+  const processQRCode = async (qrDataString: string) => {
+    try {
+      stopScanning()
+
+      const qrData = parseQRCode(qrDataString)
+      if (qrData) {
+        const validation = validateQRCode(qrData)
+        if (validation.isValid) {
+          setSuccess("QR code scanned successfully!")
+          console.log("[v0] Valid QR code, calling onScanSuccess")
+          onScanSuccess(qrData)
+        } else {
+          setError(validation.reason || "Invalid QR code")
+        }
+      } else {
+        setError("Invalid QR code format")
+      }
+    } catch (error) {
+      console.error("[v0] QR processing error:", error)
+      setError("Failed to process QR code")
+    }
+  }
+
   const stopScanning = () => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current)
+      scanIntervalRef.current = null
+    }
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop())
       streamRef.current = null
@@ -131,9 +201,18 @@ export function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
         ) : (
           <div className="space-y-4">
             <div className="relative aspect-square bg-black rounded-lg overflow-hidden">
-              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-              <div className="absolute inset-0 border-2 border-primary/50 rounded-lg">
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-40 sm:w-48 sm:h-48 border-2 border-primary rounded-lg"></div>
+              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+              <canvas ref={canvasRef} className="hidden" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-40 h-40 sm:w-48 sm:h-48 border-2 border-primary rounded-lg relative">
+                  <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-primary"></div>
+                  <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-primary"></div>
+                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-primary"></div>
+                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-primary"></div>
+                </div>
+              </div>
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+                <p className="text-white text-sm bg-black/50 px-3 py-1 rounded">Position QR code within the frame</p>
               </div>
             </div>
 

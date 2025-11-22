@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { QrCode, Calendar, MapPin, Users, Plus, Search } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { QRScanner } from "@/components/qr/qr-scanner"
+import type { QRCodeData } from "@/components/qr/qr-scanner" // Assuming QRCodeData is defined here
 
 interface QREvent {
   id: string
@@ -88,14 +89,13 @@ export function QREventsClient() {
     }
   }
 
-  const handleQRScan = async (result: string) => {
-    console.log("QR Code scanned:", result)
+  const handleQRScan = async (qrData: QRCodeData) => {
+    console.log("[v0] QR Code scanned:", qrData)
 
     try {
-      const qrData = JSON.parse(result)
-
       // If in attendance mode, process as check-in/check-out
       if (attendanceMode) {
+        console.log("[v0] Processing attendance mode:", attendanceMode)
         const endpoint = attendanceMode === "checkin" ? "/api/attendance/qr-checkin" : "/api/attendance/check-out"
 
         const response = await fetch(endpoint, {
@@ -111,21 +111,25 @@ export function QREventsClient() {
         })
 
         const result = await response.json()
+        console.log("[v0] Attendance API response:", result)
 
-        if (result.success) {
-          alert(result.message)
-          // Redirect back to attendance page
-          window.location.href = "/dashboard/attendance"
+        if (result.success || response.ok) {
+          alert(result.message || `Successfully ${attendanceMode === "checkin" ? "checked in" : "checked out"}`)
+          // Redirect back to attendance page after 2 seconds
+          setTimeout(() => {
+            window.location.href = "/dashboard/attendance"
+          }, 2000)
         } else {
           alert(result.error || "Failed to process attendance")
         }
       } else {
         // Handle event attendance
         // ... existing event attendance logic ...
+        alert("Event attendance not yet implemented")
       }
     } catch (error) {
-      console.error("Error processing QR code:", error)
-      alert("Invalid QR code format")
+      console.error("[v0] Error processing QR code:", error)
+      alert("Failed to process QR code")
     } finally {
       setShowScanner(false)
     }

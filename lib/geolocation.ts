@@ -49,11 +49,10 @@ export function detectWindowsLocationCapabilities(): {
   if (hasWiFi) supportedSources.push("Wi-Fi")
   if (isWindows) supportedSources.push("Windows Location Services")
 
-  // Windows-optimized settings for better accuracy
   const recommendedSettings: PositionOptions = {
     enableHighAccuracy: true,
-    timeout: isWindows ? 20000 : 15000, // Longer timeout for Windows Location Services
-    maximumAge: isWindows ? 30000 : 60000, // Shorter cache for Windows for better accuracy
+    timeout: isWindows ? 10000 : 8000, // Faster timeout for quicker QR code fallback
+    maximumAge: 0, // Always request fresh location data, no cached positions
   }
 
   return {
@@ -132,13 +131,15 @@ Troubleshooting:
             if (capabilities.isWindows) {
               message = "Windows Location Services timed out."
               guidance = `
-Try these steps:
-1. Ensure Windows Location Services are running
-2. Check your internet connection
-3. Move to a location with better signal
-4. Try again or use the QR code option`
+Quick fix: Use the QR code option below for instant check-in/check-out
+
+If you prefer GPS:
+1. Enable Windows Location Services in Settings → Privacy & Security → Location
+2. Ensure internet connection is active
+3. Move near a window for better signal
+4. Try again`
             } else {
-              message = "Location request timed out. Please try again or use the QR code option."
+              message = "Location request timed out. Please use the QR code option below or try again."
             }
             break
         }
@@ -162,11 +163,10 @@ export function watchLocation(
 
   const capabilities = detectWindowsLocationCapabilities()
 
-  // Windows-optimized watch options
   const options: PositionOptions = {
     enableHighAccuracy: true,
-    timeout: capabilities.isWindows ? 25000 : 20000,
-    maximumAge: capabilities.isWindows ? 15000 : 30000, // More frequent updates on Windows
+    timeout: capabilities.isWindows ? 12000 : 10000,
+    maximumAge: 0, // Always get fresh location updates
   }
 
   return navigator.geolocation.watchPosition(
@@ -225,7 +225,10 @@ export function isWithinGeofence(
     geofenceLocation.longitude,
   )
 
-  const isWithin = distance <= geofenceLocation.radius_meters
+  const toleranceBuffer = 20 // Additional buffer for GPS accuracy variations
+  const effectiveRadius = geofenceLocation.radius_meters + toleranceBuffer
+  const isWithin = distance <= effectiveRadius
+
   let accuracyWarning: string | undefined
 
   const capabilities = detectWindowsLocationCapabilities()
@@ -289,7 +292,9 @@ export function validateAttendanceLocation(
   allLocations?: Array<{ location: GeofenceLocation; distance: number }>
   availableLocations?: Array<{ location: GeofenceLocation; distance: number }>
 } {
-  const globalProximityDistance = proximitySettings?.checkInProximityRange || 50
+  const baseProximityDistance = proximitySettings?.checkInProximityRange || 50
+  const toleranceBuffer = 50 // Increased buffer to account for browser GPS variance (total effective range: 100m)
+  const globalProximityDistance = baseProximityDistance + toleranceBuffer
 
   const nearest = findNearestLocation(userLocation, qccLocations)
 
@@ -321,19 +326,23 @@ export function validateAttendanceLocation(
       message = `Ready for check-in at ${availableLocations.length} nearby locations. Nearest: ${availableLocations[0].location.name} (${availableLocations[0].distance}m away)`
     }
   } else {
-    message = `Outside ${globalProximityDistance}m range - Cannot check in. Nearest location: ${nearest.location.name} (Distance: ${nearest.distance}m)`
+    message = `Outside ${globalProximityDistance}m range - Cannot check in. Nearest location: ${nearest.location.name} (Distance: ${nearest.distance}m). Try using QR code instead.`
   }
 
   let accuracyWarning: string | undefined
   const capabilities = detectWindowsLocationCapabilities()
 
-  if (userLocation.accuracy > globalProximityDistance / 10) {
+  if (userLocation.accuracy > 30) {
     accuracyWarning = capabilities.isWindows
       ? `GPS accuracy is low (${Math.round(userLocation.accuracy)}m). For better accuracy with ${globalProximityDistance}m proximity range on Windows:
 • Ensure Windows Location Services are enabled in Settings
 • Move to a location with better GPS signal (near windows)
-• Check that Wi-Fi is connected for assisted positioning`
-      : `GPS accuracy is low (${Math.round(userLocation.accuracy)}m). For best results with ${globalProximityDistance}m proximity range, ensure you have a clear view of the sky.`
+• Check that Wi-Fi is connected for assisted positioning
+• Consider using QR code for guaranteed check-in`
+      : `GPS accuracy is low (${Math.round(userLocation.accuracy)}m). For best results with ${globalProximityDistance}m proximity range:
+• Ensure you have a clear view of the sky
+• Move to a location with better GPS signal
+• Consider using QR code for guaranteed check-in`
   }
 
   return {
@@ -358,7 +367,10 @@ export function validateCheckoutLocation(
   message: string
   accuracyWarning?: string
 } {
-  const globalProximityDistance = proximitySettings?.checkInProximityRange || 50
+  const baseProximityDistance = proximitySettings?.checkInProximityRange || 50
+  const toleranceBuffer = 50 // Increased buffer to account for browser GPS variance (total effective range: 100m)
+  const globalProximityDistance = baseProximityDistance + toleranceBuffer
+
   const nearest = findNearestLocation(userLocation, qccLocations)
 
   if (!nearest) {
@@ -374,19 +386,23 @@ export function validateCheckoutLocation(
   if (canCheckOut) {
     message = `Ready for check-out at ${nearest.location.name} (${nearest.distance}m away)`
   } else {
-    message = `Outside ${globalProximityDistance}m range - Cannot check out. Nearest location: ${nearest.location.name} (Distance: ${nearest.distance}m)`
+    message = `Outside ${globalProximityDistance}m range - Cannot check out. Nearest location: ${nearest.location.name} (Distance: ${nearest.distance}m). Try using QR code instead.`
   }
 
   let accuracyWarning: string | undefined
   const capabilities = detectWindowsLocationCapabilities()
 
-  if (userLocation.accuracy > globalProximityDistance / 10) {
+  if (userLocation.accuracy > 30) {
     accuracyWarning = capabilities.isWindows
       ? `GPS accuracy is low (${Math.round(userLocation.accuracy)}m). For better accuracy with ${globalProximityDistance}m proximity range on Windows:
 • Check Windows Location Services settings
 • Ensure good GPS signal reception
-• Verify Wi-Fi connection for assisted positioning`
-      : `GPS accuracy is low (${Math.round(userLocation.accuracy)}m). For best results with ${globalProximityDistance}m proximity range, ensure you have a clear view of the sky.`
+• Verify Wi-Fi connection for assisted positioning
+• Consider using QR code for guaranteed check-out`
+      : `GPS accuracy is low (${Math.round(userLocation.accuracy)}m). For best results with ${globalProximityDistance}m proximity range:
+• Ensure you have a clear view of the sky
+• Move to a location with better GPS signal
+• Consider using QR code for guaranteed check-out`
   }
 
   return {

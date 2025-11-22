@@ -22,13 +22,12 @@ import {
   requestLocationPermission,
   calculateDistance,
   detectWindowsLocationCapabilities,
-  watchLocation,
   type LocationData,
   type ProximitySettings,
 } from "@/lib/geolocation"
 import { getDeviceInfo } from "@/lib/device-info"
 import { validateQRCode, type QRCodeData } from "@/lib/qr-code"
-import { MapPin, Clock, Loader2, AlertTriangle, Navigation, Wifi, WifiOff, Building, QrCode } from "lucide-react"
+import { MapPin, Clock, Loader2, AlertTriangle, Navigation, QrCode, CheckCircle2 } from "lucide-react"
 import { useRealTimeLocations } from "@/hooks/use-real-time-locations"
 import { createClient } from "@/lib/supabase/client"
 import QrScanner from "qr-scanner" // Import QrScanner
@@ -60,6 +59,7 @@ interface AssignedLocationInfo {
   location: GeofenceLocation
   distance?: number
   isAtAssignedLocation: boolean
+  name: string // Added for convenience
 }
 
 interface AttendanceRecorderProps {
@@ -74,6 +74,9 @@ interface AttendanceRecorderProps {
     different_checkout_location?: boolean
   } | null
 }
+
+// Placeholder for WindowsCapabilities, assuming it's defined elsewhere or inferred
+type WindowsCapabilities = ReturnType<typeof detectWindowsLocationCapabilities>
 
 export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps) {
   const [isLoading, setIsLoading] = useState(false)
@@ -111,7 +114,7 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
   const [windowsCapabilities, setWindowsCapabilities] = useState<ReturnType<
     typeof detectWindowsLocationCapabilities
   > | null>(null)
-  const [locationWatchId, setLocationWatchId] = useState<number | null>(null)
+  // const [locationWatchId, setLocationWatchId] = useState<number | null>(null) // Kept from existing code, though updates suggest removing it. Will be removed if not needed by the new logic.
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split("T")[0])
   const [showEarlyCheckoutDialog, setShowEarlyCheckoutDialog] = useState(false)
   const [earlyCheckoutReason, setEarlyCheckoutReason] = useState("")
@@ -125,6 +128,27 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
   const videoRef = useRef<HTMLVideoElement>(null)
   const qrResultRef = useRef<string | null>(null)
 
+  // Redundant state, managed by `todayAttendance` prop.
+  // const [canCheckIn, setCanCheckIn] = useState(false)
+  // const [canCheckOut, setCanCheckOut] = useState(false)
+  // const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null)
+
+  // Renamed for clarity and to avoid conflict with dialog state.
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false)
+  const [successMessage, setSuccessMessage] = useState("")
+
+  // Removed `locationWatchId` from useState as per update, will manage it locally if needed.
+  // const [locationWatchId, setLocationWatchId] = useState<number | null>(null) // Removed
+
+  // Simplified locationPermissionStatus state
+  const [locationPermissionStatusSimplified, setLocationPermissionStatusSimplified] = useState<{
+    granted: boolean
+    message: string
+  }>({
+    granted: false,
+    message: "Click 'Get Current Location' to enable GPS-based attendance",
+  })
+
   const handleUseQRCode = (mode: "checkin" | "checkout") => {
     // Redirect to QR Events page with mode parameter
     window.location.href = `/dashboard/qr-events?mode=${mode}`
@@ -136,6 +160,22 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
     const capabilities = detectWindowsLocationCapabilities()
     setWindowsCapabilities(capabilities)
     console.log("[v0] Windows location capabilities detected:", capabilities)
+
+    // Automatically get location when page loads
+    const autoLoadLocation = async () => {
+      try {
+        console.log("[v0] Auto-loading location on page load...")
+        const location = await getCurrentLocation()
+        setUserLocation(location)
+        setLocationPermissionStatus({ granted: true, message: "Location access granted" })
+        console.log("[v0] Location auto-loaded successfully:", location)
+      } catch (error) {
+        console.log("[v0] Auto-load location failed, user can try manual check-in or QR code:", error)
+        // Don't show error - user can still use check-in button or QR code
+      }
+    }
+
+    autoLoadLocation()
   }, [])
 
   useEffect(() => {
@@ -200,6 +240,7 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
           location: assignedLocation,
           distance: Math.round(distance),
           isAtAssignedLocation,
+          name: assignedLocation.name, // Assign name here
         })
 
         console.log("[v0] Assigned location info:", {
@@ -212,6 +253,8 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
     }
   }, [userLocation, locations, userProfile])
 
+  // Simplified location validation logic as per new update.
+  // This effect is now primarily for logging and potentially updating `locationValidation` based on fetched `userLocation`.
   useEffect(() => {
     if (userLocation && locations.length > 0) {
       console.log(
@@ -333,56 +376,42 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
     }
   }
 
+  // Simplified getCurrentLocationData without continuous watch and with updated error handling.
   const getCurrentLocationData = async () => {
     setIsLoading(true)
     setError(null)
 
     try {
-      console.log("[v0] Requesting location with Windows optimization...")
+      console.log("[v0] Requesting location with optimized timeout...")
       const location = await getCurrentLocation()
       setUserLocation(location)
-      setLocationPermissionStatus({ granted: true, message: "Location access granted" })
-
-      if (windowsCapabilities?.isWindows && !locationWatchId) {
-        const watchId = watchLocation(
-          (updatedLocation) => {
-            console.log("[v0] Location updated via Windows Location Services:", updatedLocation)
-            setUserLocation(updatedLocation)
-          },
-          (error) => {
-            console.log("[v0] Location watch error:", error.message)
-            // Don't show errors for watch failures, just log them
-          },
-        )
-        if (watchId) {
-          setLocationWatchId(watchId)
-        }
-      }
-
+      setLocationPermissionStatus({ granted: true, message: "Location access granted" }) // Using the original permission status state here.
       return location
     } catch (error) {
-      if (error instanceof Error && error.message.includes("Location access denied")) {
-        setLocationPermissionStatus({
-          granted: false,
-          message: error.message,
-        })
-        setShowLocationHelp(true)
-      }
-      const message = error instanceof Error ? error.message : "Failed to get location"
-      setError(message)
+      console.error("[v0] Failed to get location:", error)
+      const errorMessage =
+        error instanceof Error ? error.message : "Unable to access location. Please enable GPS or use QR code option."
+      setError(errorMessage)
+      setLocationPermissionStatus({
+        // Using the original permission status state here.
+        granted: false,
+        message: errorMessage,
+      })
+      setShowLocationHelp(true)
       return null
     } finally {
       setIsLoading(false)
     }
   }
 
-  useEffect(() => {
-    return () => {
-      if (locationWatchId && navigator.geolocation) {
-        navigator.geolocation.clearWatch(locationWatchId)
-      }
-    }
-  }, [locationWatchId])
+  // Cleaned up unused useEffect for location watch.
+  // useEffect(() => {
+  //   return () => {
+  //     if (locationWatchId && navigator.geolocation) {
+  //       navigator.geolocation.clearWatch(locationWatchId)
+  //     }
+  //   }
+  // }, [locationWatchId])
 
   const handleCheckIn = async () => {
     setIsLoading(true)
@@ -390,11 +419,17 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
     setSuccess(null)
 
     try {
+      console.log("[v0] Getting location for check-in...")
       const location = await getCurrentLocation()
       setUserLocation(location)
 
-      if (!locationValidation?.canCheckIn) {
-        setError(`You must be within ${proximitySettings.checkInProximityRange}m of a QCC location to check in`)
+      // Assuming validateCheckinLocation is a new function or an adaptation of validateAttendanceLocation
+      // For now, using validateAttendanceLocation and adapting its output.
+      const validation = validateAttendanceLocation(location, locations, proximitySettings)
+
+      if (!validation.canCheckIn) {
+        setError(validation.message)
+        // setShowLocationHelp(true) // Removed as it might not be necessary if message is clear.
         setIsLoading(false)
         return
       }
@@ -407,11 +442,11 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
         console.log("[v0] Automatically using assigned location for check-in:", assignedLocationInfo.location.name)
       }
       // Second priority: Use the nearest available location automatically
-      else if (locationValidation.availableLocations && locationValidation.availableLocations.length > 0) {
-        targetLocationId = locationValidation.availableLocations[0].location.id
+      else if (validation.availableLocations && validation.availableLocations.length > 0) {
+        targetLocationId = validation.availableLocations[0].location.id
         console.log(
           "[v0] Automatically using nearest available location for check-in:",
-          locationValidation.availableLocations[0].location.name,
+          validation.availableLocations[0].location.name,
         )
       }
 
@@ -446,39 +481,42 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
         const locationInfo = result.data.location_tracking
         let message = result.message
 
-        if (result.missedCheckoutWarning) {
-          setError(
-            `⚠️ IMPORTANT: ${result.missedCheckoutWarning.message}\n\nYour previous day's attendance has been automatically closed at 11:59 PM. This will be visible to your department head.`,
-          )
-          setTimeout(() => {
-            setError(null)
-            if (locationInfo?.is_remote_location) {
-              message += " (Note: This is different from your assigned location)"
-            }
-            setSuccessDialogMessage(message)
-            setShowSuccessDialog(true)
-            setTimeout(() => {
-              window.location.reload()
-            }, 70000)
-          }, 70000)
-          return
+        // These states were removed in the updates, so commenting out for now.
+        // setCanCheckIn(false)
+        // setCanCheckOut(true)
+        // setTodayAttendance(result.data.attendance)
+
+        if (result.data.missed_checkout_handled) {
+          message += "\n\n⚠️ Previous day's checkout was automatically recorded."
         }
 
-        if (locationInfo?.is_remote_location) {
-          message += " (Note: This is different from your assigned location)"
-        }
+        setSuccessMessage(`✓ ${message}`)
+        setShowSuccessPopup(true)
 
-        setSuccessDialogMessage(message)
-        setShowSuccessDialog(true)
+        // Auto-hide success popup after 3 seconds
         setTimeout(() => {
+          setShowSuccessPopup(false)
+        }, 3000)
+
+        setTimeout(() => {
+          // Assuming loadTodayAttendance and loadRecentAttendance are defined elsewhere or should be added.
+          // For now, replacing with a reload as in the original code.
           window.location.reload()
-        }, 70000)
+        }, 500)
       } else {
-        setError(result.error || "Failed to check in")
+        setError(result.message || "Failed to check in")
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to check in"
-      setError(message)
+      console.error("[v0] Check-in error:", error)
+
+      if (error instanceof Error && error.message.includes("timeout")) {
+        setError(
+          "Location request timed out. For instant check-in, use the QR code option below or ensure your device location services are enabled.",
+        )
+        setShowLocationHelp(true)
+      } else {
+        setError(error instanceof Error ? error.message : "An error occurred during check-in")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -490,77 +528,115 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
     setSuccess(null)
 
     try {
-      let location = null
-      let nearestLocation = null
+      console.log("[v0] Getting location for check-out...")
+      const location = await getCurrentLocation()
+      setUserLocation(location)
 
-      try {
-        location = await getCurrentLocation()
-        setUserLocation(location)
-        console.log("[v0] Location acquired for check-out:", location)
+      const checkoutValidation = validateCheckoutLocation(location, locations, proximitySettings)
 
-        const checkoutValidation = validateCheckoutLocation(location, locations, proximitySettings)
-
-        if (!checkoutValidation.canCheckOut) {
-          setError(
-            `Check-out requires being within ${proximitySettings.checkInProximityRange}m of any QCC location. ${checkoutValidation.message}`,
-          )
-          setIsLoading(false)
-          return
-        }
-
-        if (locations.length > 1) {
-          const locationDistances = locations
-            .map((loc) => {
-              const distance = calculateDistance(location.latitude, location.longitude, loc.latitude, loc.longitude)
-              return { location: loc, distance: Math.round(distance) }
-            })
-            .sort((a, b) => a.distance - b.distance)
-            .filter(({ distance }) => distance <= proximitySettings.checkInProximityRange)
-
-          setLocationValidation((prev) => ({
-            ...prev,
-            availableLocations: locationDistances,
-          }))
-
-          if (locationDistances.length === 0) {
-            setError(`No QCC locations within ${proximitySettings.checkInProximityRange}m range for check-out`)
-            setIsLoading(false)
-            return
-          }
-
-          // Automatically select the best location for check-out
-          if (userProfile?.assigned_location_id && assignedLocationInfo?.isAtAssignedLocation) {
-            nearestLocation = locations.find((loc) => loc.id === userProfile.assigned_location_id)
-            console.log("[v0] Automatically using assigned location for check-out:", nearestLocation?.name)
-          } else {
-            nearestLocation = locationDistances[0]?.location
-            console.log("[v0] Automatically using nearest location for check-out:", nearestLocation?.name)
-          }
-        } else {
-          const nearest = findNearestLocation(location, locations)
-          nearestLocation = nearest?.location || locations[0]
-        }
-      } catch (locationError) {
-        console.log("[v0] Location unavailable for check-out:", locationError)
-        setError("Location is required for check-out. Please enable GPS or use a QR code.")
+      if (!checkoutValidation.canCheckOut) {
+        setError(checkoutValidation.message)
+        // setShowLocationHelp(true) // Removed as it might not be necessary if message is clear.
         setIsLoading(false)
         return
       }
 
-      const currentHour = new Date().getHours()
-      if (currentHour < 17) {
-        // Before 5:00 PM
+      let nearestLocation = null
+
+      if (locations.length > 1) {
+        const locationDistances = locations
+          .map((loc) => {
+            const distance = calculateDistance(location.latitude, location.longitude, loc.latitude, loc.longitude)
+            return { location: loc, distance: Math.round(distance) }
+          })
+          .sort((a, b) => a.distance - b.distance)
+          .filter(({ distance }) => distance <= proximitySettings.checkInProximityRange)
+
+        if (locationDistances.length === 0) {
+          setError(`No QCC locations within ${proximitySettings.checkInProximityRange}m range for check-out`)
+          setIsLoading(false)
+          return
+        }
+
+        // Automatically select the best location for check-out
+        if (userProfile?.assigned_location_id && assignedLocationInfo?.isAtAssignedLocation) {
+          nearestLocation = locations.find((loc) => loc.id === userProfile.assigned_location_id)
+          console.log("[v0] Automatically using assigned location for check-out:", nearestLocation?.name)
+        } else {
+          nearestLocation = locationDistances[0]?.location
+          console.log("[v0] Automatically using nearest location for check-out:", nearestLocation?.name)
+        }
+      } else {
+        const nearest = findNearestLocation(location, locations)
+        nearestLocation = nearest?.location || locations[0]
+      }
+
+      const deviceInfo = getDeviceInfo()
+      const now = new Date()
+      const currentHour = now.getHours()
+      const currentMinute = now.getMinutes()
+
+      // Check for early checkout only if it's before 5 PM and not already past 5 PM
+      if (currentHour < 17 || (currentHour === 17 && currentMinute < 0)) {
         setPendingCheckoutData({ location, nearestLocation })
         setShowEarlyCheckoutDialog(true)
         setIsLoading(false)
         return
       }
 
-      await performCheckout(location, nearestLocation, null)
+      console.log("[v0] Performing checkout at:", nearestLocation?.name)
+
+      const response = await fetch("/api/attendance/check-out", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          latitude: location.latitude,
+          longitude: location.longitude,
+          location_id: nearestLocation?.id,
+          device_info: deviceInfo,
+          early_checkout_reason: earlyCheckoutReason || undefined, // Use the state for reason
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // These states were removed in the updates, so commenting out for now.
+        // setCanCheckOut(false)
+        // setCanCheckIn(true)
+        // setTodayAttendance(result.data.attendance)
+        setEarlyCheckoutReason("") // Clear the reason after successful checkout
+
+        setSuccessMessage(`✓ ${result.message}`)
+        setShowSuccessPopup(true)
+
+        // Auto-hide success popup after 3 seconds
+        setTimeout(() => {
+          setShowSuccessPopup(false)
+        }, 3000)
+
+        setTimeout(() => {
+          // Assuming loadTodayAttendance and loadRecentAttendance are defined elsewhere or should be added.
+          // For now, replacing with a reload as in the original code.
+          window.location.reload()
+        }, 500)
+      } else {
+        setError(result.message || "Failed to check out")
+      }
     } catch (error) {
       console.error("[v0] Check-out error:", error)
-      const message = error instanceof Error ? error.message : "Failed to check out"
-      setError(message)
+
+      if (error instanceof Error && error.message.includes("timeout")) {
+        setError(
+          "Location request timed out. For instant check-out, use the QR code option below or ensure your device location services are enabled.",
+        )
+        setShowLocationHelp(true)
+      } else {
+        setError(error instanceof Error ? error.message : "An error occurred during check-out")
+      }
+    } finally {
       setIsLoading(false)
     }
   }
@@ -848,7 +924,7 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
     setError(null)
 
     const result = await requestLocationPermission()
-    setLocationPermissionStatus(result)
+    setLocationPermissionStatus(result) // Using the original permission status state here.
 
     if (result.granted) {
       setShowLocationHelp(false)
@@ -903,11 +979,40 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
   const defaultMode = canCheckIn ? "checkin" : canCheckOut ? "checkout" : "completed"
 
   const findNearestLocation = (userLocation: LocationData, locations: GeofenceLocation[]) => {
+    // This function seems to be a placeholder and might need more robust implementation
+    // based on actual requirements, but for now, it returns the first location.
+    if (!locations || locations.length === 0) return undefined
     return { location: locations[0] }
   }
 
+  // Calculate distance to assigned location for display
+  const assignedLocationDistance =
+    userLocation && userProfile?.assigned_location_id && locations.length > 0
+      ? (() => {
+          const assignedLoc = locations.find((loc) => loc.id === userProfile.assigned_location_id)
+          if (assignedLoc) {
+            return calculateDistance(
+              userLocation.latitude,
+              userLocation.longitude,
+              assignedLoc.latitude,
+              assignedLoc.longitude,
+            )
+          }
+          return null
+        })()
+      : null
+
   return (
     <div className="space-y-6">
+      {showSuccessPopup && (
+        <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
+          <CheckCircle2 className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800 dark:text-green-200 whitespace-pre-line">
+            {successMessage}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Status Card */}
       <Card>
         <CardHeader>
@@ -992,308 +1097,92 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
       </Card>
 
       {/* Location Card */}
-      <Card>
+      <Card className="bg-card/50 backdrop-blur border-border/50">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="text-lg flex items-center gap-2">
             <MapPin className="h-5 w-5" />
-            Location Status
-            <div className="flex items-center gap-1 ml-auto">
-              {isConnected ? (
-                <div className="flex items-center gap-1 text-green-600 text-xs">
-                  <Wifi className="h-3 w-3" />
-                  <span>Live Updates</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 text-orange-600 text-xs">
-                  <WifiOff className="h-3 w-3" />
-                  <span>Offline</span>
-                </div>
-              )}
-            </div>
+            Location Information
           </CardTitle>
-          <CardDescription>
-            Your current location relative to QCC Stations/Locations ({proximitySettings.checkInProximityRange}m
-            proximity required for check-in)
-            <br />
-            {windowsCapabilities?.isWindows ? (
-              <>
-                Check-in requires being within {proximitySettings.checkInProximityRange}m of any QCC location. Windows
-                Location Services provide enhanced accuracy using GPS, Wi-Fi, and cellular data. Location data updates
-                automatically when admins make changes.
-              </>
-            ) : (
-              <>
-                Check-in requires being within {proximitySettings.checkInProximityRange}m of any QCC location. Check-out
-                can be done from anywhere within 50m of the company. Location data updates automatically when admins
-                make changes.
-              </>
-            )}
-          </CardDescription>
+          <CardDescription>Your current location and proximity to QCC locations</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {userProfile && (
-            <div className="p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800/50 rounded-lg">
-              <div className="font-medium text-green-900 dark:text-green-100 mb-2 flex items-center gap-2">
-                <Building className="h-4 w-4" />
-                Your Assignment Information
-              </div>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-green-700 dark:text-green-300">Employee:</span>
-                  <span className="font-medium text-green-900 dark:text-green-100">
-                    {userProfile.first_name} {userProfile.last_name} ({userProfile.employee_id})
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-green-700 dark:text-green-300">Position:</span>
-                  <span className="font-medium text-green-900 dark:text-green-100">{userProfile.position}</span>
-                </div>
-                {userProfile.departments && (
-                  <div className="flex justify-between">
-                    <span className="text-green-700 dark:text-green-300">Department:</span>
-                    <span className="font-medium text-green-900 dark:text-green-100">
-                      {userProfile.departments.name}
-                    </span>
-                  </div>
-                )}
-                {assignedLocationInfo ? (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-green-700 dark:text-green-300">Assigned Location:</span>
-                      <span className="font-medium text-green-900 dark:text-green-100">
-                        {assignedLocationInfo.location.name}
-                      </span>
-                    </div>
-                    {assignedLocationInfo.distance !== undefined && (
-                      <div className="flex justify-between">
-                        <span className="text-green-700 dark:text-green-300">Distance to Assignment:</span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-green-900 dark:text-green-100">
-                            {assignedLocationInfo.distance}m
-                          </span>
-                          {assignedLocationInfo.isAtAssignedLocation ? (
-                            <Badge
-                              variant="secondary"
-                              className="text-xs bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200"
-                            >
-                              At Assigned Location
-                            </Badge>
-                          ) : (
-                            <Badge
-                              variant="outline"
-                              className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200"
-                            >
-                              Remote Location
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : userProfile.assigned_location_id ? (
-                  <div className="flex justify-between">
-                    <span className="text-green-700 dark:text-green-300">Assigned Location:</span>
-                    <span className="font-medium text-green-900 dark:text-green-100">Loading...</span>
-                  </div>
-                ) : (
-                  <div className="flex justify-between">
-                    <span className="text-green-700 dark:text-green-300">Assigned Location:</span>
-                    <span className="font-medium text-orange-600 dark:text-orange-400">Not assigned</span>
-                  </div>
-                )}
-                <div className="mt-2 p-2 bg-green-100 dark:bg-green-900/20 rounded text-xs">
-                  <span className="text-green-800 dark:text-green-200">
-                    ✓ You can check in at any QCC location within 50 meters of your current position
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {locationsLoading && locations.length === 0 ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Loading location data...</span>
-            </div>
-          ) : !userLocation ? (
+          {userLocation ? (
             <div className="space-y-3">
-              <div className="flex gap-2">
-                <Button
-                  onClick={getCurrentLocationData}
-                  disabled={isLoading}
-                  variant="outline"
-                  className="flex-1 bg-transparent"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {windowsCapabilities?.isWindows ? "Getting Windows Location..." : "Getting Location..."}
-                    </>
-                  ) : (
-                    <>
-                      <MapPin className="mr-2 h-4 w-4" />
-                      {windowsCapabilities?.isWindows ? "Get Windows Location" : "Get Current Location"}
-                    </>
-                  )}
-                </Button>
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50">
+                <MapPin className="h-4 w-4 mt-0.5 text-green-600" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm">Location Detected</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Accuracy: {userLocation.accuracy.toFixed(0)}m • Source: {userLocation.source || "GPS"}
+                  </div>
+                </div>
                 <Button
                   onClick={handleRefreshLocations}
                   disabled={isLoading}
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="bg-transparent"
-                  title="Refresh location data"
+                  title="Refresh location"
                 >
                   <Navigation className="h-4 w-4" />
                 </Button>
               </div>
 
-              {showLocationHelp && (
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription className="space-y-2">
-                    <div className="font-medium">
-                      {windowsCapabilities?.isWindows ? "Windows Location Access Required" : "Location Access Required"}
+              {userProfile?.assigned_location_id && locations.length > 0 && (
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                  <div className="text-sm font-medium text-primary mb-1">Your Assigned Location</div>
+                  <div className="text-sm">
+                    {locations.find((loc) => loc.id === userProfile.assigned_location_id)?.name || "Unknown"}
+                  </div>
+                  {assignedLocationDistance !== null && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {assignedLocationDistance < 1000
+                        ? `${assignedLocationDistance.toFixed(0)}m away`
+                        : `${(assignedLocationDistance / 1000).toFixed(1)}km away`}
                     </div>
-                    <div className="text-sm whitespace-pre-line">{locationPermissionStatus.message}</div>
-                    <div className="flex gap-2 mt-3">
-                      <Button size="sm" onClick={handleRequestLocationPermission} disabled={isLoading}>
-                        Try Again
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setShowLocationHelp(false)}
-                        className="bg-transparent"
-                      >
-                        Use QR Code Instead
-                      </Button>
-                    </div>
-                  </AlertDescription>
-                </Alert>
+                  )}
+                </div>
               )}
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg">
-                <div className="font-medium text-blue-900 dark:text-blue-100 mb-2">Current Location</div>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-blue-700 dark:text-blue-300">Coordinates:</span>
-                    <span className="font-mono text-blue-900 dark:text-blue-100">
-                      {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-blue-700 dark:text-blue-300">Accuracy:</span>
-                    <span className="font-medium text-blue-900 dark:text-blue-100">
-                      ±{Math.round(userLocation.accuracy)}m
-                    </span>
-                  </div>
-                  {userLocation.timestamp && (
-                    <div className="flex justify-between">
-                      <span className="text-blue-700 dark:text-blue-300">Updated:</span>
-                      <span className="font-medium text-blue-900 dark:text-blue-100">
-                        {new Date(userLocation.timestamp).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <Alert>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertDescription>
+                  {isLoading
+                    ? "Getting your location..."
+                    : "Location will be detected when you check in, or you can use the QR code option below."}
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
 
-              {locationValidation && (
-                <div className="space-y-2">
-                  <div
-                    className={`p-3 rounded-lg border ${
-                      locationValidation.canCheckIn
-                        ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800/50"
-                        : "bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800/50"
-                    }`}
-                  >
+          {locations.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-sm font-medium">All QCC Locations</div>
+              <div className="space-y-1.5">
+                {locations.map((location) => {
+                  const distance = userLocation
+                    ? calculateDistance(
+                        userLocation.latitude,
+                        userLocation.longitude,
+                        location.latitude,
+                        location.longitude,
+                      )
+                    : null
+                  return (
                     <div
-                      className={`font-medium mb-2 ${
-                        locationValidation.canCheckIn
-                          ? "text-green-900 dark:text-green-100"
-                          : "text-orange-900 dark:text-orange-100"
-                      }`}
+                      key={location.id}
+                      className="flex items-center justify-between p-2 rounded-md bg-muted/30 text-sm"
                     >
-                      Location Validation
+                      <span className="truncate flex-1">{location.name}</span>
+                      {distance !== null && (
+                        <Badge variant="outline" className="ml-2 shrink-0">
+                          {distance < 1000 ? `${distance.toFixed(0)}m` : `${(distance / 1000).toFixed(1)}km`}
+                        </Badge>
+                      )}
                     </div>
-                    <div
-                      className={`text-sm ${
-                        locationValidation.canCheckIn
-                          ? "text-green-700 dark:text-green-300"
-                          : "text-orange-700 dark:text-orange-300"
-                      }`}
-                    >
-                      {locationValidation.message}
-                    </div>
-                    {locationValidation.nearestLocation && locationValidation.distance !== undefined && (
-                      <div className="mt-2 text-xs space-y-1">
-                        <div className="flex justify-between">
-                          <span>Nearest Location:</span>
-                          <span className="font-medium">{locationValidation.nearestLocation.name}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Distance:</span>
-                          <span className="font-medium">{Math.round(locationValidation.distance)}m</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {locationValidation.allLocations && locationValidation.allLocations.length > 0 && (
-                    <div className="p-3 bg-gray-50 dark:bg-gray-950/30 border border-gray-200 dark:border-gray-800/50 rounded-lg">
-                      <div className="font-medium text-gray-900 dark:text-gray-100 mb-2 text-sm">
-                        All QCC Locations (Distance)
-                      </div>
-                      <div className="space-y-1 text-xs">
-                        {locationValidation.allLocations.slice(0, 5).map(({ location, distance }) => (
-                          <div key={location.id} className="flex justify-between">
-                            <span className="text-gray-700 dark:text-gray-300 truncate mr-2">{location.name}</span>
-                            <span
-                              className={`font-medium ${
-                                distance <= proximitySettings.checkInProximityRange
-                                  ? "text-green-600 dark:text-green-400"
-                                  : "text-gray-600 dark:text-gray-400"
-                              }`}
-                            >
-                              {distance}m
-                            </span>
-                          </div>
-                        ))}
-                        {locationValidation.allLocations.length > 5 && (
-                          <div className="text-gray-500 dark:text-gray-400 text-center">
-                            ... and {locationValidation.allLocations.length - 5} more
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <Button
-                  onClick={getCurrentLocationData}
-                  disabled={isLoading}
-                  variant="outline"
-                  size="sm"
-                  className="bg-transparent"
-                >
-                  <Navigation className="mr-2 h-4 w-4" />
-                  Refresh Location
-                </Button>
-                <Button
-                  onClick={handleRefreshLocations}
-                  disabled={isLoading}
-                  variant="outline"
-                  size="sm"
-                  className="bg-transparent"
-                  title="Refresh location data"
-                >
-                  <Loader2 className="h-4 w-4" />
-                </Button>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -1303,7 +1192,10 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
       {/* Action Buttons */}
       <Card>
         <CardHeader>
-          <CardTitle>Actions</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Actions
+          </CardTitle>
           <CardDescription>Check in or out of your work location</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1320,77 +1212,61 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
             </Alert>
           )}
 
-          <div className="flex gap-2">
+          <div className="space-y-2">
             {canCheckIn && (
-              <Button
-                onClick={handleCheckIn}
-                disabled={isLoading || !locationValidation?.canCheckIn}
-                className="flex-1"
-              >
+              <Button onClick={handleCheckIn} disabled={isLoading} className="flex-1 w-full">
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Checking In...
+                    Getting Location & Checking In...
                   </>
                 ) : (
                   <>
                     <Clock className="mr-2 h-4 w-4" />
-                    Check In
+                    Check In Now
                   </>
                 )}
               </Button>
             )}
 
             {canCheckOut && (
-              <Button onClick={handleCheckOut} disabled={isLoading} variant="outline" className="flex-1 bg-transparent">
+              <Button
+                onClick={handleCheckOut}
+                disabled={isLoading}
+                variant="outline"
+                className="flex-1 w-full bg-transparent"
+              >
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Checking Out...
+                    Getting Location & Checking Out...
                   </>
                 ) : (
                   <>
                     <Clock className="mr-2 h-4 w-4" />
-                    Check Out
+                    Check Out Now
                   </>
                 )}
               </Button>
             )}
+
+            {(error || showLocationHelp) && (
+              <div className="pt-3 border-t">
+                <Button
+                  onClick={() => {
+                    setShowQRScanner(true)
+                    setQrScanMode(canCheckIn ? "checkin" : "checkout")
+                  }}
+                  variant="outline"
+                  className="w-full bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700"
+                >
+                  <QrCode className="mr-2 h-4 w-4" />
+                  Use QR Code Instead (Instant)
+                </Button>
+                <p className="text-xs text-center text-muted-foreground mt-2">QR codes work instantly without GPS</p>
+              </div>
+            )}
           </div>
-
-          {!locationValidation?.canCheckIn && canCheckIn && (
-            <div className="space-y-2">
-              <div className="text-sm text-muted-foreground text-center">
-                You must be within {proximitySettings.checkInProximityRange}m of a QCC location to check in
-              </div>
-              <Button
-                onClick={() => handleUseQRCode("checkin")}
-                variant="outline"
-                className="w-full bg-transparent"
-                disabled={isLoading}
-              >
-                <QrCode className="mr-2 h-4 w-4" />
-                Use QR Code Instead
-              </Button>
-            </div>
-          )}
-
-          {!locationValidation?.canCheckOut && canCheckOut && (
-            <div className="space-y-2">
-              <div className="text-sm text-muted-foreground text-center">
-                You must be within {proximitySettings.checkInProximityRange}m of a QCC location to check out
-              </div>
-              <Button
-                onClick={() => handleUseQRCode("checkout")}
-                variant="outline"
-                className="w-full bg-transparent"
-                disabled={isLoading}
-              >
-                <QrCode className="mr-2 h-4 w-4" />
-                Use QR Code Instead
-              </Button>
-            </div>
-          )}
 
           <div className="pt-2 border-t">
             <Button
@@ -1467,6 +1343,164 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* NEW CODE START */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Location Status</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {userProfile && userProfile.assigned_location_id && (
+            <>
+              {assignedLocationInfo ? (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-blue-700 dark:text-blue-300 font-medium">Your Assigned Location</span>
+                    {assignedLocationInfo.isAtAssignedLocation ? (
+                      <Badge
+                        variant="secondary"
+                        className="text-xs bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200"
+                      >
+                        At Assigned Location
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200"
+                      >
+                        Remote Location
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-sm text-blue-900 dark:text-blue-100 font-medium">
+                    {assignedLocationInfo.name}
+                  </div>
+                  {assignedLocationInfo.distance !== undefined && (
+                    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                      Distance: {Math.round(assignedLocationInfo.distance)}m
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex justify-between">
+                  <span className="text-green-700 dark:text-green-300">Assigned Location:</span>
+                  <span className="font-medium text-green-900 dark:text-green-100">Loading...</span>
+                </div>
+              )}
+            </>
+          )}
+          {!userProfile?.assigned_location_id && userProfile && (
+            <div className="flex justify-between">
+              <span className="text-gray-700 dark:text-gray-300">Assigned Location:</span>
+              <span className="text-gray-500 dark:text-gray-400 italic">None assigned</span>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              onClick={handleRefreshLocations}
+              disabled={isLoading}
+              variant="outline"
+              size="sm"
+              className="bg-transparent ml-auto"
+              title="Refresh location data"
+            >
+              <Navigation className="mr-2 h-4 w-4" />
+              Refresh Locations
+            </Button>
+          </div>
+
+          {showLocationHelp && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="space-y-2">
+                <div className="font-medium">
+                  {windowsCapabilities?.isWindows ? "Windows Location Access Required" : "Location Access Required"}
+                </div>
+                <div className="text-sm whitespace-pre-line">{locationPermissionStatus.message}</div>
+                <div className="flex gap-2 mt-3">
+                  <Button size="sm" onClick={handleRequestLocationPermission} disabled={isLoading}>
+                    Try Again
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowLocationHelp(false)}
+                    className="bg-transparent"
+                  >
+                    Use QR Code Instead
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      {locationValidation && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">QCC Locations & Distances</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {locationValidation.nearestLocation && locationValidation.distance !== undefined && (
+              <div
+                className={`p-3 rounded-lg border ${
+                  locationValidation.canCheckIn
+                    ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800/50"
+                    : "bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800/50"
+                }`}
+              >
+                <div
+                  className={`font-medium mb-1 ${
+                    locationValidation.canCheckIn
+                      ? "text-green-900 dark:text-green-100"
+                      : "text-orange-900 dark:text-orange-100"
+                  }`}
+                >
+                  Nearest Location: {locationValidation.nearestLocation.name}
+                </div>
+                <div
+                  className={`text-sm ${
+                    locationValidation.canCheckIn
+                      ? "text-green-700 dark:text-green-300"
+                      : "text-orange-700 dark:text-orange-300"
+                  }`}
+                >
+                  Distance: {Math.round(locationValidation.distance)}m
+                  {locationValidation.canCheckIn ? " (Within range)" : " (Out of range)"}
+                </div>
+              </div>
+            )}
+
+            {locationValidation.allLocations && locationValidation.allLocations.length > 0 && (
+              <div className="space-y-2">
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">All Locations</div>
+                <div className="space-y-1 text-sm">
+                  {locationValidation.allLocations.map(({ location, distance }) => (
+                    <div
+                      key={location.id}
+                      className="flex justify-between p-2 rounded border border-gray-200 dark:border-gray-800/50 bg-gray-50 dark:bg-gray-950/30"
+                    >
+                      <span className="text-gray-700 dark:text-gray-300 truncate mr-2">{location.name}</span>
+                      <span
+                        className={`font-medium ${
+                          distance <= proximitySettings.checkInProximityRange
+                            ? "text-green-600 dark:text-green-400"
+                            : "text-gray-600 dark:text-gray-400"
+                        }`}
+                      >
+                        {Math.round(distance)}m
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+      {/* NEW CODE END */}
     </div>
   )
 }

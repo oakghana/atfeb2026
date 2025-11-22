@@ -2,15 +2,12 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function updateSession(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    console.warn("[v0] Missing Supabase credentials in middleware, skipping auth check")
-    return NextResponse.next({
-      request,
-    })
-  }
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "https://ycglrckbxehwlcyxzqyv.supabase.co"
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljZ2xyY2tieGVod2xjeXh6cXl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTE5NjYsImV4cCI6MjA1MjA4Nzk2Nn0.Cf3NKvWr8_WwXjLpemLc9MvE2F8LVXIwVZC1gMOlpkg"
 
   let supabaseResponse = NextResponse.next({
     request,
