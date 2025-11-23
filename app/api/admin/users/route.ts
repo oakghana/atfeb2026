@@ -45,13 +45,13 @@ export async function GET(request: NextRequest) {
 
     console.log("[v0] Users API: User profile:", profile)
 
-    if (!["admin", "department_head"].includes(profile.role)) {
+    if (!["admin", "department_head", "it-admin"].includes(profile.role)) {
       console.log("[v0] Users API: Insufficient permissions - user role:", profile.role)
       return NextResponse.json(
         {
           error: "Insufficient permissions",
           userRole: profile.role,
-          requiredRoles: ["admin", "department_head"],
+          requiredRoles: ["admin", "department_head", "it-admin"],
         },
         { status: 403 },
       )
@@ -81,23 +81,37 @@ export async function GET(request: NextRequest) {
           error: "Failed to fetch users",
           details: error.message,
         },
-        { status: 500 },
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        },
       )
     }
 
-    console.log("[v0] Users API: Successfully fetched", users?.length || 0, "users")
+    let filteredUsers = users || []
+    if (profile.role === "it-admin") {
+      filteredUsers = users?.filter((u) => u.role !== "admin" && u.role !== "it-admin") || []
+      console.log("[v0] Users API: IT-Admin filtering applied, showing", filteredUsers.length, "users")
+    }
+
+    console.log("[v0] Users API: Successfully fetched", filteredUsers.length, "users")
 
     return NextResponse.json(
       {
         success: true,
-        users: users || [],
+        users: filteredUsers,
         debug: {
           currentUser: {
             id: user.id,
             role: profile.role,
             name: `${profile.first_name} ${profile.last_name}`,
           },
-          totalUsers: users?.length || 0,
+          totalUsers: filteredUsers.length,
         },
       },
       {

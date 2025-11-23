@@ -68,8 +68,10 @@ export async function GET(request: NextRequest) {
     const searchTerm = searchParams.get("search")
     const departmentFilter = searchParams.get("department")
     const roleFilter = searchParams.get("role")
+    const sortBy = searchParams.get("sortBy") || "created_at"
+    const sortOrder = searchParams.get("sortOrder") || "desc"
 
-    console.log("[v0] Staff API - Filters:", { searchTerm, departmentFilter, roleFilter })
+    console.log("[v0] Staff API - Filters:", { searchTerm, departmentFilter, roleFilter, sortBy, sortOrder })
 
     let query = supabase.from("user_profiles").select(`
         id,
@@ -97,8 +99,11 @@ export async function GET(request: NextRequest) {
       query = query.eq("role", roleFilter)
     }
 
+    const orderColumn = sortBy === "department" ? "department_id" : sortBy === "role" ? "role" : "created_at"
+    const ascending = sortOrder === "asc"
+
     // Execute query
-    const { data: staff, error: staffError } = await query.order("created_at", { ascending: false })
+    const { data: staff, error: staffError } = await query.order(orderColumn, { ascending })
 
     if (staffError) {
       console.error("[v0] Staff API - Query error:", staffError)

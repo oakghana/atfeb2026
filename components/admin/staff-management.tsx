@@ -619,7 +619,7 @@ export function StaffManagement() {
                       </Label>
                       <Input
                         id="editFirstName"
-                        value={editingStaff.first_name}
+                        value={editingStaff.first_name || ""}
                         onChange={(e) => setEditingStaff({ ...editingStaff, first_name: e.target.value })}
                         className="mt-1"
                       />
@@ -630,7 +630,7 @@ export function StaffManagement() {
                       </Label>
                       <Input
                         id="editLastName"
-                        value={editingStaff.last_name}
+                        value={editingStaff.last_name || ""}
                         onChange={(e) => setEditingStaff({ ...editingStaff, last_name: e.target.value })}
                         className="mt-1"
                       />
@@ -643,7 +643,7 @@ export function StaffManagement() {
                     <Input
                       id="editEmail"
                       type="email"
-                      value={editingStaff.email}
+                      value={editingStaff.email || ""}
                       onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
                       className="mt-1"
                     />
@@ -654,7 +654,7 @@ export function StaffManagement() {
                     </Label>
                     <Input
                       id="editEmployeeId"
-                      value={editingStaff.employee_id}
+                      value={editingStaff.employee_id || ""}
                       onChange={(e) => setEditingStaff({ ...editingStaff, employee_id: e.target.value })}
                       className="mt-1"
                     />
@@ -665,7 +665,7 @@ export function StaffManagement() {
                     </Label>
                     <Input
                       id="editPosition"
-                      value={editingStaff.position}
+                      value={editingStaff.position || ""}
                       onChange={(e) => setEditingStaff({ ...editingStaff, position: e.target.value })}
                       className="mt-1"
                     />
