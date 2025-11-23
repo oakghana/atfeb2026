@@ -62,8 +62,8 @@ export default async function HelpPage() {
             <Alert className="bg-primary/5 border-primary/20">
               <Smartphone className="h-4 w-4 text-primary" />
               <AlertDescription className="text-sm">
-                <strong>Best for:</strong> Staff using Opera browser, or when GPS accuracy is poor (above 1km), or when
-                you want instant check-in without waiting for location services.
+                <strong>Best for:</strong> Staff using Opera browser, when GPS accuracy is poor, or when you want
+                instant check-in without waiting for location services.
               </AlertDescription>
             </Alert>
 
@@ -585,25 +585,25 @@ export default async function HelpPage() {
                 <div className="flex items-start gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                   <p>
-                    <strong>Good accuracy (0-30m):</strong> GPS check-in will work reliably
+                    <strong>Excellent:</strong> GPS check-in will work reliably when you're at the location
                   </p>
                 </div>
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
                   <p>
-                    <strong>Moderate accuracy (30-100m):</strong> May work but consider using QR code
+                    <strong>Good:</strong> Should work at the location but may take a few seconds
                   </p>
                 </div>
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
                   <p>
-                    <strong>Poor accuracy (100m-1km):</strong> Strongly recommend using QR code instead
+                    <strong>Fair:</strong> Recommend using QR code for faster, more reliable check-in
                   </p>
                 </div>
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
                   <p>
-                    <strong>Critical accuracy (&gt;1km):</strong> Browser using IP location - MUST use QR code
+                    <strong>Poor:</strong> Browser using IP location - MUST use QR code instead
                   </p>
                 </div>
               </div>

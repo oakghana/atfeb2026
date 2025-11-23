@@ -1,40 +1,11 @@
-export interface LocationData {
-  latitude: number
-  longitude: number
-  accuracy: number
-  timestamp?: number
-}
-
-export interface GeofenceLocation {
-  id: string
-  name: string
-  latitude: number
-  longitude: number
-  radius_meters: number
-}
-
-export interface ProximitySettings {
-  checkInProximityRange: number
-  defaultRadius: number
-  requireHighAccuracy: boolean
-  allowManualOverride: boolean
-}
-
-export interface BrowserToleranceSettings {
-  chrome: number
-  edge: number
-  firefox: number
-  safari: number
-  opera: number
-  default: number
-}
-
-export interface GeoSettings {
-  browserTolerances?: BrowserToleranceSettings
-  enableBrowserSpecificTolerance?: boolean
-  globalProximityDistance?: number
-  checkInProximityRange?: number
-}
+import type {
+  LocationData,
+  GeofenceLocation,
+  ProximitySettings,
+  BrowserToleranceSettings,
+  GeoSettings,
+} from "./geolocation-types"
+import { getDeviceInfo } from "./device-info"
 
 export class GeolocationError extends Error {
   constructor(
@@ -140,6 +111,14 @@ export function detectBrowser(): {
  * Get browser-specific tolerance distance
  */
 export async function getBrowserTolerance(geoSettings?: GeoSettings): Promise<number> {
+  const deviceInfo = getDeviceInfo()
+  const isMobile = deviceInfo.device_type === "mobile" || deviceInfo.device_type === "tablet"
+
+  // If user is on mobile/tablet, use mobile tolerance (50 meters)
+  if (isMobile) {
+    return geoSettings?.mobileDeviceTolerance || 50
+  }
+
   const browserInfo = detectBrowser()
 
   // If browser-specific tolerance is disabled, use global setting
@@ -174,17 +153,20 @@ export async function isWithinBrowserProximity(
   distance: number
   tolerance: number
   browser: string
+  deviceType?: string
 }> {
   const distance = calculateDistance(userLocation.latitude, userLocation.longitude, locationLat, locationLng)
 
   const tolerance = await getBrowserTolerance(geoSettings)
   const browserInfo = detectBrowser()
+  const deviceInfo = getDeviceInfo()
 
   return {
     isWithin: distance <= tolerance,
     distance: Math.round(distance),
     tolerance,
     browser: browserInfo.name,
+    deviceType: deviceInfo.device_type,
   }
 }
 
@@ -311,7 +293,7 @@ If you prefer GPS:
           const fullMessage = guidance ? `${message}\n\n${guidance}` : message
           reject(new GeolocationError(fullMessage, error.code))
         },
-        options,
+        highAccuracyOptions,
       )
     }
 

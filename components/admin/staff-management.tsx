@@ -158,10 +158,15 @@ export function StaffManagement() {
 
   const fetchCurrentUserRole = async () => {
     try {
-      const response = await fetch("/api/settings")
+      console.log("[v0] Fetching current user role...")
+      const response = await fetch("/api/auth/current-user")
       const result = await response.json()
-      if (result.success && result.profile) {
-        setCurrentUserRole(result.profile.role)
+      console.log("[v0] Current user role fetch result:", result)
+      if (result.success && result.user) {
+        console.log("[v0] Setting current user role to:", result.user.role)
+        setCurrentUserRole(result.user.role)
+      } else {
+        console.error("[v0] Failed to fetch user role - response:", result)
       }
     } catch (error) {
       console.error("[v0] Failed to fetch current user role:", error)
@@ -544,8 +549,10 @@ export function StaffManagement() {
                         <SelectContent>
                           <SelectItem value="staff">Staff</SelectItem>
                           <SelectItem value="department_head">Department Head</SelectItem>
+                          {(currentUserRole === "admin" || currentUserRole === "it-admin") && (
+                            <SelectItem value="it-admin">IT Admin</SelectItem>
+                          )}
                           {currentUserRole === "admin" && <SelectItem value="admin">Admin</SelectItem>}
-                          {currentUserRole === "admin" && <SelectItem value="it-admin">IT-Admin</SelectItem>}
                           <SelectItem value="nsp">NSP</SelectItem>
                           <SelectItem value="intern">Intern</SelectItem>
                           <SelectItem value="contract">Contract</SelectItem>
@@ -701,8 +708,10 @@ export function StaffManagement() {
                       <SelectContent>
                         <SelectItem value="staff">Staff</SelectItem>
                         <SelectItem value="department_head">Department Head</SelectItem>
+                        {(currentUserRole === "admin" || currentUserRole === "it-admin") && (
+                          <SelectItem value="it-admin">IT Admin</SelectItem>
+                        )}
                         {currentUserRole === "admin" && <SelectItem value="admin">Admin</SelectItem>}
-                        {currentUserRole === "admin" && <SelectItem value="it-admin">IT-Admin</SelectItem>}
                         <SelectItem value="nsp">NSP</SelectItem>
                         <SelectItem value="intern">Intern</SelectItem>
                         <SelectItem value="contract">Contract</SelectItem>

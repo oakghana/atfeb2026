@@ -14,7 +14,6 @@ export default async function SettingsPage() {
     redirect("/auth/login")
   }
 
-  // Fetch user profile on server side
   const { data: profile } = await supabase
     .from("user_profiles")
     .select("id, role, first_name, last_name")
@@ -25,9 +24,18 @@ export default async function SettingsPage() {
     redirect("/dashboard?error=access_denied")
   }
 
+  // Fetch system settings
+  const { data: systemSettings } = await supabase.from("system_settings").select("*").single()
+
+  // Prepare initialSettings object with both profile and settings data
+  const initialSettings = {
+    profile,
+    ...systemSettings,
+  }
+
   return (
     <DashboardLayout>
-      <SettingsClient profile={profile} />
+      <SettingsClient initialSettings={initialSettings} />
     </DashboardLayout>
   )
 }
