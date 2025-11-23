@@ -4,6 +4,9 @@ export interface DeviceInfo {
   device_type: string
   browser_info: string
   ip_address?: string
+  isMobile: boolean
+  isTablet: boolean
+  isDesktop: boolean
 }
 
 export function generateDeviceId(): string {
@@ -39,10 +42,14 @@ export function getDeviceInfo(): DeviceInfo {
   const deviceId = generateDeviceId()
 
   // Detect device type
+  const ua = navigator.userAgent.toLowerCase()
+  const isMobile = /android|webos|iphone|ipod|blackberry|iemobile|opera mini/i.test(ua)
+  const isTablet = /ipad|android(?!.*mobile)|tablet/i.test(ua)
+
   let deviceType = "desktop"
-  if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+  if (isMobile) {
     deviceType = "mobile"
-  } else if (/iPad/i.test(navigator.userAgent)) {
+  } else if (isTablet) {
     deviceType = "tablet"
   }
 
@@ -65,5 +72,8 @@ export function getDeviceInfo(): DeviceInfo {
     device_name: deviceName,
     device_type: deviceType,
     browser_info: navigator.userAgent,
+    isMobile,
+    isTablet,
+    isDesktop: !isMobile && !isTablet,
   }
 }

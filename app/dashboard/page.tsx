@@ -1,5 +1,3 @@
-"use client"
-
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { StatsCard } from "@/components/dashboard/stats-card"
 import { QuickActions } from "@/components/dashboard/quick-actions"
@@ -11,7 +9,7 @@ import { Clock, Calendar, Users, TrendingUp, UserCheck, AlertCircle, Activity } 
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { MobileAppDownload } from "@/components/ui/mobile-app-download"
-import { DepartmentHeadAttendanceModal } from "@/components/dashboard/department-head-attendance-modal"
+import { StaffWarningModal } from "@/components/notifications/staff-warning-modal"
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -24,6 +22,7 @@ export default async function DashboardPage() {
     redirect("/auth/login")
   }
 
+  // Get user profile with error handling
   const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
     .select(`
@@ -34,8 +33,9 @@ export default async function DashboardPage() {
       )
     `)
     .eq("id", user.id)
-    .maybeSingle()
+    .maybeSingle() // Use maybeSingle instead of single to handle missing records
 
+  // If no profile exists, show a message to contact admin
   if (!profile && !profileError) {
     return (
       <DashboardLayout>
@@ -79,6 +79,7 @@ export default async function DashboardPage() {
     pendingApprovals = count || 0
   }
 
+  // Get today's attendance with error handling
   const today = new Date().toISOString().split("T")[0]
   const { data: todayAttendance, error: attendanceError } = await supabase
     .from("attendance_records")
@@ -88,6 +89,7 @@ export default async function DashboardPage() {
     .lt("check_in_time", `${today}T23:59:59`)
     .maybeSingle()
 
+  // Get this month's attendance count with error handling
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
   const { count: monthlyAttendance, error: monthlyError } = await supabase
     .from("attendance_records")
@@ -95,16 +97,16 @@ export default async function DashboardPage() {
     .eq("user_id", user.id)
     .gte("check_in_time", startOfMonth)
 
+  // Get total locations with error handling
   const { count: totalLocations, error: locationsError } = await supabase
     .from("geofence_locations")
     .select("*", { count: "exact", head: true })
     .eq("is_active", true)
 
-  const showDepartmentHeadModal =
-    profile?.role === "department_head" && profile.department_id && todayAttendance?.check_out_time
-
   return (
     <DashboardLayout>
+      <StaffWarningModal />
+
       <div className="space-y-8">
         <div className="space-y-2">
           <h1 className="text-4xl font-heading font-bold text-foreground tracking-tight">Dashboard</h1>
@@ -162,10 +164,12 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid gap-8 lg:grid-cols-5">
+          {/* Quick Actions */}
           <div className="lg:col-span-2">
             <QuickActions />
           </div>
 
+          {/* Recent Activity */}
           <div className="lg:col-span-3">
             <Card className="shadow-sm border-0 bg-gradient-to-br from-card to-card/50">
               <CardHeader className="pb-4">
@@ -240,15 +244,6 @@ export default async function DashboardPage() {
         </Card>
       </div>
       <MobileAppDownload variant="dashboard" />
-
-      {showDepartmentHeadModal && (
-        <DepartmentHeadAttendanceModal
-          open={true}
-          onClose={() => {}}
-          departmentId={profile.department_id}
-          departmentName={profile.departments?.name || "Your Department"}
-        />
-      )}
     </DashboardLayout>
   )
 }

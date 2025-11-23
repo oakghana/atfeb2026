@@ -154,9 +154,6 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
     message: "Click 'Get Current Location' to enable GPS-based attendance",
   })
 
-  const [showLocationModal, setShowLocationModal] = useState(false)
-  const [selectedLocationForCheckIn, setSelectedLocationForCheckIn] = useState<GeofenceLocation | null>(null)
-
   const handleQRScanSuccess = async (qrData: QRCodeData) => {
     console.log("[v0] QR scan successful, mode:", qrScanMode)
     setShowQRScanner(false)
@@ -1042,79 +1039,6 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
     }
   }, [showQRScanner])
 
-  const handleLocationSelection = async (location: GeofenceLocation, distance: number) => {
-    setSelectedLocationForCheckIn(location)
-    setIsLoading(true)
-    setError(null)
-    setSuccess(null)
-
-    try {
-      if (!userLocation) {
-        throw new Error("User location not available")
-      }
-
-      const browserInfo = detectBrowser()
-      const proximityCheck = await isWithinBrowserProximity(
-        userLocation,
-        location.latitude,
-        location.longitude,
-        geoSettings || undefined,
-      )
-
-      console.log("[v0] Selected location proximity check:", {
-        location: location.name,
-        distance: proximityCheck.distance,
-        tolerance: proximityCheck.tolerance,
-        isWithin: proximityCheck.isWithin,
-      })
-
-      if (!proximityCheck.isWithin) {
-        setError(
-          `Too far from ${location.name} (${proximityCheck.distance}m away, ${proximityCheck.browser} requires ${proximityCheck.tolerance}m). Please move closer or use QR code.`,
-        )
-        setShowLocationModal(false)
-        setIsLoading(false)
-        return
-      }
-
-      const response = await fetch("/api/attendance/check-in", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          latitude: userLocation.latitude,
-          longitude: userLocation.longitude,
-          location_id: location.id,
-          location_name: location.name,
-          device_info: navigator.userAgent,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to check in")
-      }
-
-      setSuccessDialogMessage(
-        `Checked in successfully at ${location.name}!\n\nDistance: ${proximityCheck.distance}m (within ${proximityCheck.tolerance}m tolerance)`,
-      )
-      setShowSuccessDialog(true)
-      setShowLocationModal(false)
-
-      setTimeout(() => {
-        window.location.reload()
-      }, 500)
-    } catch (error) {
-      console.error("[v0] Location selection check-in error:", error)
-      setError(error instanceof Error ? error.message : "An error occurred during check-in")
-      setShowLocationModal(false)
-    } finally {
-      setIsLoading(false)
-      setSelectedLocationForCheckIn(null)
-    }
-  }
-
   return (
     <div className="space-y-6">
       {showSuccessPopup && (
@@ -1382,72 +1306,57 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
 
           <div className="space-y-2">
             {canCheckIn && (
-              <>
-                <Button
-                  onClick={() => setShowLocationModal(true)}
-                  disabled={isLoading || !userLocation}
-                  className="flex-1 w-full"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <MapPin className="mr-2 h-4 w-4" />
-                      Choose Location & Check In
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  onClick={() => {
-                    setShowQRScanner(true)
-                    setQrScanMode("checkin")
-                  }}
-                  variant="outline"
-                  className="w-full bg-blue-50 dark:bg-blue-950 border-blue-300"
-                >
-                  <QrCode className="mr-2 h-4 w-4" />
-                  Scan QR Code to Check In (Instant)
-                </Button>
-              </>
+              <Button onClick={handleCheckIn} disabled={isLoading} className="flex-1 w-full">
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Getting Location & Checking In...
+                  </>
+                ) : (
+                  <>
+                    <Clock className="mr-2 h-4 w-4" />
+                    Check In Now
+                  </>
+                )}
+              </Button>
             )}
 
             {canCheckOut && (
-              <>
-                <Button
-                  onClick={handleCheckOut}
-                  disabled={isLoading}
-                  variant="outline"
-                  className="flex-1 w-full bg-transparent"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Getting Location & Checking Out...
-                    </>
-                  ) : (
-                    <>
-                      <Clock className="mr-2 h-4 w-4" />
-                      Check Out Now
-                    </>
-                  )}
-                </Button>
+              <Button
+                onClick={handleCheckOut}
+                disabled={isLoading}
+                variant="outline"
+                className="flex-1 w-full bg-transparent"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Getting Location & Checking Out...
+                  </>
+                ) : (
+                  <>
+                    <Clock className="mr-2 h-4 w-4" />
+                    Check Out Now
+                  </>
+                )}
+              </Button>
+            )}
 
+            {(error || showLocationHelp) && (
+              <div className="pt-3 border-t">
                 <Button
                   onClick={() => {
                     setShowQRScanner(true)
-                    setQrScanMode("checkout")
+                    setQrScanMode(canCheckIn ? "checkin" : "checkout")
                   }}
                   variant="outline"
-                  className="w-full bg-blue-50 dark:bg-blue-950 border-blue-300"
+                  className="w-full bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700"
                 >
                   <QrCode className="mr-2 h-4 w-4" />
-                  Scan QR Code to Check Out (Instant)
+                  Use QR Code Instead (Instant)
                 </Button>
-              </>
+                <p className="text-xs text-center text-muted-foreground mt-2">QR codes work instantly without GPS</p>
+              </div>
             )}
           </div>
 
@@ -1697,124 +1606,6 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
           </AlertDescription>
         </Alert>
       )}
-
-      <Dialog open={showLocationModal} onOpenChange={setShowLocationModal}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Select Your Check-In Location
-            </DialogTitle>
-            <DialogDescription>
-              Choose the QCC location closest to you. Your current distance from each location is shown below.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            {locationValidation.allLocations && locationValidation.allLocations.length > 0 ? (
-              locationValidation.allLocations.map(({ location, distance }) => {
-                const proximityCheck = isWithinBrowserProximity(
-                  userLocation!,
-                  location.latitude,
-                  location.longitude,
-                  geoSettings || undefined,
-                )
-                const isWithinRange = distance <= 1500 // Using the tolerance
-                const isNearest = locationValidation.nearestLocation?.id === location.id
-
-                return (
-                  <Card
-                    key={location.id}
-                    className={`cursor-pointer transition-all hover:border-primary ${
-                      isNearest ? "border-2 border-primary bg-primary/5" : ""
-                    } ${!isWithinRange ? "opacity-50" : ""}`}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold">{location.name}</h3>
-                            {isNearest && (
-                              <Badge variant="secondary" className="text-xs">
-                                Nearest
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">{location.address}</p>
-                          <div className="flex items-center gap-4 text-sm">
-                            <span className={`font-medium ${isWithinRange ? "text-green-600" : "text-red-600"}`}>
-                              {distance < 1000
-                                ? `${Math.round(distance)}m away`
-                                : `${(distance / 1000).toFixed(1)}km away`}
-                            </span>
-                            {isWithinRange && (
-                              <Badge variant="outline" className="text-green-600 border-green-600">
-                                Within Range
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          {isWithinRange ? (
-                            <Button
-                              onClick={() => handleLocationSelection(location, distance)}
-                              disabled={isLoading}
-                              size="sm"
-                            >
-                              {isLoading && selectedLocationForCheckIn?.id === location.id ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Checking In...
-                                </>
-                              ) : (
-                                <>
-                                  <Clock className="mr-2 h-4 w-4" />
-                                  Check In Here
-                                </>
-                              )}
-                            </Button>
-                          ) : (
-                            <Button variant="outline" disabled size="sm">
-                              Too Far
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-                <p>Loading locations...</p>
-              </div>
-            )}
-          </div>
-
-          <div className="pt-4 border-t">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
-              <QrCode className="h-4 w-4" />
-              <span>Can't find your location or too far away?</span>
-            </div>
-            <Button
-              onClick={() => {
-                setShowLocationModal(false)
-                setShowQRScanner(true)
-                setQrScanMode("checkin")
-              }}
-              variant="outline"
-              className="w-full bg-blue-50 dark:bg-blue-950 border-blue-300"
-            >
-              <QrCode className="mr-2 h-4 w-4" />
-              Use QR Code Scanner Instead (Instant)
-            </Button>
-            <p className="text-xs text-center text-muted-foreground mt-2">
-              Scan the QR code posted at your location for instant check-in
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showQRScanner} onOpenChange={setShowQRScanner}>
         <DialogContent className="max-w-[95vw] sm:max-w-md p-0 max-h-[90vh] overflow-auto">

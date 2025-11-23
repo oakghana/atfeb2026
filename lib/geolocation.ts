@@ -1,11 +1,41 @@
-import type {
-  LocationData,
-  GeofenceLocation,
-  ProximitySettings,
-  BrowserToleranceSettings,
-  GeoSettings,
-} from "./geolocation-types"
-import { getDeviceInfo } from "./device-info"
+export interface LocationData {
+  latitude: number
+  longitude: number
+  accuracy: number
+  timestamp?: number
+}
+
+export interface GeofenceLocation {
+  id: string
+  name: string
+  latitude: number
+  longitude: number
+  radius_meters: number
+}
+
+export interface ProximitySettings {
+  checkInProximityRange: number
+  defaultRadius: number
+  requireHighAccuracy: boolean
+  allowManualOverride: boolean
+}
+
+export interface BrowserToleranceSettings {
+  chrome: number
+  edge: number
+  firefox: number
+  safari: number
+  opera: number
+  default: number
+  mobile: number // New: tolerance for mobile/tablet devices
+}
+
+export interface GeoSettings {
+  browserTolerances?: BrowserToleranceSettings
+  enableBrowserSpecificTolerance?: boolean
+  globalProximityDistance?: number
+  checkInProximityRange?: number
+}
 
 export class GeolocationError extends Error {
   constructor(
@@ -111,33 +141,36 @@ export function detectBrowser(): {
  * Get browser-specific tolerance distance
  */
 export async function getBrowserTolerance(geoSettings?: GeoSettings): Promise<number> {
-  const deviceInfo = getDeviceInfo()
-  const isMobile = deviceInfo.device_type === "mobile" || deviceInfo.device_type === "tablet"
-
-  // If user is on mobile/tablet, use mobile tolerance (50 meters)
-  if (isMobile) {
-    return geoSettings?.mobileDeviceTolerance || 50
-  }
-
   const browserInfo = detectBrowser()
+  const deviceInfo = detectDevice()
 
-  // If browser-specific tolerance is disabled, use global setting
-  if (!geoSettings?.enableBrowserSpecificTolerance) {
-    return geoSettings?.globalProximityDistance || 1000
+  if (deviceInfo.isMobile || deviceInfo.isTablet) {
+    return 100
   }
 
-  const tolerances = geoSettings?.browserTolerances || {
-    chrome: 1000,
-    edge: 300,
-    firefox: 1000,
-    safari: 1000,
-    opera: 1000,
-    default: 1000,
+  switch (browserInfo.name.toLowerCase()) {
+    case "chrome":
+      return 100
+    case "edge":
+      return 100
+    case "firefox":
+      return 500
+    case "safari":
+      return 500
+    case "opera":
+      return 500
+    default:
+      return 100 // Default for unknown browsers
   }
+}
 
-  // Map browser name to tolerance
-  const browserKey = browserInfo.name.toLowerCase() as keyof BrowserToleranceSettings
-  return tolerances[browserKey] || tolerances.default
+function detectDevice(): { isMobile: boolean; isTablet: boolean; isDesktop: boolean } {
+  const ua = navigator.userAgent.toLowerCase()
+  const isMobile = /android|webos|iphone|ipod|blackberry|iemobile|opera mini/i.test(ua)
+  const isTablet = /ipad|android(?!.*mobile)|tablet/i.test(ua)
+  const isDesktop = !isMobile && !isTablet
+
+  return { isMobile, isTablet, isDesktop }
 }
 
 /**
@@ -153,20 +186,17 @@ export async function isWithinBrowserProximity(
   distance: number
   tolerance: number
   browser: string
-  deviceType?: string
 }> {
   const distance = calculateDistance(userLocation.latitude, userLocation.longitude, locationLat, locationLng)
 
   const tolerance = await getBrowserTolerance(geoSettings)
   const browserInfo = detectBrowser()
-  const deviceInfo = getDeviceInfo()
 
   return {
     isWithin: distance <= tolerance,
     distance: Math.round(distance),
     tolerance,
     browser: browserInfo.name,
-    deviceType: deviceInfo.device_type,
   }
 }
 
@@ -293,7 +323,7 @@ If you prefer GPS:
           const fullMessage = guidance ? `${message}\n\n${guidance}` : message
           reject(new GeolocationError(fullMessage, error.code))
         },
-        highAccuracyOptions,
+        options,
       )
     }
 
@@ -422,9 +452,8 @@ export function validateAttendanceLocation(
   allLocations?: Array<{ location: GeofenceLocation; distance: number }>
   availableLocations?: Array<{ location: GeofenceLocation; distance: number }>
 } {
-  const baseProximityDistance = 1450 // Internal: allows check-in from 1500m away
-  const toleranceBuffer = 50
-  const globalProximityDistance = baseProximityDistance + toleranceBuffer // 1500m total
+  const deviceInfo = detectDevice()
+  const internalProximityDistance = deviceInfo.isMobile || deviceInfo.isTablet ? 100 : 50
   const displayDistance = 50 // What we show to users in UI messages
 
   const nearest = findNearestLocation(userLocation, qccLocations)
@@ -445,19 +474,20 @@ export function validateAttendanceLocation(
     }))
     .sort((a, b) => a.distance - b.distance)
 
-  const availableLocations = allLocationsWithDistance.filter(({ distance }) => distance <= globalProximityDistance)
+  const availableLocations = allLocationsWithDistance.filter(({ distance }) => distance <= internalProximityDistance)
 
   const canCheckIn = availableLocations.length > 0
 
   let message: string
+
   if (canCheckIn) {
     if (availableLocations.length === 1) {
-      message = `Ready for check-in at ${availableLocations[0].location.name} (${availableLocations[0].distance}m away)`
+      message = `You can check in at ${availableLocations[0].location.name}`
     } else {
-      message = `Ready for check-in at ${availableLocations.length} nearby locations. Nearest: ${availableLocations[0].location.name} (${availableLocations[0].distance}m away)`
+      message = `You can check in at ${availableLocations.length} locations`
     }
   } else {
-    message = `Outside ${displayDistance}m range - Cannot check in. Nearest location: ${nearest.location.name} (Distance: ${nearest.distance}m). Try using QR code instead.`
+    message = `You must be within ${displayDistance} meters of a QCC location to check in`
   }
 
   let accuracyWarning: string | undefined
@@ -522,10 +552,9 @@ export function validateCheckoutLocation(
   message: string
   accuracyWarning?: string
 } {
-  const baseProximityDistance = 1450 // Internal: allows check-out from 1500m away
-  const toleranceBuffer = 50
-  const globalProximityDistance = baseProximityDistance + toleranceBuffer // 1500m total
-  const displayDistance = 50 // What we show to users
+  const deviceInfo = detectDevice()
+  const internalProximityDistance = deviceInfo.isMobile || deviceInfo.isTablet ? 100 : 50
+  const displayDistance = 50 // What we show to users in UI messages
 
   const nearest = findNearestLocation(userLocation, qccLocations)
 
@@ -536,13 +565,14 @@ export function validateCheckoutLocation(
     }
   }
 
-  const canCheckOut = nearest.distance <= globalProximityDistance
+  const canCheckOut = nearest.distance <= internalProximityDistance
 
   let message: string
+
   if (canCheckOut) {
-    message = `Ready for check-out at ${nearest.location.name} (${nearest.distance}m away)`
+    message = `You can check out at ${nearest.location.name}`
   } else {
-    message = `Outside ${displayDistance}m range - Cannot check out. Nearest location: ${nearest.location.name} (Distance: ${nearest.distance}m). Try using QR code instead.`
+    message = `You must be within ${displayDistance} meters of a QCC location to check out`
   }
 
   let accuracyWarning: string | undefined

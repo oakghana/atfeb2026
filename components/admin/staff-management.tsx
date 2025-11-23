@@ -143,20 +143,18 @@ export function StaffManagement() {
     try {
       console.log("[v0] Fetching locations...")
       const response = await fetch("/api/admin/locations")
+      const result = await response.json()
+      console.log("[v0] Locations fetch result:", result)
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error("[v0] Failed to fetch locations:", errorData)
-        showError(errorData.error || "Failed to fetch locations")
-        return
+      if (result.success) {
+        setLocations(result.data || [])
+      } else {
+        console.error("[v0] Failed to fetch locations:", result.error)
+        showError("Failed to load locations")
       }
-
-      const locations = await response.json()
-      console.log("[v0] Locations fetched successfully:", locations?.length)
-      setLocations(locations || [])
     } catch (error) {
       console.error("[v0] Locations fetch exception:", error)
-      showError("Failed to fetch locations")
+      showError("Error loading locations")
     }
   }
 

@@ -1,5 +1,5 @@
 @import "tailwindcss";
-/* Removed @import "tw-animate-css" causing empty utility error */
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -227,5 +227,4 @@
   /* Fixed font variables with proper fallbacks */
   --font-sans: var(--font-inter, Inter, ui-sans-serif, system-ui, sans-serif);
   --font-mono: var(--font-jetbrains-mono, "JetBrains Mono", ui-monospace, monospace);
-  /* Added missing closing brace for @theme inline block */
 }

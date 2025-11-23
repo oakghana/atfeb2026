@@ -3,7 +3,6 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    console.log("[v0] Locations API - Starting request")
     const supabase = await createClient()
 
     const {
@@ -12,35 +11,23 @@ export async function GET() {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
-
-    console.log("[v0] Locations API - User authenticated:", user.id)
 
     const { data: profile } = await supabase.from("user_profiles").select("role").eq("id", user.id).single()
 
-    console.log("[v0] Locations API - User role:", profile?.role)
-
-    const allowedRoles = ["admin", "it-admin", "department_head"]
-    const userRole = profile?.role
-
-    if (!userRole || !allowedRoles.includes(userRole)) {
-      console.log("[v0] Locations API - Permission denied. Role:", userRole, "Allowed:", allowedRoles)
-      return NextResponse.json({ error: "Insufficient permissions to view locations" }, { status: 403 })
+    if (!profile || !["admin", "it-admin", "department_head"].includes(profile.role)) {
+      return NextResponse.json({ success: false, error: "Insufficient permissions" }, { status: 403 })
     }
-
-    console.log("[v0] Locations API - Permission granted for role:", userRole)
 
     const { data: locations, error } = await supabase.from("geofence_locations").select("*").order("name")
 
     if (error) throw error
 
-    console.log("[v0] Locations API - Successfully fetched", locations?.length, "locations")
-
-    return NextResponse.json(locations)
+    return NextResponse.json({ success: true, data: locations || [] })
   } catch (error) {
-    console.error("[v0] Locations API - Error:", error)
-    return NextResponse.json({ error: "Failed to fetch locations" }, { status: 500 })
+    console.error("[v0] Locations API error:", error)
+    return NextResponse.json({ success: false, error: "Failed to fetch locations" }, { status: 500 })
   }
 }
 

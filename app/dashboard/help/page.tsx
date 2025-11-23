@@ -62,8 +62,8 @@ export default async function HelpPage() {
             <Alert className="bg-primary/5 border-primary/20">
               <Smartphone className="h-4 w-4 text-primary" />
               <AlertDescription className="text-sm">
-                <strong>Best for:</strong> Staff using Opera browser, when GPS accuracy is poor, or when you want
-                instant check-in without waiting for location services.
+                <strong>Best for:</strong> Staff using Opera browser, or when GPS accuracy is poor (above 1km), or when
+                you want instant check-in without waiting for location services.
               </AlertDescription>
             </Alert>
 
@@ -585,25 +585,25 @@ export default async function HelpPage() {
                 <div className="flex items-start gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                   <p>
-                    <strong>Excellent:</strong> GPS check-in will work reliably when you're at the location
+                    <strong>Good accuracy (0-30m):</strong> GPS check-in will work reliably
                   </p>
                 </div>
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
                   <p>
-                    <strong>Good:</strong> Should work at the location but may take a few seconds
+                    <strong>Moderate accuracy (30-100m):</strong> May work but consider using QR code
                   </p>
                 </div>
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
                   <p>
-                    <strong>Fair:</strong> Recommend using QR code for faster, more reliable check-in
+                    <strong>Poor accuracy (100m+):</strong> Strongly recommend using QR code instead
                   </p>
                 </div>
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
                   <p>
-                    <strong>Poor:</strong> Browser using IP location - MUST use QR code instead
+                    <strong>Critical accuracy:</strong> Browser using IP location - MUST use QR code
                   </p>
                 </div>
               </div>
@@ -634,7 +634,7 @@ export default async function HelpPage() {
                 <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-medium">Check-out Deadline</p>
-                  <p className="text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Check out before 11:59 PM. After midnight, the system switches to check-in mode for the new day.
                   </p>
                 </div>
@@ -644,7 +644,7 @@ export default async function HelpPage() {
                 <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-medium">Early Check-out</p>
-                  <p className="text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     If checking out before 5:00 PM, you'll be asked to provide a reason.
                   </p>
                 </div>
@@ -654,7 +654,7 @@ export default async function HelpPage() {
                 <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-medium">Missed Check-out</p>
-                  <p className="text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     If you forget to check out, the system automatically checks you out at 11:59 PM when you check in
                     the next day.
                   </p>
@@ -665,7 +665,7 @@ export default async function HelpPage() {
                 <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-medium">Location Services</p>
-                  <p className="text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Enable location services in your browser for accurate check-in/check-out tracking.
                   </p>
                 </div>
@@ -675,7 +675,7 @@ export default async function HelpPage() {
                 <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-medium">QR Code Alternative</p>
-                  <p className="text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     If GPS is unavailable, you can use QR code scanning for check-in at supported locations.
                   </p>
                 </div>

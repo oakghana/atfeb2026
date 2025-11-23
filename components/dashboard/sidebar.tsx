@@ -37,7 +37,6 @@ import {
   LogOut,
   HelpCircle,
   RefreshCw,
-  AlertTriangle,
 } from "lucide-react"
 import Image from "next/image"
 
@@ -133,13 +132,6 @@ const navigationItems = [
     title: "Staff Activation",
     href: "/dashboard/staff-activation",
     icon: UserCheck,
-    roles: ["admin"],
-    category: "admin",
-  },
-  {
-    title: "Warnings",
-    href: "/dashboard/warnings",
-    icon: AlertTriangle,
     roles: ["admin"],
     category: "admin",
   },
@@ -389,13 +381,6 @@ export function Sidebar({ user, profile }: SidebarProps) {
                   )}
                 />
                 <span className="flex-1 text-left">{isClearingCache ? "Clearing..." : "Clear Cache"}</span>
-              </button>
-              <button
-                onClick={handleSignOut}
-                className="group flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px] w-full text-destructive hover:bg-gradient-to-r hover:from-destructive/10 hover:to-destructive/5 hover:text-destructive hover:shadow-md hover:scale-[1.01]"
-              >
-                <LogOut className="h-5 w-5 flex-shrink-0 transition-transform duration-300 group-hover:scale-105" />
-                <span className="flex-1 text-left">Sign Out</span>
               </button>
             </div>
           </nav>

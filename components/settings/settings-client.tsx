@@ -44,7 +44,6 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
     checkInProximityRange: "50",
     globalProximityDistance: "1000",
     enableBrowserSpecificTolerance: true,
-    mobileDeviceTolerance: 50,
     browserTolerances: {
       chrome: 1000,
       edge: 300,
@@ -157,11 +156,7 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
 
         if (data.systemSettings && data.isAdmin) {
           setSystemSettings({ ...systemSettings, ...data.systemSettings.settings })
-          setGeoSettings({
-            ...geoSettings,
-            ...data.systemSettings.geo_settings,
-            mobileDeviceTolerance: data.systemSettings.geo_settings?.mobileDeviceTolerance || 50,
-          })
+          setGeoSettings({ ...geoSettings, ...data.systemSettings.geo_settings })
         }
       } else {
         throw new Error("Failed to load settings from API")
@@ -234,10 +229,7 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
             initialSettings.profile?.role === "admin"
               ? {
                   settings: systemSettings,
-                  geo_settings: {
-                    ...geoSettings,
-                    mobileDeviceTolerance: geoSettings.mobileDeviceTolerance,
-                  },
+                  geo_settings: geoSettings,
                 }
               : null,
         }),
@@ -584,83 +576,11 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Globe className="h-5 w-5" />
-                <Shield className="h-4 w-4 text-orange-500" />
-                Mobile Device GPS Settings (Admin Only)
+                <Shield className="h-4 w-4 text-blue-500" />
+                Browser-Specific GPS Tolerance (Admin Only)
               </CardTitle>
               <CardDescription>
-                Fixed tolerance for mobile phones and tablets. Mobile devices have built-in GPS and are generally more
-                accurate than desktop computers.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 border rounded-lg bg-green-50 dark:bg-green-950/30 border-green-200">
-                <div className="flex items-start gap-3">
-                  <Info className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-                  <div className="space-y-2">
-                    <p className="font-medium text-green-800 dark:text-green-200">Mobile Device Priority</p>
-                    <p className="text-sm text-green-700 dark:text-green-300">
-                      All smartphones and tablets automatically use this tolerance setting, regardless of browser. This
-                      provides consistent accuracy for mobile users who have built-in GPS hardware.
-                    </p>
-                    <ul className="text-sm text-green-700 dark:text-green-300 space-y-1 list-disc list-inside">
-                      <li>Applies to: iPhones, Android phones, iPads, Android tablets</li>
-                      <li>Overrides browser-specific tolerances on mobile devices</li>
-                      <li>Desktop users continue using browser-specific tolerances</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="mobileDeviceTolerance" className="text-base font-semibold flex items-center gap-2">
-                  📱 Mobile/Tablet Tolerance Distance (meters)
-                </Label>
-                <Input
-                  id="mobileDeviceTolerance"
-                  type="number"
-                  min="10"
-                  max="500"
-                  value={geoSettings.mobileDeviceTolerance}
-                  onChange={(e) =>
-                    setGeoSettings({
-                      ...geoSettings,
-                      mobileDeviceTolerance: Number(e.target.value),
-                    })
-                  }
-                  className="mt-2 text-lg font-medium"
-                />
-                <p className="text-sm text-muted-foreground mt-2">
-                  <strong>Recommended: 50 meters</strong>
-                  <br />
-                  Mobile devices have GPS hardware and provide accurate location data. A smaller tolerance ensures staff
-                  are genuinely at the location.
-                  <br />
-                  <span className="text-xs">Range: 10-500 meters</span>
-                </p>
-              </div>
-
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-200">
-                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                  ✓ Current setting: {geoSettings.mobileDeviceTolerance}m for all mobile/tablet users
-                </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                  This setting applies to iPhone, Android, iPad, and all mobile browsers
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Desktop Browser Tolerance Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5" />
-                <Shield className="h-4 w-4 text-orange-500" />
-                Desktop Browser GPS Settings (Admin Only)
-              </CardTitle>
-              <CardDescription>
-                Configure tolerance distances for desktop/laptop browsers. Desktop computers typically rely on WiFi/IP
-                location and are less accurate than mobile devices.
+                Configure different proximity tolerances for each browser to account for GPS accuracy variations
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -684,23 +604,10 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
 
               {geoSettings.enableBrowserSpecificTolerance && (
                 <>
-                  <div className="p-4 border border-yellow-200 rounded-lg bg-yellow-50 dark:bg-yellow-950/30">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-yellow-800 dark:text-yellow-200">Desktop Browsers Only</p>
-                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                          These settings only apply to desktop/laptop computers. Mobile devices (phones and tablets)
-                          always use the {geoSettings.mobileDeviceTolerance}m mobile tolerance above.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <Label htmlFor="chromeTolerance" className="flex items-center gap-2">
-                        <span className="text-blue-600">●</span> Chrome (meters)
+                        <span className="text-green-600">●</span> Chrome (meters)
                       </Label>
                       <Input
                         id="chromeTolerance"
@@ -718,12 +625,12 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
                           })
                         }
                       />
-                      <p className="text-xs text-muted-foreground mt-1">Best desktop accuracy - Recommended: 1000m</p>
+                      <p className="text-xs text-muted-foreground mt-1">Good accuracy - Recommended: 1000m</p>
                     </div>
 
                     <div>
                       <Label htmlFor="edgeTolerance" className="flex items-center gap-2">
-                        <span className="text-green-600">●</span> Microsoft Edge (meters)
+                        <span className="text-blue-600">●</span> Edge (meters)
                       </Label>
                       <Input
                         id="edgeTolerance"
@@ -818,16 +725,15 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
                     <div className="flex items-start gap-2">
                       <Info className="h-5 w-5 text-blue-600 mt-0.5" />
                       <div>
-                        <p className="font-medium text-blue-800 dark:text-blue-200">How Tolerance Works</p>
+                        <p className="font-medium text-blue-800 dark:text-blue-200">How Browser Tolerances Work</p>
                         <ul className="text-sm text-blue-700 dark:text-blue-300 mt-2 space-y-1 list-disc list-inside">
-                          <li>
-                            📱 Mobile users: Always {geoSettings.mobileDeviceTolerance}m (phones & tablets with GPS)
-                          </li>
-                          <li>💻 Desktop Chrome: {geoSettings.browserTolerances.chrome}m (WiFi/IP location)</li>
-                          <li>💻 Desktop Edge: {geoSettings.browserTolerances.edge}m (WiFi/IP location)</li>
-                          <li>💻 Desktop Firefox: {geoSettings.browserTolerances.firefox}m (WiFi/IP location)</li>
-                          <li>💻 Desktop Opera: {geoSettings.browserTolerances.opera}m (WiFi/IP location)</li>
-                          <li>All users still see "50m radius" message for consistency</li>
+                          <li>System automatically detects which browser the user is using</li>
+                          <li>Applies the appropriate tolerance distance for that browser</li>
+                          <li>Edge users only need to be within {geoSettings.browserTolerances.edge}m</li>
+                          <li>Chrome users only need to be within {geoSettings.browserTolerances.chrome}m</li>
+                          <li>Firefox users only need to be within {geoSettings.browserTolerances.firefox}m</li>
+                          <li>Opera users only need to be within {geoSettings.browserTolerances.opera}m</li>
+                          <li>All users still see "50m radius" in the UI for consistency</li>
                         </ul>
                       </div>
                     </div>
