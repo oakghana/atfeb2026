@@ -67,3 +67,62 @@ export async function clearCacheAndReload(): Promise<void> {
     forceReload()
   }, 500)
 }
+
+/**
+ * Clear all cookies related to the attendance system
+ */
+export function clearAllCookies(): void {
+  try {
+    console.log("[v0] Clearing all cookies...")
+
+    // Get all cookies
+    const cookies = document.cookie.split(";")
+
+    // Delete each cookie
+    for (const cookie of cookies) {
+      const eqPos = cookie.indexOf("=")
+      const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim()
+
+      // Delete cookie for current domain
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
+
+      // Delete cookie for root domain
+      const domain = window.location.hostname
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${domain}`
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${domain}`
+
+      console.log(`[v0] Cleared cookie: ${name}`)
+    }
+
+    console.log("[v0] All cookies cleared")
+  } catch (error) {
+    console.error("[v0] Error clearing cookies:", error)
+  }
+}
+
+/**
+ * Clear all browser storage and logout user completely
+ */
+export async function clearAllDataAndLogout(): Promise<void> {
+  try {
+    console.log("[v0] Starting complete data clearing and logout...")
+
+    // Clear all caches and storage
+    await clearAppCache()
+
+    // Clear all cookies
+    clearAllCookies()
+
+    // Clear browser history (only works in some contexts)
+    try {
+      window.history.replaceState(null, "", "/auth/login")
+    } catch (error) {
+      console.log("[v0] Could not clear history:", error)
+    }
+
+    console.log("[v0] Complete data clearing and logout finished")
+  } catch (error) {
+    console.error("[v0] Error in clearAllDataAndLogout:", error)
+    throw error
+  }
+}

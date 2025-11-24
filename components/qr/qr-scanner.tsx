@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Camera, X, CheckCircle, KeyRound, Upload, Copy, MapPin, Info } from "lucide-react"
+import { Camera, X, CheckCircle, KeyRound, Upload, MapPin, Info } from "lucide-react"
 import { parseQRCode, parseLocationCode, validateQRCode, type QRCodeData } from "@/lib/qr-code"
 import { useToast } from "@/hooks/use-toast"
 
@@ -626,19 +626,79 @@ export function QRScanner({ onScanSuccess, onClose, autoStart = false }: QRScann
     }
   }, [autoStart])
 
+  const handleLocationCodeClick = async (location: any) => {
+    const code =
+      location.location_code || location.qr_code || location.name.substring(0, 10).toUpperCase().replace(/\s/g, "")
+
+    console.log("[v0] Location clicked:", location.name, "Code:", code)
+
+    // Auto-fill the input
+    setManualCode(code)
+
+    // Show toast notification
+    toast({
+      title: "Location Selected",
+      description: `Processing check-in to ${location.name}...`,
+      duration: 3000,
+    })
+
+    // Directly process the check-in with the code
+    try {
+      console.log("[v0] Auto-submitting location code:", code)
+
+      // Lookup location by code to get full location data
+      const response = await fetch(`/api/locations/lookup?code=${encodeURIComponent(code)}`)
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || "Location code not found")
+      }
+
+      const { location: foundLocation } = await response.json()
+      console.log("[v0] Found location for auto check-in:", foundLocation)
+
+      // Create QR data structure from location
+      const autoCheckInData: QRCodeData = {
+        type: "location",
+        locationId: foundLocation.id,
+        timestamp: Date.now(),
+        signature: "auto-checkin", // Special signature for one-tap check-ins
+      }
+
+      console.log("[v0] Calling onScanSuccess with auto check-in data")
+
+      // Call the success callback to trigger check-in (without GPS requirement)
+      onScanSuccess(autoCheckInData)
+
+      toast({
+        title: "Success",
+        description: `Checking in to ${location.name}`,
+        duration: 3000,
+      })
+    } catch (error: any) {
+      console.error("[v0] Auto check-in error:", error)
+      toast({
+        title: "Check-in Failed",
+        description: error.message || "Could not process check-in. Please try again.",
+        variant: "destructive",
+        duration: 5000,
+      })
+    }
+  }
+
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>QR Code Check-In</CardTitle>
+          <CardTitle>{isMobile ? "Enter Location Code" : "Location Code Check-In"}</CardTitle>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>
         <CardDescription>
           {isMobile
-            ? "Use your phone's camera to scan, then enter the code below"
-            : "Scan location QR code or enter code manually"}
+            ? "Tap your location below for instant check-in/out"
+            : "Enter location code from your work site or scan QR code"}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -657,113 +717,234 @@ export function QRScanner({ onScanSuccess, onClose, autoStart = false }: QRScann
 
         {isMobile ? (
           <div className="space-y-6">
-            {/* Native QR Scanner Instructions */}
-            <Card className="border-2 border-primary/20 bg-primary/5">
+            <Alert className="bg-green-50 border-green-500 border-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <AlertDescription className="text-sm font-semibold text-green-900">
+                ✓ RECOMMENDED: Enter Location Code for Instant Check-In
+              </AlertDescription>
+            </Alert>
+
+            <Card className="border-2 border-primary bg-primary/5 shadow-lg">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Camera className="h-5 w-5" />
-                  Use Your Phone's Built-In QR Scanner
+                  <KeyRound className="h-5 w-5" />
+                  Enter Location Code
                 </CardTitle>
+                <CardDescription className="text-sm font-semibold">
+                  Fastest and most reliable method - No camera or GPS issues!
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="space-y-2 text-sm">
-                  <p className="font-semibold">Quick Steps:</p>
-                  <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                    <li>Open your phone's Camera app</li>
-                    <li>Point camera at the QR code</li>
-                    <li>The code will appear automatically (e.g., "SWANZY", "ACCRA")</li>
-                    <li>Copy or remember the code</li>
-                    <li>Come back here and enter it below</li>
-                  </ol>
+                <div className="space-y-2">
+                  <Label htmlFor="manual-code" className="text-base font-semibold">
+                    Location Code
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Type or tap a location below (e.g., SWANZY, ACCRA, NSAWAM)
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      id="manual-code"
+                      placeholder="Enter location code"
+                      value={manualCode}
+                      onChange={(e) => setManualCode(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleManualCodeSubmit()
+                        }
+                      }}
+                      className="text-lg h-14 font-mono font-bold"
+                    />
+                    <Button
+                      onClick={handleManualCodeSubmit}
+                      size="lg"
+                      className="px-8 h-14 text-base"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Checking..." : "Submit"}
+                    </Button>
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <Alert className="bg-blue-50 border-blue-200">
-                  <AlertDescription className="text-xs text-blue-900">
-                    <strong>iOS:</strong> Use Camera app - QR scanner is built-in
-                    <br />
-                    <strong>Android:</strong> Use Camera or Google Lens app
+            <Card className="bg-background shadow-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Tap Your Location for Instant Check-In
+                </CardTitle>
+                <CardDescription className="text-sm font-medium">One tap = Automatic check-in/out</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {loadingLocations ? (
+                  <div className="text-xs text-muted-foreground">Loading available locations...</div>
+                ) : availableLocations.length > 0 ? (
+                  <div className="grid gap-2">
+                    {availableLocations.map((location) => (
+                      <button
+                        key={location.id}
+                        onClick={() => handleLocationCodeClick(location)}
+                        className="flex items-center justify-between p-4 bg-background rounded-lg border-2 hover:border-primary hover:bg-primary/5 transition-all active:scale-95"
+                      >
+                        <div className="flex-1 min-w-0 text-left">
+                          <div className="font-medium text-sm truncate">{location.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">{location.address}</div>
+                        </div>
+                        <div className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md font-mono text-base font-bold ml-3 flex-shrink-0">
+                          <CheckCircle className="h-4 w-4" />
+                          {location.location_code || location.name.substring(0, 10).toUpperCase()}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground">No locations available</div>
+                )}
+
+                <Alert className="bg-blue-50 dark:bg-blue-950/50 border-blue-200">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    <strong>Tip:</strong> Bookmark this page on your phone for quick daily check-ins!
                   </AlertDescription>
                 </Alert>
               </CardContent>
             </Card>
 
-            {/* Manual Code Entry - Primary option on mobile */}
-            <div className="space-y-3">
-              <Label htmlFor="manual-code" className="text-base font-semibold">
-                <KeyRound className="h-4 w-4 inline mr-2" />
-                Enter Location Code
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Enter the code you scanned from the QR code (e.g., SWANZY, ACCRA, NSAWAM)
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  id="manual-code"
-                  placeholder="Enter location code"
-                  value={manualCode}
-                  onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleManualCodeSubmit()
-                    }
-                  }}
-                  className="text-lg h-12"
-                />
-                <Button onClick={handleManualCodeSubmit} size="lg" className="px-8">
-                  Submit Code
-                </Button>
-              </div>
-            </div>
-
-            {/* Alternative: File Upload */}
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or take a photo</span>
+                <span className="bg-background px-2 text-muted-foreground">If Code Entry Doesn't Work</span>
               </div>
             </div>
 
-            <label htmlFor="qr-camera-input" className="block">
-              <Input
-                id="qr-camera-input"
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <Button variant="outline" size="lg" className="w-full h-16 bg-transparent" asChild>
-                <div>
-                  <Upload className="h-6 w-6 mr-3" />
-                  Take Photo of QR Code
-                </div>
-              </Button>
-            </label>
-            <p className="text-xs text-center text-muted-foreground">
-              Opens your camera to capture a photo of the QR code
-            </p>
+            <Card className="border-dashed opacity-75">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Camera className="h-4 w-4" />
+                  Last Resort: Scan with Phone Camera
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">Only use if manual code entry above is not working:</p>
+
+                <ol className="list-decimal list-inside space-y-1 text-xs text-muted-foreground">
+                  <li>Open your phone's Camera app</li>
+                  <li>Point at QR code poster at your location</li>
+                  <li>Code will appear - copy it</li>
+                  <li>Enter code in the field above</li>
+                </ol>
+
+                <label htmlFor="qr-camera-input" className="block">
+                  <Input
+                    id="qr-camera-input"
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <Button variant="outline" size="lg" className="w-full h-14 bg-transparent" asChild>
+                    <div>
+                      <Upload className="h-5 w-5 mr-3" />
+                      Take Photo of QR Code
+                    </div>
+                  </Button>
+                </label>
+              </CardContent>
+            </Card>
           </div>
         ) : (
-          // Desktop Experience - Keep existing functionality
           <div className="space-y-4">
-            {!showManualInput ? (
-              <div className="space-y-4">
-                {/* Desktop camera streaming */}
-                {!isScanning && (
-                  <Button onClick={startScanning} className="w-full" size="lg">
+            <Alert className="bg-green-50 border-green-500 border-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <AlertDescription className="text-sm font-semibold text-green-900">
+                ✓ RECOMMENDED: Enter Location Code (Fastest Method)
+              </AlertDescription>
+            </Alert>
+
+            <Card className="border-2 border-primary bg-primary/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Enter Location Code</CardTitle>
+                <CardDescription>Most reliable method for all devices</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="desktop-manual-code">Location Code</Label>
+                    <Input
+                      id="desktop-manual-code"
+                      placeholder="Enter location code (e.g., SWANZY)"
+                      value={manualCode}
+                      onChange={(e) => setManualCode(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleManualCodeSubmit()
+                        }
+                      }}
+                      className="font-mono font-bold text-lg h-12"
+                    />
+                  </div>
+                  <Button onClick={handleManualCodeSubmit} className="w-full" size="lg" disabled={isLoading}>
+                    {isLoading ? "Checking In..." : "Submit Code"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {availableLocations.length > 0 && (
+              <Card className="bg-background">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Quick Select Location
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-2">
+                    {availableLocations.map((location) => (
+                      <button
+                        key={location.id}
+                        onClick={() => handleLocationCodeClick(location)}
+                        className="flex flex-col items-start p-3 bg-background rounded-lg border-2 hover:border-primary hover:bg-primary/5 transition-all"
+                      >
+                        <div className="font-medium text-sm truncate w-full">{location.name}</div>
+                        <div className="text-xs font-mono font-bold text-primary mt-1">
+                          {location.location_code || location.name.substring(0, 10).toUpperCase()}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Alternative Option</span>
+              </div>
+            </div>
+
+            <Card className="border-dashed opacity-75">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Scan QR Code with Webcam</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!isScanning ? (
+                  <Button onClick={startScanning} variant="outline" className="w-full bg-transparent">
                     <Camera className="mr-2 h-4 w-4" />
                     Start Camera Scanner
                   </Button>
-                )}
-
-                {isScanning && (
+                ) : (
                   <div className="space-y-4">
                     <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
                       <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
                       <canvas ref={canvasRef} className="hidden" />
-                      {/* Scanning indicator */}
                       <div className="absolute inset-0 pointer-events-none">
                         <div className="absolute inset-0 border-4 border-primary/30 rounded-lg" />
                         <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-primary animate-scan" />
@@ -774,101 +955,10 @@ export function QRScanner({ onScanSuccess, onClose, autoStart = false }: QRScann
                     </Button>
                   </div>
                 )}
-
-                <Button onClick={() => setShowManualInput(true)} variant="outline" className="w-full">
-                  <KeyRound className="mr-2 h-4 w-4" />
-                  Enter Location Code Manually
-                </Button>
-              </div>
-            ) : (
-              // Desktop manual entry
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="desktop-manual-code">Location Code</Label>
-                  <Input
-                    id="desktop-manual-code"
-                    placeholder="Enter location code (e.g., SWANZY)"
-                    value={manualCode}
-                    onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleManualCodeSubmit()
-                      }
-                    }}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={handleManualCodeSubmit} className="flex-1">
-                    Submit Code
-                  </Button>
-                  <Button onClick={() => setShowManualInput(false)} variant="outline">
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
+              </CardContent>
+            </Card>
           </div>
         )}
-
-        <Card className="bg-muted/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              Available Location Codes
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              {isMobile
-                ? "Tap any code below to copy it, then use 'Enter Location Code' above and paste or type the code to check in/out."
-                : "Click any code below to copy it, then use manual entry to check in/out."}
-            </p>
-
-            {loadingLocations ? (
-              <div className="text-xs text-muted-foreground">Loading available locations...</div>
-            ) : availableLocations.length > 0 ? (
-              <div className="grid gap-2">
-                {availableLocations.map((location) => (
-                  <div
-                    key={location.id}
-                    className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{location.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">{location.address}</div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        const code = location.location_code || location.name.substring(0, 10).toUpperCase()
-                        navigator.clipboard.writeText(code)
-                        setManualCode(code)
-                        toast({
-                          title: "Code Copied!",
-                          description: `${code} copied and filled. Tap "Submit Code" to check in.`,
-                          duration: 5000,
-                        })
-                      }}
-                      className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-mono text-xs font-bold ml-2 flex-shrink-0"
-                    >
-                      <Copy className="h-3 w-3" />
-                      {location.location_code || location.name.substring(0, 10).toUpperCase()}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-xs text-muted-foreground">No locations available</div>
-            )}
-
-            <Alert className="bg-blue-50 dark:bg-blue-950/50 border-blue-200">
-              <Info className="h-4 w-4" />
-              <AlertDescription className="text-xs">
-                <strong>How to use:</strong> Tap a code to copy and auto-fill it, then click "Submit Code" button above
-                to check in/out.
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
       </CardContent>
     </Card>
   )

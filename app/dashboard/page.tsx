@@ -10,6 +10,7 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { MobileAppDownload } from "@/components/ui/mobile-app-download"
 import { StaffWarningModal } from "@/components/notifications/staff-warning-modal"
+import { GPSStatusBanner } from "@/components/attendance/gps-status-banner"
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -108,6 +109,8 @@ export default async function DashboardPage() {
       <StaffWarningModal />
 
       <div className="space-y-8">
+        <GPSStatusBanner />
+
         <div className="space-y-2">
           <h1 className="text-4xl font-heading font-bold text-foreground tracking-tight">Dashboard</h1>
           <p className="text-lg text-muted-foreground font-medium">

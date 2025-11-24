@@ -17,7 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { clearAppCache, clearCacheAndReload } from "@/lib/cache-manager"
+import { clearAppCache } from "@/lib/cache-manager"
 import {
   Home,
   Clock,
@@ -196,7 +196,25 @@ export function Sidebar({ user, profile }: SidebarProps) {
   const handleClearCache = async () => {
     setIsClearingCache(true)
     try {
-      await clearCacheAndReload()
+      const supabase = createClient()
+
+      // Log the action
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }).catch(console.error)
+
+      // Sign out from Supabase
+      await supabase.auth.signOut()
+
+      // Clear all data, cache, cookies, and storage
+      const { clearAllDataAndLogout } = await import("@/lib/cache-manager")
+      await clearAllDataAndLogout()
+
+      // Force redirect to login with a clean slate
+      window.location.href = "/auth/login"
     } catch (error) {
       console.error("[v0] Failed to clear cache:", error)
       setIsClearingCache(false)

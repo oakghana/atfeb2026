@@ -31,7 +31,7 @@ import {
 } from "@/lib/geolocation"
 import { getDeviceInfo } from "@/lib/device-info"
 import type { QRCodeData } from "@/lib/qr-code"
-import { MapPin, Clock, Loader2, AlertTriangle, Navigation, QrCode, CheckCircle2 } from "lucide-react"
+import { MapPin, Clock, Loader2, AlertTriangle, Navigation, CheckCircle2 } from "lucide-react"
 import { useRealTimeLocations } from "@/hooks/use-real-time-locations"
 import { createClient } from "@/lib/supabase/client"
 import { QRScanner } from "@/components/qr/qr-scanner"
@@ -283,7 +283,6 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
     setWindowsCapabilities(capabilities)
     console.log("[v0] Windows location capabilities detected:", capabilities)
 
-    // Automatically get location when page loads
     const autoLoadLocation = async () => {
       try {
         console.log("[v0] Auto-loading location on page load...")
@@ -291,6 +290,13 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
         setUserLocation(location)
         setLocationPermissionStatus({ granted: true, message: "Location access granted" })
         console.log("[v0] Location auto-loaded successfully:", location)
+
+        const capabilities = detectWindowsLocationCapabilities()
+        if (capabilities.isWindows && location.accuracy > 200) {
+          setError(
+            `GPS accuracy is ${Math.round(location.accuracy)}m. Click the refresh button to update your location for better accuracy.`,
+          )
+        }
       } catch (error) {
         console.log("[v0] Auto-load location failed, user can try manual check-in or QR code:", error)
         // Don't show error - user can still use check-in button or QR code
@@ -1236,8 +1242,8 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
                         variant="default"
                         className="bg-green-600 hover:bg-green-700"
                       >
-                        <QrCode className="h-3 w-3 mr-1" />
-                        Use QR Code Instead
+                        <MapPin className="h-3 w-3 mr-1" />
+                        Enter Location Code Manually
                       </Button>
                     </div>
                   </AlertDescription>
@@ -1401,10 +1407,12 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
                   variant="outline"
                   className="w-full bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700"
                 >
-                  <QrCode className="mr-2 h-4 w-4" />
-                  Use QR Code Instead (Instant)
+                  <MapPin className="mr-2 h-4 w-4" />
+                  Enter Location Code Manually (Recommended)
                 </Button>
-                <p className="text-xs text-center text-muted-foreground mt-2">QR codes work instantly without GPS</p>
+                <p className="text-xs text-center text-muted-foreground mt-2">
+                  Tap your location below for instant check-in - no camera needed!
+                </p>
               </div>
             )}
           </div>
@@ -1568,7 +1576,7 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
                     }}
                     className="bg-green-600 hover:bg-green-700 text-white"
                   >
-                    Use QR Code Instead
+                    Enter Location Code Manually
                   </Button>
                 </div>
               </AlertDescription>

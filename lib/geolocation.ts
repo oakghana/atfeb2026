@@ -150,11 +150,11 @@ export async function getBrowserTolerance(geoSettings?: GeoSettings): Promise<nu
 
   switch (browserInfo.name.toLowerCase()) {
     case "chrome":
-      return 100
+      return 500
     case "edge":
       return 100
     case "firefox":
-      return 100
+      return 500
     case "safari":
       return 100
     case "opera":
@@ -203,7 +203,7 @@ export async function isWithinBrowserProximity(
 export async function getCurrentLocation(): Promise<LocationData> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new GeolocationError("Geolocation is not supported by this browser", 0))
+      reject(new Error("Geolocation is not supported by your browser"))
       return
     }
 
@@ -213,7 +213,7 @@ export async function getCurrentLocation(): Promise<LocationData> {
     const highAccuracyOptions: PositionOptions = {
       enableHighAccuracy: true,
       timeout: capabilities.isWindows ? 15000 : 12000, // Increased timeout for better GPS lock
-      maximumAge: 0, // Always get fresh location
+      maximumAge: 0, // Always get fresh location, never use cached
     }
 
     let attempts = 0
@@ -321,7 +321,7 @@ If you prefer GPS:
           }
 
           const fullMessage = guidance ? `${message}\n\n${guidance}` : message
-          reject(new GeolocationError(fullMessage, error.code))
+          reject(new Error(fullMessage))
         },
         options,
       )
@@ -719,10 +719,10 @@ export function getWindowsLocationTroubleshooting(): {
 
 export function watchLocation(
   onLocationUpdate: (location: LocationData) => void,
-  onError: (error: GeolocationError) => void,
+  onError: (error: Error) => void,
 ): number | null {
   if (!navigator.geolocation) {
-    onError(new GeolocationError("Geolocation is not supported by this browser", 0))
+    onError(new Error("Geolocation is not supported by this browser"))
     return null
   }
 
@@ -760,7 +760,7 @@ export function watchLocation(
           message = capabilities.isWindows ? "Windows Location Services timeout. Trying again..." : "Location timeout"
           break
       }
-      onError(new GeolocationError(message, error.code))
+      onError(new Error(message))
     },
     options,
   )
@@ -796,7 +796,7 @@ export async function getAveragedLocation(samples = 3): Promise<LocationData> {
   }
 
   if (readings.length === 0) {
-    throw new GeolocationError("Failed to get any location readings", 2)
+    throw new Error("Failed to get any location readings")
   }
 
   // Calculate average position
