@@ -24,28 +24,43 @@ export function QRScanner({ onScanSuccess, onClose, autoStart = false }: QRScann
   const [success, setSuccess] = useState<string | null>(null)
   const [showManualInput, setShowManualInput] = useState(false)
   const [manualCode, setManualCode] = useState("")
+  const [isMobile, setIsMobile] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
 
+  useEffect(() => {
+    const checkMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    setIsMobile(checkMobile)
+    console.log("[v0] Mobile device detected:", checkMobile)
+  }, [])
+
   const startScanning = async () => {
     try {
       setError(null)
       setIsScanning(true)
 
-      const constraints = {
+      const constraints: MediaStreamConstraints = {
         video: {
           facingMode: { ideal: "environment" },
-          width: { ideal: 1280, min: 640 },
-          height: { ideal: 720, min: 480 },
+          width: { ideal: 1920, max: 1920, min: 640 },
+          height: { ideal: 1080, max: 1080, min: 480 },
+          aspectRatio: { ideal: 16 / 9 },
         },
+        audio: false,
       }
 
-      console.log("[v0] Requesting camera access with constraints:", constraints)
+      console.log("[v0] Requesting camera access for mobile device")
+      console.log("[v0] Camera constraints:", constraints)
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera access is not supported on this device")
+      }
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      console.log("[v0] Camera stream obtained successfully")
 
       streamRef.current = stream
       if (videoRef.current) {
@@ -53,23 +68,56 @@ export function QRScanner({ onScanSuccess, onClose, autoStart = false }: QRScann
 
         videoRef.current.setAttribute("playsinline", "true")
         videoRef.current.setAttribute("webkit-playsinline", "true")
+        videoRef.current.setAttribute("muted", "true")
+        videoRef.current.setAttribute("autoplay", "true")
+        videoRef.current.muted = true
+
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error("Video load timeout")), 10000)
+
+          videoRef.current!.onloadedmetadata = () => {
+            clearTimeout(timeout)
+            console.log("[v0] Video metadata loaded")
+            resolve()
+          }
+
+          videoRef.current!.onerror = (e) => {
+            clearTimeout(timeout)
+            console.error("[v0] Video error:", e)
+            reject(new Error("Video load error"))
+          }
+        })
 
         await videoRef.current.play()
-        console.log("[v0] Camera stream started successfully")
+        console.log("[v0] Camera stream started successfully, starting QR scan interval")
 
-        scanIntervalRef.current = setInterval(scanForQRCode, 200)
+        setTimeout(() => {
+          scanIntervalRef.current = setInterval(scanForQRCode, 300)
+        }, 500)
       }
     } catch (err) {
       console.error("[v0] Camera access error:", err)
-      const errorMessage =
-        "Camera access denied or not available. Please enable camera permissions in your device settings."
-      setError(errorMessage)
 
+      let errorMessage = "Unable to access camera. "
+
+      if (err instanceof Error) {
+        if (err.name === "NotAllowedError") {
+          errorMessage += "Please allow camera permissions in your browser settings and reload the page."
+        } else if (err.name === "NotFoundError") {
+          errorMessage += "No camera found on your device. Try using the 'Enter Location Code' option instead."
+        } else if (err.name === "NotReadableError") {
+          errorMessage += "Camera is already in use by another app. Please close other apps and try again."
+        } else {
+          errorMessage += err.message || "Please enable camera permissions and try again."
+        }
+      }
+
+      setError(errorMessage)
       toast({
         title: "Camera Error",
         description: errorMessage,
         variant: "destructive",
-        duration: 5000,
+        duration: 8000,
       })
 
       setIsScanning(false)
@@ -241,29 +289,54 @@ export function QRScanner({ onScanSuccess, onClose, autoStart = false }: QRScann
     setIsScanning(false)
   }
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
+    console.log("[v0] Processing uploaded QR image:", file.name)
+    setError(null)
+
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const result = e.target?.result as string
-      try {
-        const qrData = parseQRCode(result)
-        if (qrData) {
-          const validation = validateQRCode(qrData)
-          if (validation.isValid) {
-            setSuccess("QR code scanned successfully!")
-            onScanSuccess(qrData)
-          } else {
-            setError(validation.reason || "Invalid QR code")
+
+      const img = new Image()
+      img.onload = async () => {
+        try {
+          const canvas = document.createElement("canvas")
+          canvas.width = img.width
+          canvas.height = img.height
+          const ctx = canvas.getContext("2d")
+
+          if (!ctx) {
+            setError("Failed to process image")
+            return
           }
-        } else {
-          setError("Invalid QR code format")
+
+          ctx.drawImage(img, 0, 0)
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+
+          const jsQR = (await import("jsqr")).default
+          const code = jsQR(imageData.data, imageData.width, imageData.height)
+
+          if (code) {
+            console.log("[v0] QR code found in uploaded image:", code.data)
+            await processQRCode(code.data)
+          } else {
+            setError("No QR code found in image. Please try again with a clearer image.")
+            toast({
+              title: "No QR Code Found",
+              description: "Please ensure the QR code is visible and try again.",
+              variant: "destructive",
+              duration: 5000,
+            })
+          }
+        } catch (error) {
+          console.error("[v0] Image processing error:", error)
+          setError("Failed to process image")
         }
-      } catch {
-        setError("Failed to read QR code")
       }
+      img.src = result
     }
     reader.readAsDataURL(file)
   }
@@ -338,20 +411,22 @@ export function QRScanner({ onScanSuccess, onClose, autoStart = false }: QRScann
         {showManualInput ? (
           <div className="space-y-4 p-4">
             <div className="space-y-2">
-              <Label htmlFor="location-code">Location Code</Label>
+              <Label htmlFor="location-code" className="text-base font-semibold">
+                Location Code
+              </Label>
               <Input
                 id="location-code"
                 placeholder="e.g., HO-SWZ-001"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-                className="h-14 text-lg font-mono"
+                className="h-16 text-lg font-mono touch-manipulation"
                 onKeyPress={(e) => {
                   if (e.key === "Enter") {
                     handleManualCodeSubmit()
                   }
                 }}
               />
-              <p className="text-xs text-muted-foreground">Enter the location code found on the QCC location sign</p>
+              <p className="text-sm text-muted-foreground">Enter the location code found on the QCC location sign</p>
             </div>
 
             <Button
@@ -370,17 +445,45 @@ export function QRScanner({ onScanSuccess, onClose, autoStart = false }: QRScann
                 setManualCode("")
               }}
               variant="outline"
-              className="w-full touch-manipulation h-12"
+              className="w-full touch-manipulation h-14"
             >
               Back to Camera Scan
             </Button>
           </div>
         ) : !isScanning ? (
           <div className="space-y-4 p-4">
-            <Button onClick={startScanning} className="w-full touch-manipulation h-16 text-lg font-semibold">
-              <Camera className="h-6 w-6 mr-2" />
-              Start Camera
+            <Button
+              onClick={startScanning}
+              className="w-full touch-manipulation h-20 text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+            >
+              <Camera className="h-8 w-8 mr-3" />
+              Start Camera Scanner
             </Button>
+
+            {isMobile && (
+              <div>
+                <label htmlFor="qr-capture" className="block">
+                  <Button
+                    variant="outline"
+                    className="w-full touch-manipulation h-20 text-xl font-bold bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-2 border-green-500"
+                    asChild
+                  >
+                    <span>
+                      <Camera className="h-8 w-8 mr-3" />
+                      Take Photo of QR Code
+                    </span>
+                  </Button>
+                </label>
+                <input
+                  id="qr-capture"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
+              </div>
+            )}
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -394,71 +497,66 @@ export function QRScanner({ onScanSuccess, onClose, autoStart = false }: QRScann
             <Button
               onClick={() => setShowManualInput(true)}
               variant="outline"
-              className="w-full touch-manipulation h-16 text-lg font-semibold bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700"
+              className="w-full touch-manipulation h-16 text-lg font-semibold bg-blue-50 dark:bg-blue-950 border-2 border-blue-300 dark:border-blue-700"
             >
               <KeyRound className="h-5 w-5 mr-2" />
               Enter Location Code
             </Button>
 
-            <div>
-              <label htmlFor="qr-upload" className="block">
-                <Button
-                  variant="outline"
-                  className="w-full touch-manipulation h-14 text-base font-semibold bg-transparent"
-                  asChild
-                >
-                  <span>Upload QR Image</span>
-                </Button>
-              </label>
-              <input
-                id="qr-upload"
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-            </div>
+            {!isMobile && (
+              <div>
+                <label htmlFor="qr-upload" className="block">
+                  <Button
+                    variant="outline"
+                    className="w-full touch-manipulation h-14 text-base font-semibold bg-transparent"
+                    asChild
+                  >
+                    <span>Upload QR Image</span>
+                  </Button>
+                </label>
+                <input id="qr-upload" type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+              </div>
+            )}
 
-            <p className="text-xs text-center text-muted-foreground mt-4">
-              Point your camera at the QCC location QR code, or enter the location code manually if camera is not
-              working
+            <p className="text-sm text-center text-muted-foreground mt-4 leading-relaxed">
+              {isMobile
+                ? "Use your camera to scan or take a photo of the QCC location QR code. You must be within 40 meters of the location."
+                : "Point your camera at the QCC location QR code, or enter the location code manually."}
             </p>
           </div>
         ) : (
           <div className="space-y-4 p-4">
-            <div className="relative aspect-square bg-black rounded-lg overflow-hidden">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-                style={{ WebkitPlaysinline: "true" } as React.CSSProperties}
-              />
+            <div className="relative w-full rounded-lg overflow-hidden bg-black" style={{ aspectRatio: "4/3" }}>
+              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
               <canvas ref={canvasRef} className="hidden" />
+
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-48 h-48 sm:w-56 sm:h-56 border-4 border-primary rounded-lg relative animate-pulse">
-                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary"></div>
-                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary"></div>
-                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary"></div>
-                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary"></div>
+                <div className="w-64 h-64 border-4 border-white rounded-2xl relative">
+                  <div className="absolute -top-2 -left-2 w-12 h-12 border-t-8 border-l-8 border-blue-500 rounded-tl-lg"></div>
+                  <div className="absolute -top-2 -right-2 w-12 h-12 border-t-8 border-r-8 border-blue-500 rounded-tr-lg"></div>
+                  <div className="absolute -bottom-2 -left-2 w-12 h-12 border-b-8 border-l-8 border-blue-500 rounded-bl-lg"></div>
+                  <div className="absolute -bottom-2 -right-2 w-12 h-12 border-b-8 border-r-8 border-blue-500 rounded-br-lg"></div>
+
+                  <div className="absolute inset-0 overflow-hidden">
+                    <div className="w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-scan"></div>
+                  </div>
                 </div>
               </div>
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-4/5">
-                <p className="text-white text-sm sm:text-base bg-black/70 px-4 py-2 rounded-full text-center font-medium">
-                  📷 Align QR code in frame
+
+              <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 w-11/12">
+                <p className="text-white text-base sm:text-lg bg-black/80 px-6 py-3 rounded-full text-center font-semibold backdrop-blur-sm">
+                  📷 Align QR code within frame
                 </p>
               </div>
             </div>
 
             <Button
               onClick={stopScanning}
-              variant="outline"
-              className="w-full touch-manipulation h-16 text-lg font-semibold bg-transparent"
+              variant="destructive"
+              className="w-full touch-manipulation h-16 text-lg font-bold"
             >
-              <X className="h-5 w-5 mr-2" />
-              Cancel Scanning
+              <X className="h-6 w-6 mr-2" />
+              Stop Camera
             </Button>
           </div>
         )}
