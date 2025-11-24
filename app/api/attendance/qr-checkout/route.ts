@@ -46,7 +46,42 @@ export async function POST(request: Request) {
       .single()
 
     if (findError || !attendance) {
-      return NextResponse.json({ error: "No active check-in found for today" }, { status: 400 })
+      console.log("[v0] No active check-in found for checkout:", findError?.message)
+
+      // Check if user has already checked out today
+      const { data: completedAttendance } = await supabase
+        .from("attendance_records")
+        .select("check_in_time, check_out_time")
+        .eq("user_id", user.id)
+        .gte("check_in_time", `${today}T00:00:00Z`)
+        .lt("check_in_time", `${today}T23:59:59Z`)
+        .not("check_out_time", "is", null)
+        .maybeSingle()
+
+      if (completedAttendance) {
+        return NextResponse.json(
+          {
+            error: "Already checked out",
+            message: "You have already checked out today. You cannot check out again until you check in tomorrow.",
+            reason: "ALREADY_CHECKED_OUT",
+            details: {
+              check_in_time: completedAttendance.check_in_time,
+              check_out_time: completedAttendance.check_out_time,
+            },
+          },
+          { status: 400 },
+        )
+      }
+
+      // User hasn't checked in yet today
+      return NextResponse.json(
+        {
+          error: "No active check-in found",
+          message: "You need to check in first before you can check out. Please check in at your location.",
+          reason: "NOT_CHECKED_IN",
+        },
+        { status: 400 },
+      )
     }
 
     // Calculate work hours

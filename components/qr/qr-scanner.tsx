@@ -283,7 +283,7 @@ export function QRScanner({ onScanSuccess, onClose, autoStart = false }: QRScann
           if (response.status === 403) {
             // Distance error
             if (result.distance && result.locationName) {
-              errorMsg = `You are ${result.distance}m away from ${result.locationName}. You must be within 40 meters to check in using QR code.`
+              errorMsg = `You must be within 100 meters of your assigned location to check in. Please use manual location code entry.`
             } else if (result.message) {
               errorMsg = result.message
             } else if (result.error) {
@@ -529,7 +529,7 @@ export function QRScanner({ onScanSuccess, onClose, autoStart = false }: QRScann
       console.log("[v0] GPS location obtained, distance will be verified")
       toast({
         title: "GPS Obtained",
-        description: "Your location will be verified (must be within 40m)",
+        description: "Your location will be verified (within 100m required)",
         duration: 3000,
       })
 

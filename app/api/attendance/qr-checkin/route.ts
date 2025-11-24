@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
-import { calculateDistance } from "@/lib/geolocation"
+import { calculateDistance, getBrowserTolerance } from "@/lib/geolocation"
 
 export async function POST(request: Request) {
   try {
@@ -41,22 +41,24 @@ export async function POST(request: Request) {
     let proximityVerified = false
     let gpsAvailable = false
 
+    const browserTolerance = await getBrowserTolerance()
+
     if (userLatitude !== undefined && userLongitude !== undefined) {
       gpsAvailable = true
       distance = calculateDistance(userLatitude, userLongitude, location.latitude, location.longitude)
 
       console.log("[v0] QR scan with GPS - distance from location:", distance, "meters")
+      console.log("[v0] Browser tolerance:", browserTolerance, "meters")
 
-      const QR_PROXIMITY_LIMIT = 40 // 40 meters for QR code check-in
+      const QR_PROXIMITY_LIMIT = browserTolerance
 
       if (distance > QR_PROXIMITY_LIMIT) {
         console.log("[v0] User too far from location for QR check-in:", distance, "meters")
         return NextResponse.json(
           {
             error: "Too far from location",
-            message: `You are too far from ${location.name} (${Math.round(distance)}m away). You must be within 40 meters to check in.`,
+            message: `You must be within 100 meters of your assigned location to check in. Please use manual location code entry.`,
             distance: Math.round(distance),
-            requiredDistance: QR_PROXIMITY_LIMIT,
             locationName: location.name,
           },
           { status: 403 },
@@ -64,7 +66,7 @@ export async function POST(request: Request) {
       }
 
       proximityVerified = true
-      console.log("[v0] GPS proximity verified - within 40m of:", location.name)
+      console.log("[v0] GPS proximity verified - within", browserTolerance, "m of:", location.name)
     } else {
       console.log("[v0] QR check-in WITHOUT GPS (device GPS unavailable or manual entry)")
       distance = 0
@@ -136,7 +138,7 @@ export async function POST(request: Request) {
         check_in_longitude: userLongitude || location.longitude,
         status: "present",
         notes: gpsAvailable
-          ? `QR code scanned - ${Math.round(distance)}m from location (GPS verified within 40m)`
+          ? `QR code scanned - ${Math.round(distance)}m from location (GPS verified within ${browserTolerance}m tolerance)`
           : `QR code scanned - GPS unavailable, location verified by QR code only (manual entry or GPS disabled)`,
       })
       .select()
@@ -147,7 +149,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to record attendance", details: insertError.message }, { status: 500 })
     }
 
-    console.log("[v0] Attendance record created via QR code (within 40m):", attendance.id)
+    console.log("[v0] Attendance record created via QR code (within tolerance):", attendance.id)
 
     if (device_info) {
       await supabase.from("device_sessions").insert({

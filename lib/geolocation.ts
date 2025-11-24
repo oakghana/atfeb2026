@@ -144,21 +144,23 @@ export async function getBrowserTolerance(geoSettings?: GeoSettings): Promise<nu
   const browserInfo = detectBrowser()
   const deviceInfo = detectDevice()
 
+  // Mobile and tablet devices get standard tolerance
   if (deviceInfo.isMobile || deviceInfo.isTablet) {
     return 100
   }
 
+  // PC users get increased tolerance for GPS accuracy issues
   switch (browserInfo.name.toLowerCase()) {
     case "chrome":
-      return 500
+      return 2000 // Increased from 500 to 2000 meters for PC Chrome users
     case "edge":
       return 100
     case "firefox":
-      return 500
+      return 2000 // Increased from 500 to 2000 meters for PC Firefox users
     case "safari":
       return 100
     case "opera":
-      return 100
+      return 2000 // Increased from 100 to 2000 meters for PC Opera users
     default:
       return 100
   }

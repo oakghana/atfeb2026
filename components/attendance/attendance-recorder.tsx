@@ -637,16 +637,15 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
       // Check if the distance is within the required 100m
       if (proximityCheck.distance > 100) {
         setError(
-          `Too far from location (${proximityCheck.distance}m away). You must be within 100m to check in. Please move closer or use QR code.`,
+          `You must be within 100 meters of your assigned location to check in. Please use manual location code entry or move closer.`,
         )
         setIsLoading(false)
         return
       }
 
       if (!proximityCheck.isWithin) {
-        // This condition might be redundant if the above check covers it, but kept for safety.
         setError(
-          `Too far from location (${proximityCheck.distance}m away, ${proximityCheck.browser} requires ${proximityCheck.tolerance}m). Please move closer or use QR code.`,
+          `You must be within 100 meters of your assigned location to check in. Please use manual location code entry or move closer.`,
         )
         setIsLoading(false)
         return
@@ -1591,6 +1590,7 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
             <CardTitle className="text-lg">QCC Locations & Distances</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Hide distance information from status display for PC users */}
             {locationValidation.nearestLocation && locationValidation.distance !== undefined && (
               <div
                 className={`p-3 rounded-lg border ${
@@ -1615,8 +1615,7 @@ export function AttendanceRecorder({ todayAttendance }: AttendanceRecorderProps)
                       : "text-orange-700 dark:text-orange-300"
                   }`}
                 >
-                  Distance: {Math.round(locationValidation.distance)}m
-                  {locationValidation.canCheckIn ? " (Within range)" : " (Out of range)"}
+                  {locationValidation.canCheckIn ? "Within range" : "Please use manual location code entry"}
                 </div>
               </div>
             )}
