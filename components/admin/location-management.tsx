@@ -808,7 +808,7 @@ export function LocationManagement() {
 
       {qrCodeUrl && (
         <Dialog open={!!qrCodeUrl} onOpenChange={() => setQrCodeUrl(null)}>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Location QR Code</DialogTitle>
               <DialogDescription>QR code for {selectedLocation?.name}</DialogDescription>
@@ -816,9 +816,30 @@ export function LocationManagement() {
             {qrCodeUrl && (
               <div className="text-center space-y-4">
                 <img src={qrCodeUrl || "/placeholder.svg"} alt="Location QR Code" className="mx-auto" />
-                <p className="text-sm text-muted-foreground">
-                  Staff can scan this QR code to check in at this location
-                </p>
+                <div className="bg-muted/50 p-4 rounded-lg text-left space-y-3">
+                  <h4 className="font-semibold text-sm flex items-center gap-2">
+                    <QrCode className="h-4 w-4" />
+                    How to Use QR Code Check-In/Out
+                  </h4>
+                  <ol className="text-sm space-y-2 text-muted-foreground list-decimal list-inside">
+                    <li>Go to the Attendance page in your dashboard</li>
+                    <li>
+                      Click on the <strong>"Scan QR Code"</strong> button
+                    </li>
+                    <li>Allow camera access when prompted</li>
+                    <li>Point your camera at this QR code</li>
+                    <li>
+                      The system will verify you're within <strong>40 meters</strong> of the location
+                    </li>
+                    <li>If verified, you'll be checked in/out automatically</li>
+                  </ol>
+                  <div className="pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Note:</strong> You must be within 40 meters of {selectedLocation?.name} to use this QR
+                      code. Location services must be enabled on your device.
+                    </p>
+                  </div>
+                </div>
                 <Button
                   onClick={() => {
                     const link = document.createElement("a")

@@ -93,9 +93,60 @@ export function QRScanner({ onScanSuccess, onClose, autoStart = false }: QRScann
       if (qrData) {
         const validation = validateQRCode(qrData)
         if (validation.isValid) {
-          setSuccess("QR code scanned successfully!")
-          console.log("[v0] Valid QR code, calling onScanSuccess")
-          onScanSuccess(qrData)
+          try {
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0,
+              })
+            })
+
+            const userLocation = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            }
+
+            console.log("[v0] User GPS location obtained for QR check-in:", userLocation)
+
+            const response = await fetch("/api/attendance/qr-checkin", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                location_id: qrData.location_id,
+                qr_timestamp: new Date().toISOString(),
+                userLatitude: userLocation.latitude,
+                userLongitude: userLocation.longitude,
+                device_info: {
+                  browser: navigator.userAgent,
+                  platform: navigator.platform,
+                },
+              }),
+            })
+
+            const result = await response.json()
+
+            if (!response.ok) {
+              if (response.status === 403 && result.distance) {
+                setError(
+                  result.message ||
+                    `You must be within 40 meters to use QR code check-in. You are ${result.distance}m away from ${result.locationName}.`,
+                )
+              } else {
+                setError(result.error || "Failed to process QR code check-in")
+              }
+              return
+            }
+
+            setSuccess("QR code scanned successfully!")
+            console.log("[v0] Valid QR code with GPS validation, calling onScanSuccess")
+            onScanSuccess(result.data || qrData)
+          } catch (gpsError) {
+            console.error("[v0] Failed to get GPS location:", gpsError)
+            setError(
+              "Location access required for QR code check-in. Please enable location services. You must be within 40 meters of the location to check in.",
+            )
+          }
         } else {
           setError(validation.reason || "Invalid QR code")
         }
