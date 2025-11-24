@@ -184,7 +184,7 @@ export function AttendanceDefaulters({ userRole, departmentId }: AttendanceDefau
   const getDefaultMessage = () => {
     const senderLabel = userRole === "admin" ? "Management of QCC" : "Department Head"
     if (timeframe === "daily") {
-      return `Dear Staff,
+      return `Dear [STAFF_NAME],
 
 This is a formal notification from ${senderLabel} regarding your attendance today. Our records indicate that you have not checked in/out of the system.
 
@@ -195,7 +195,7 @@ If you were on authorized leave or had a valid reason for absence, please contac
 Best regards,
 ${senderLabel}`
     } else {
-      return `Dear Staff,
+      return `Dear [STAFF_NAME],
 
 This is a formal notification from ${senderLabel} regarding your attendance this week. Our records indicate that you have failed to check in/out on multiple occasions.
 

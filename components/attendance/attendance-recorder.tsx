@@ -622,6 +622,12 @@ export function AttendanceRecorder({
       const browserInfo = detectBrowser()
       console.log("[v0] Browser detected:", browserInfo.name)
 
+      if (!locations || locations.length === 0) {
+        setError("No QCC locations found")
+        setIsLoading(false)
+        return
+      }
+
       // Find nearest location
       const nearest = locations.reduce(
         (closest, loc) => {
@@ -647,25 +653,14 @@ export function AttendanceRecorder({
         geoSettings || undefined,
       )
 
-      console.log("[v0] Browser-specific proximity check:", {
-        browser: proximityCheck.browser,
+      console.log("[v0] Proximity check:", {
         distance: proximityCheck.distance,
-        tolerance: proximityCheck.tolerance,
         isWithin: proximityCheck.isWithin,
       })
 
-      // Check if the distance is within the required 100m
-      if (proximityCheck.distance > 100) {
-        setError(
-          `You must be within 100 meters of your assigned location to check in. Please use manual location code entry or move closer.`,
-        )
-        setIsLoading(false)
-        return
-      }
-
       if (!proximityCheck.isWithin) {
         setError(
-          `You must be within 100 meters of your assigned location to check in. Please use manual location code entry or move closer.`,
+          `You must be within 100 meters of your assigned location to check in. You are currently ${Math.round(proximityCheck.distance)}m away. Please use manual location code entry or move closer.`,
         )
         setIsLoading(false)
         return
@@ -716,7 +711,7 @@ export function AttendanceRecorder({
 
       setTimeout(() => {
         setRecentCheckIn(false)
-      }, 120000) // 2 minutes
+      }, 120000)
 
       setTimeout(() => {
         window.location.reload()
@@ -728,12 +723,19 @@ export function AttendanceRecorder({
 
       if (error instanceof Error && error.message.includes("timeout")) {
         setError(
-          "Location request timed out. For instant check-in, use the QR code option below or ensure your device location services are enabled.",
+          "Location request timed out. For instant check-in, use the manual location code entry option or ensure your device location services are enabled.",
         )
         setShowLocationHelp(true)
       } else {
         setError(error instanceof Error ? error.message : "An error occurred during check-in")
       }
+
+      toast({
+        title: "Check-in Failed",
+        description: error instanceof Error ? error.message : "An error occurred during check-in",
+        variant: "destructive",
+        duration: 8000,
+      })
     } finally {
       setIsLoading(false)
     }
@@ -749,12 +751,24 @@ export function AttendanceRecorder({
       const location = await getCurrentLocation()
       setUserLocation(location)
 
+      if (!locations || locations.length === 0) {
+        setError("No QCC locations found")
+        setIsLoading(false)
+        return
+      }
+
       const checkoutValidation = validateCheckoutLocation(location, locations, proximitySettings)
 
       if (!checkoutValidation.canCheckOut) {
         setError(checkoutValidation.message)
-        // setShowLocationHelp(true) // Removed as it might not be necessary if message is clear.
         setIsLoading(false)
+
+        toast({
+          title: "Check-out Failed",
+          description: checkoutValidation.message,
+          variant: "destructive",
+          duration: 8000,
+        })
         return
       }
 
@@ -770,8 +784,15 @@ export function AttendanceRecorder({
           .filter(({ distance }) => distance <= proximitySettings.checkInProximityRange)
 
         if (locationDistances.length === 0) {
-          setError(`No QCC locations within ${proximitySettings.checkInProximityRange}m range for check-out`)
+          setError(`You must be within 100 meters of a QCC location to check out`)
           setIsLoading(false)
+
+          toast({
+            title: "Check-out Failed",
+            description: `You must be within 100 meters of a QCC location to check out`,
+            variant: "destructive",
+            duration: 8000,
+          })
           return
         }
 
@@ -793,7 +814,7 @@ export function AttendanceRecorder({
       const currentHour = now.getHours()
       const currentMinute = now.getMinutes()
 
-      // Check for early checkout only if it's before 5 PM and not already past 5 PM
+      // Check for early checkout only if it's before 5 PM
       if (currentHour < 17 || (currentHour === 17 && currentMinute < 0)) {
         setPendingCheckoutData({ location, nearestLocation })
         setShowEarlyCheckoutDialog(true)
@@ -813,19 +834,25 @@ export function AttendanceRecorder({
           longitude: location.longitude,
           location_id: nearestLocation?.id,
           device_info: deviceInfo,
-          early_checkout_reason: earlyCheckoutReason || undefined, // Use the state for reason
+          early_checkout_reason: earlyCheckoutReason || undefined,
         }),
       })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to check out")
+      }
 
       const result = await response.json()
 
       setLocalTodayAttendance({
         ...localTodayAttendance!,
         check_out_time: new Date().toISOString(),
+        check_out_location_name: nearestLocation?.name,
       })
       setRecentCheckOut(true)
 
-      const message = `Checked out successfully${pendingCheckoutData?.nearestLocation?.name ? ` at ${pendingCheckoutData.nearestLocation.name}` : ""}!`
+      const message = `Checked out successfully${nearestLocation?.name ? ` at ${nearestLocation.name}` : ""}!`
       setSuccessDialogMessage(message)
       setShowSuccessDialog(true)
 
@@ -841,36 +868,16 @@ export function AttendanceRecorder({
       setTimeout(() => {
         window.location.reload()
       }, 3000)
-
-      // These states were removed in the updates, so commenting out for now.
-      // setCanCheckOut(false)
-      // setCanCheckIn(true)
-      // setTodayAttendance(result.data.attendance)
-      setEarlyCheckoutReason("") // Clear the reason after successful checkout
-
-      // setShowSuccessPopup(true)
-
-      // Auto-hide success popup after 3 seconds
-      // setTimeout(() => {
-      //   setShowSuccessPopup(false)
-      // }, 3000)
-
-      // setTimeout(() => {
-      //   // Assuming loadTodayAttendance and loadRecentAttendance are defined elsewhere or should be added.
-      //   // For now, replacing with a reload as in the original code.
-      //   window.location.reload()
-      // }, 500)
     } catch (error) {
       console.error("[v0] Check-out error:", error)
+      setError(error instanceof Error ? error.message : "An error occurred during check-out")
 
-      if (error instanceof Error && error.message.includes("timeout")) {
-        setError(
-          "Location request timed out. For instant check-out, use the QR code option below or ensure your device location services are enabled.",
-        )
-        setShowLocationHelp(true)
-      } else {
-        setError(error instanceof Error ? error.message : "An error occurred during check-out")
-      }
+      toast({
+        title: "Check-out Failed",
+        description: error instanceof Error ? error.message : "An error occurred during check-out",
+        variant: "destructive",
+        duration: 8000,
+      })
     } finally {
       setIsLoading(false)
     }

@@ -30,19 +30,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 })
     }
 
+    const { data: recipients, error: fetchError } = await supabase
+      .from("user_profiles")
+      .select("id, first_name, last_name")
+      .in("id", recipient_ids)
+
+    if (fetchError) {
+      console.error("[v0] Error fetching recipients:", fetchError)
+      return NextResponse.json({ error: "Failed to fetch recipient details" }, { status: 500 })
+    }
+
     const senderLabel = profile.role === "admin" ? "Management of QCC" : "Department Head"
-    const warnings = recipient_ids.map((recipientId: string) => ({
-      recipient_id: recipientId,
-      sender_id: user.id,
-      sender_role: profile.role,
-      sender_label: senderLabel,
-      subject: `Attendance Notice - ${warning_type === "daily_absence" ? "Daily" : "Weekly"} Check-in Issue`,
-      message: message.trim(),
-      warning_type: warning_type || "attendance_issue",
-      is_read: false,
-      attendance_date: new Date().toISOString().split("T")[0],
-      department_id: profile.department_id,
-    }))
+
+    const warnings = (recipients || []).map((recipient) => {
+      // Replace [STAFF_NAME] placeholder with recipient's first name
+      const personalizedMessage = message.trim().replace(/\[STAFF_NAME\]/g, recipient.first_name)
+
+      return {
+        recipient_id: recipient.id,
+        sender_id: user.id,
+        sender_role: profile.role,
+        sender_label: senderLabel,
+        subject: `Attendance Notice - ${warning_type === "daily_absence" ? "Daily" : "Weekly"} Check-in Issue`,
+        message: personalizedMessage,
+        warning_type: warning_type || "attendance_issue",
+        is_read: false,
+        attendance_date: new Date().toISOString().split("T")[0],
+        department_id: profile.department_id,
+      }
+    })
 
     const { data, error } = await supabase.from("staff_warnings").insert(warnings).select()
 
