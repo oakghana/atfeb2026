@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { QrCode, Camera, AlertTriangle } from "lucide-react"
+import { QrCode, Camera, AlertTriangle, Loader2 } from "lucide-react"
 import type { LocationData } from "@/lib/geolocation"
 
 interface QRScannerDialogProps {
@@ -15,10 +15,28 @@ interface QRScannerDialogProps {
 
 export function QRScannerDialog({ open, onClose, mode, userLocation }: QRScannerDialogProps) {
   const [error, setError] = useState<string | null>(null)
+  const [isScanning, setIsScanning] = useState(false)
 
-  const handleUsePhoneCamera = () => {
-    // Redirect to QR events page with mode
-    window.location.href = `/dashboard/qr-events?mode=${mode || "checkin"}`
+  const handleStartScanning = async () => {
+    try {
+      setIsScanning(true)
+      setError(null)
+
+      // Check if the browser supports camera access
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera access is not supported on this device")
+      }
+
+      // Request camera permission and open QR events page with scanner
+      await navigator.mediaDevices.getUserMedia({ video: true })
+
+      // Redirect to QR events page which will open the camera scanner
+      window.location.href = `/dashboard/qr-events?mode=${mode || "checkin"}&autoScan=true`
+    } catch (err) {
+      console.error("[v0] Camera access error:", err)
+      setError(err instanceof Error ? err.message : "Failed to access camera")
+      setIsScanning(false)
+    }
   }
 
   return (
@@ -26,7 +44,7 @@ export function QRScannerDialog({ open, onClose, mode, userLocation }: QRScanner
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>QR Code Scanner</DialogTitle>
-          <DialogDescription>Use your phone's camera to scan the QR code at your work location</DialogDescription>
+          <DialogDescription>Use your device camera to scan the QR code at your work location</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -47,14 +65,14 @@ export function QRScannerDialog({ open, onClose, mode, userLocation }: QRScanner
               </div>
               <div>
                 <p className="font-semibold text-sm">How to use QR Code Check-in</p>
-                <p className="text-xs text-muted-foreground">Follow these steps for quick check-in</p>
+                <p className="text-xs text-muted-foreground">Quick and easy camera scanning</p>
               </div>
             </div>
 
             <ol className="space-y-2 text-sm">
               <li className="flex gap-2">
                 <span className="font-semibold">1.</span>
-                <span>Click the button below to open your phone's camera</span>
+                <span>Click the button below to open your device camera</span>
               </li>
               <li className="flex gap-2">
                 <span className="font-semibold">2.</span>
@@ -62,16 +80,25 @@ export function QRScannerDialog({ open, onClose, mode, userLocation }: QRScanner
               </li>
               <li className="flex gap-2">
                 <span className="font-semibold">3.</span>
-                <span>The system will automatically record your attendance</span>
+                <span>The system will automatically scan and record your attendance</span>
               </li>
             </ol>
           </div>
 
           {/* Action Buttons */}
           <div className="space-y-3">
-            <Button onClick={handleUsePhoneCamera} className="w-full h-12" size="lg">
-              <Camera className="h-5 w-5 mr-2" />
-              Open Camera to Scan QR Code
+            <Button onClick={handleStartScanning} className="w-full h-12" size="lg" disabled={isScanning}>
+              {isScanning ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Opening Camera...
+                </>
+              ) : (
+                <>
+                  <Camera className="h-5 w-5 mr-2" />
+                  Open Camera to Scan QR Code
+                </>
+              )}
             </Button>
 
             <Button onClick={onClose} variant="outline" className="w-full bg-transparent">
@@ -83,7 +110,7 @@ export function QRScannerDialog({ open, onClose, mode, userLocation }: QRScanner
           <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <p className="text-xs text-blue-800 dark:text-blue-200">
               <strong>Note:</strong> Make sure you have camera permissions enabled and are at your assigned work
-              location before scanning.
+              location before scanning. The camera will open automatically when you tap the button above.
             </p>
           </div>
         </div>

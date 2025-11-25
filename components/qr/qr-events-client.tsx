@@ -41,12 +41,17 @@ export function QREventsClient() {
   const supabase = createClient()
 
   useEffect(() => {
-    // Check if we're in attendance mode
     const params = new URLSearchParams(window.location.search)
     const mode = params.get("mode") as "checkin" | "checkout" | null
+    const autoScan = params.get("autoScan") === "true"
+
     if (mode) {
       setAttendanceMode(mode)
-      setShowScanner(true) // Automatically show scanner for attendance
+      // Auto-open scanner if autoScan parameter is present or if in attendance mode
+      if (autoScan || mode) {
+        console.log("[v0] Auto-opening QR scanner for attendance mode:", mode)
+        setShowScanner(true)
+      }
     }
     fetchEvents()
   }, [])

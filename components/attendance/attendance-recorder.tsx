@@ -13,6 +13,7 @@ import {
   type LocationData,
   type ProximitySettings,
   type GeoSettings,
+  reverseGeocode, // Import reverseGeocode
 } from "@/lib/geolocation"
 import { getDeviceInfo } from "@/lib/device-info"
 import type { QRCodeData } from "@/lib/qr-code"
@@ -38,7 +39,6 @@ import { Badge } from "@/components/ui/badge"
 import { LocationCodeDialog } from "@/components/dialogs/location-code-dialog"
 import { QRScannerDialog } from "@/components/dialogs/qr-scanner-dialog"
 import { FlashMessage } from "@/components/notifications/flash-message"
-import { Spinner } from "@/components/ui/spinner"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 interface GeofenceLocation {
@@ -159,6 +159,8 @@ export function AttendanceRecorder({
 
   const [showSuccessPopup, setShowSuccessPopup] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
+
+  const [detectedLocationName, setDetectedLocationName] = useState<string | null>(null)
 
   const [locationPermissionStatusSimplified, setLocationPermissionStatusSimplified] = useState<{
     granted: boolean
@@ -371,6 +373,17 @@ export function AttendanceRecorder({
 
     autoLoadLocation()
   }, [])
+
+  useEffect(() => {
+    if (userLocation?.latitude && userLocation?.longitude) {
+      reverseGeocode(userLocation.latitude, userLocation.longitude)
+        .then((name) => {
+          console.log("[v0] Detected location name:", name)
+          setDetectedLocationName(name)
+        })
+        .catch((err) => console.error("[v0] Failed to get location name:", err))
+    }
+  }, [userLocation])
 
   useEffect(() => {
     loadProximitySettings()
@@ -1080,7 +1093,7 @@ export function AttendanceRecorder({
       {isCheckingIn && checkingMessage && (
         <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
           <div className="flex items-center gap-3">
-            <Spinner className="h-5 w-5 text-blue-600" />
+            <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
             <div>
               <p className="font-medium text-blue-900">{checkingMessage}</p>
               {(recentCheckIn || recentCheckOut) && (
@@ -1170,6 +1183,12 @@ export function AttendanceRecorder({
                 <div className="flex-1 space-y-2">
                   <div>
                     <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Your Current Location</p>
+                    {detectedLocationName && (
+                      <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mt-1 flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {detectedLocationName}
+                      </p>
+                    )}
                     <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
                       GPS: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)}
                     </p>
