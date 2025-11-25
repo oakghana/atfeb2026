@@ -463,7 +463,13 @@ export function AttendanceRecorder({
   }
 
   useEffect(() => {
-    if (userLocation && realTimeLocations && realTimeLocations.length > 0 && userProfile?.assigned_location_id) {
+    if (
+      userLocation?.latitude &&
+      userLocation?.longitude &&
+      realTimeLocations &&
+      realTimeLocations.length > 0 &&
+      userProfile?.assigned_location_id
+    ) {
       const assignedLocation = realTimeLocations.find((loc) => loc.id === userProfile.assigned_location_id)
       if (assignedLocation) {
         const distance = calculateDistance(
@@ -864,8 +870,6 @@ export function AttendanceRecorder({
         nearestLocation = nearest?.location || realTimeLocations[0]
       }
 
-      // The 1-hour minimum is now enforced above
-
       const response = await fetch("/api/attendance/check-out", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -888,16 +892,17 @@ export function AttendanceRecorder({
       const result = await response.json()
 
       setFlashMessage({
-        message: `Successfully checked out from ${result.attendance.check_out_location_name || nearestLocation.name}! Your work session has been recorded.`,
+        message: `✅ Successfully checked out from ${result.data?.check_out_location_name || nearestLocation.name}! Your work session has been recorded. Work Hours: ${result.data?.work_hours?.toFixed(2) || "N/A"} hours.`,
         type: "success",
       })
 
-      setLocalTodayAttendance(result.attendance)
+      setLocalTodayAttendance(result.data)
+
       setRecentCheckOut(true)
       setIsCheckingIn(true)
       setCheckingMessage("Check-out successful! Status will refresh in 50 seconds...")
 
-      setRefreshTimer(REFRESH_PAUSE_DURATION / 1000) // Set timer in seconds
+      setRefreshTimer(REFRESH_PAUSE_DURATION / 1000)
 
       const interval = setInterval(() => {
         setRefreshTimer((prev) => {
@@ -1271,22 +1276,20 @@ export function AttendanceRecorder({
       )}
 
       {isCompletedForDay && (
-        <div className="border-2 rounded-lg p-6 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 border-emerald-300 dark:border-emerald-700">
+        <div className="rounded-lg border-2 border-emerald-500 bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-emerald-950/30 dark:via-green-950/30 dark:to-teal-950/30 p-6 shadow-lg">
           <div className="flex items-center gap-3 mb-4">
-            <div className="h-12 w-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-              <CheckCircle2 className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+            <div className="h-12 w-12 rounded-full bg-emerald-500 flex items-center justify-center">
+              <CheckCircle2 className="h-7 w-7 text-white" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-emerald-900 dark:text-emerald-100">
-                Attendance Completed for Today
-              </h3>
-              <p className="text-sm text-emerald-700 dark:text-emerald-300">
+              <h3 className="text-xl font-bold text-emerald-900 dark:text-emerald-100">✅ Attendance Complete!</h3>
+              <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
                 Your work session has been successfully recorded
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white/60 dark:bg-black/30 rounded-lg p-4 border border-emerald-200 dark:border-emerald-800">
             <div className="bg-white/50 dark:bg-gray-900/50 rounded-lg p-3">
               <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Check-In Time</p>
               <p className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -1295,6 +1298,9 @@ export function AttendanceRecorder({
                   minute: "2-digit",
                   hour12: true,
                 })}
+              </p>
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                📍 {localTodayAttendance.check_in_location_name}
               </p>
             </div>
 
@@ -1307,6 +1313,21 @@ export function AttendanceRecorder({
                   hour12: true,
                 })}
               </p>
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                📍 {localTodayAttendance.check_out_location_name}
+              </p>
+            </div>
+
+            <div className="bg-white/50 dark:bg-gray-900/50 rounded-lg p-3">
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Work Hours</p>
+              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                {localTodayAttendance.work_hours?.toFixed(2) || "0.00"} hours
+              </p>
+            </div>
+
+            <div className="bg-white/50 dark:bg-gray-900/50 rounded-lg p-3">
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Status</p>
+              <Badge className="bg-emerald-500 text-white hover:bg-emerald-600">✓ Completed for Today</Badge>
             </div>
           </div>
 
@@ -1315,6 +1336,15 @@ export function AttendanceRecorder({
               Status will refresh in {Math.floor(refreshTimer / 60)}:{(refreshTimer % 60).toString().padStart(2, "0")}
             </div>
           )}
+
+          <div className="mt-4 text-center">
+            <p className="text-sm text-emerald-800 dark:text-emerald-200 font-medium">
+              🎉 Great work today! Your attendance has been successfully recorded.
+            </p>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+              You can view your full attendance history in the reports section.
+            </p>
+          </div>
         </div>
       )}
 
