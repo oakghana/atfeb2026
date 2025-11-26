@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
+import { clearAttendanceCache } from "@/lib/utils/attendance-cache"
 
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -266,6 +267,9 @@ export default function LoginPage() {
 
         await logLoginActivity(data.user.id, "login_success", true, "password")
       }
+
+      clearAttendanceCache()
+      console.log("[v0] Attendance cache cleared on login")
 
       console.log("[v0] Login successful, redirecting to dashboard")
       showSuccess("Login successful! Redirecting to dashboard...", "Welcome Back")

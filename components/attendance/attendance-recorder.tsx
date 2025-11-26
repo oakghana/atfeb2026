@@ -41,6 +41,7 @@ import { QRScannerDialog } from "@/components/dialogs/qr-scanner-dialog"
 import { FlashMessage } from "@/components/notifications/flash-message"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
+import { clearAttendanceCache, shouldClearCache, setCachedDate } from "@/lib/utils/attendance-cache"
 
 interface GeofenceLocation {
   id: string
@@ -174,6 +175,49 @@ export function AttendanceRecorder({
   const [recentCheckIn, setRecentCheckIn] = useState(false)
   const [recentCheckOut, setRecentCheckOut] = useState(false)
   const [localTodayAttendance, setLocalTodayAttendance] = useState(initialTodayAttendance)
+
+  // Check if cache should be cleared (new day)
+  useEffect(() => {
+    if (shouldClearCache()) {
+      console.log("[v0] New day detected - clearing attendance cache")
+      clearAttendanceCache()
+
+      // Reset local state
+      setLocalTodayAttendance(null)
+      setRecentCheckIn(false)
+      setRecentCheckOut(false)
+
+      // Fetch fresh data
+      fetchTodayAttendance()
+
+      // Update cached date
+      const today = new Date().toISOString().split("T")[0]
+      setCachedDate(today)
+    }
+  }, []) // Run once on component mount
+
+  useEffect(() => {
+    const checkDateChange = setInterval(() => {
+      if (shouldClearCache()) {
+        console.log("[v0] Date changed while app is active - clearing cache")
+        clearAttendanceCache()
+
+        // Reset local state
+        setLocalTodayAttendance(null)
+        setRecentCheckIn(false)
+        setRecentCheckOut(false)
+
+        // Fetch fresh data
+        fetchTodayAttendance()
+
+        // Update cached date
+        const today = new Date().toISOString().split("T")[0]
+        setCachedDate(today)
+      }
+    }, 60000) // Check every minute
+
+    return () => clearInterval(checkDateChange)
+  }, [])
 
   const [flashMessage, setFlashMessage] = useState<{
     message: string
