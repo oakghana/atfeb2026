@@ -7,7 +7,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    unoptimized: false, // Enable image optimization
+    unoptimized: false,
     formats: ['image/webp', 'image/avif'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
@@ -37,7 +37,6 @@ const nextConfig = {
       'recharts',
       'date-fns',
     ],
-    optimizeCss: true,
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -48,28 +47,24 @@ const nextConfig = {
           cacheGroups: {
             default: false,
             vendors: false,
-            // Vendor chunk
             vendor: {
               name: 'vendor',
               chunks: 'all',
               test: /node_modules/,
               priority: 20,
             },
-            // UI components chunk
             ui: {
               name: 'ui',
               test: /[\\/]components[\\/]ui[\\/]/,
               chunks: 'all',
               priority: 30,
             },
-            // Admin components chunk (large)
             admin: {
               name: 'admin',
               test: /[\\/]components[\\/]admin[\\/]/,
               chunks: 'all',
               priority: 30,
             },
-            // Common chunk
             common: {
               name: 'common',
               minChunks: 2,
