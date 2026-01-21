@@ -126,11 +126,32 @@ export default function LoginPage() {
         email = result.email
       }
 
-      // Single authentication call
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      // Single authentication call with AbortError handling
+      let data, error
+      try {
+        const result = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+        data = result.data
+        error = result.error
+      } catch (authError: any) {
+        // Handle AbortError silently - request was cancelled but may have succeeded
+        if (authError.name === "AbortError") {
+          console.log("[v0] Auth request aborted, will verify session")
+          // Check if we have a valid session despite the abort
+          const { data: sessionData } = await supabase.auth.getSession().catch(() => ({ data: null }))
+          if (sessionData?.session) {
+            // Session exists, treat as successful login
+            data = { user: sessionData.session.user, session: sessionData.session }
+            error = null
+          } else {
+            throw new Error("Authentication request was cancelled. Please try again.")
+          }
+        } else {
+          throw authError
+        }
+      }
 
       if (error) {
         // Log failed attempt
@@ -348,11 +369,30 @@ export default function LoginPage() {
 
       console.log("[v0] Verifying OTP:", otp.substring(0, 2) + "****") // Log first 2 digits only for security
 
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: otpEmail,
-        token: otp,
-        type: "email",
-      })
+      let data, error
+      try {
+        const result = await supabase.auth.verifyOtp({
+          email: otpEmail,
+          token: otp,
+          type: "email",
+        })
+        data = result.data
+        error = result.error
+      } catch (authError: any) {
+        // Handle AbortError silently
+        if (authError.name === "AbortError") {
+          console.log("[v0] OTP verification aborted, will check session")
+          const { data: sessionData } = await supabase.auth.getSession().catch(() => ({ data: null }))
+          if (sessionData?.session) {
+            data = { user: sessionData.session.user, session: sessionData.session }
+            error = null
+          } else {
+            throw new Error("Verification request was cancelled. Please try again.")
+          }
+        } else {
+          throw authError
+        }
+      }
 
       if (error) {
         console.error("[v0] OTP verification error:", error.message)

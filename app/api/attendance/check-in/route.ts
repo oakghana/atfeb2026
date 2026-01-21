@@ -15,25 +15,72 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // Check if user already checked in today IMMEDIATELY at the start
+    const today = new Date().toISOString().split("T")[0]
+    const { data: existingRecord, error: checkError } = await supabase
+      .from("attendance_records")
+      .select("id, check_in_time, check_out_time")
+      .eq("user_id", user.id)
+      .gte("check_in_time", `${today}T00:00:00`)
+      .lt("check_in_time", `${today}T23:59:59`)
+      .maybeSingle()
+
+    if (checkError) {
+      console.error("[v0] Error checking existing attendance:", checkError)
+    }
+
+    let deviceSharingWarning = null
+
+    if (existingRecord && existingRecord.check_in_time) {
+      console.log("[v0] DUPLICATE CHECK-IN BLOCKED - User already checked in today")
+
+      // Log security violation
+      const body = await request.json()
+      if (body.device_info?.device_id) {
+        const ipAddress = request.ip || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null
+
+        await supabase
+          .from("device_security_violations")
+          .insert({
+            device_id: body.device_info.device_id,
+            ip_address: ipAddress,
+            attempted_user_id: user.id,
+            bound_user_id: user.id,
+            violation_type: "double_checkin_attempt",
+            device_info: body.device_info,
+          })
+          .catch((err) => {
+            console.log("[v0] Could not log security violation (table may not exist):", err.message)
+          })
+      }
+
+      const checkInTime = new Date(existingRecord.check_in_time).toLocaleTimeString()
+
+      if (existingRecord.check_out_time) {
+        return NextResponse.json(
+          {
+            error: `DUPLICATE CHECK-IN BLOCKED: You have already completed your attendance for today. You checked in at ${checkInTime} and checked out at ${new Date(existingRecord.check_out_time).toLocaleTimeString()}. This attempt has been logged as a security violation.`,
+          },
+          { status: 400 },
+        )
+      } else {
+        return NextResponse.json(
+          {
+            error: `DUPLICATE CHECK-IN BLOCKED: You have already checked in today at ${checkInTime}. You are currently on duty. Please check out when you finish your work. This attempt has been logged.`,
+          },
+          { status: 400 },
+        )
+      }
+    }
+
     const { data: userProfile } = await supabase
       .from("user_profiles")
-      .select("leave_status, leave_start_date, leave_end_date, first_name, assigned_location_id")
+      .select("first_name, last_name, assigned_location_id")
       .eq("id", user.id)
       .maybeSingle()
 
-    if (userProfile && userProfile.leave_status && userProfile.leave_status !== "active") {
-      const leaveType = userProfile.leave_status === "on_leave" ? "on leave" : "on sick leave"
-      const endDate = userProfile.leave_end_date
-        ? new Date(userProfile.leave_end_date).toLocaleDateString()
-        : "unspecified"
-
-      return NextResponse.json(
-        {
-          error: `You are currently marked as ${leaveType} until ${endDate}. You cannot check in during your leave period. Please update your leave status when you resume work.`,
-        },
-        { status: 403 },
-      )
-    }
+    // Leave status checking removed - columns don't exist in database yet
+    // Will be re-enabled when leave management is implemented
 
     const body = await request.json()
     const { latitude, longitude, location_id, device_info, qr_code_used, qr_timestamp } = body
@@ -55,81 +102,59 @@ export async function POST(request: NextRequest) {
 
       const ipAddress = getValidIpAddress()
 
-      // Check if device is bound to a different user
-      const { data: existingBinding, error: bindingError } = await supabase
-        .from("device_user_bindings")
-        .select("user_id")
-        .eq("device_id", device_info.device_id)
-        .eq("is_active", true)
-        .maybeSingle()
+      // Check if this device was recently used by another staff member
+      if (device_info?.device_id) {
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+        
+        const { data: recentDeviceSession } = await supabase
+          .from("device_sessions")
+          .select("user_id, last_activity, device_sessions!inner(user_profiles(first_name, last_name, employee_id, department_id))")
+          .eq("device_id", device_info.device_id)
+          .neq("user_id", user.id)
+          .gte("last_activity", twoHoursAgo)
+          .order("last_activity", { ascending: false })
+          .limit(1)
+          .maybeSingle()
 
-      if (bindingError) {
-        if (bindingError.code === "PGRST205" || bindingError.message?.includes("Could not find the table")) {
-          console.log("[v0] Device binding tables not created yet, skipping device security check")
-          // Continue with check-in
-        } else {
-          console.error("[v0] Error checking device binding:", bindingError)
-          // Continue with check-in on other errors too
-        }
-      } else if (existingBinding && existingBinding.user_id !== user.id) {
-        // Log violation only if tables exist
-        await supabase.from("device_security_violations").insert({
-          device_id: device_info.device_id,
-          ip_address: ipAddress,
-          attempted_user_id: user.id,
-          bound_user_id: existingBinding.user_id,
-          violation_type: "checkin_attempt",
-          device_info: device_info,
-        })
+        if (recentDeviceSession) {
+          // Get previous user's info with proper nested query
+          const { data: previousUserProfile } = await supabase
+            .from("user_profiles")
+            .select("first_name, last_name, employee_id, department_id")
+            .eq("id", recentDeviceSession.user_id)
+            .single()
 
-        return NextResponse.json(
-          {
-            error:
-              "This device is registered to another staff member. You cannot check in from this device. Your supervisor has been notified.",
-          },
-          { status: 403 },
-        )
-      }
+          if (previousUserProfile) {
+            const previousUserName = `${previousUserProfile.first_name} ${previousUserProfile.last_name}`
+            const timeSinceLastUse = Math.round((Date.now() - new Date(recentDeviceSession.last_activity).getTime()) / (1000 * 60))
+            
+            deviceSharingWarning = {
+              previousUser: previousUserName,
+              previousEmployeeId: previousUserProfile.employee_id,
+              timeSinceLastUse: timeSinceLastUse,
+              message: `This device was recently used by ${previousUserName} (${previousUserProfile.employee_id}) ${timeSinceLastUse} minutes ago. Your department head will be notified of this shared device usage.`
+            }
 
-      if (ipAddress) {
-        const today = new Date().toISOString().split("T")[0]
-        const { data: ipCheckIns, error: ipError } = await supabase
-          .from("attendance_records")
-          .select("user_id, check_in_time")
-          .gte("check_in_time", `${today}T00:00:00`)
-          .lt("check_in_time", `${today}T23:59:59`)
-          .not("user_id", "eq", user.id)
-
-        if (!ipError && ipCheckIns && ipCheckIns.length > 0) {
-          // Check if any check-ins came from this IP
-          const { data: deviceSessions } = await supabase
-            .from("device_sessions")
-            .select("user_id")
-            .eq("ip_address", ipAddress)
-            .in(
-              "user_id",
-              ipCheckIns.map((r) => r.user_id),
+            console.warn(
+              `[v0] ⚠️ DEVICE SHARING DETECTED: Device ${device_info.device_id} used by ${user.id} after ${previousUserName} (${previousUserProfile.employee_id})`,
             )
-            .gte("last_activity", `${today}T00:00:00`)
 
-          if (deviceSessions && deviceSessions.length > 0) {
-            // Log as security violation
-            await supabase.from("device_security_violations").insert({
-              device_id: device_info.device_id,
-              ip_address: ipAddress,
-              attempted_user_id: user.id,
-              bound_user_id: deviceSessions[0].user_id,
-              violation_type: "duplicate_ip_checkin",
-              device_info: device_info,
-            })
-
-            return NextResponse.json(
-              {
-                error:
-                  "SECURITY VIOLATION: Another staff member has already checked in from this IP address today. Device sharing is not permitted. Your department head has been notified.",
+            // Log to audit trail
+            await supabase.from("audit_logs").insert({
+              user_id: user.id,
+              action: "device_sharing_detected",
+              table_name: "device_sessions",
+              record_id: device_info.device_id,
+              new_values: {
+                current_user: user.id,
+                previous_user: recentDeviceSession.user_id,
+                previous_user_name: previousUserName,
+                time_since_last_use_minutes: timeSinceLastUse,
+                device_id: device_info.device_id,
               },
-              { status: 403 },
-            )
+              ip_address: ipAddress || null,
+              user_agent: request.headers.get("user-agent"),
+            })
           }
         }
       }
@@ -188,49 +213,6 @@ export async function POST(request: NextRequest) {
       missedCheckoutWarning = {
         date: yesterdayDate,
         message: "You did not check out yesterday. This has been recorded and will be visible to your department head.",
-      }
-    }
-
-    // Check if user already checked in today
-    const today = new Date().toISOString().split("T")[0]
-    const { data: existingRecord } = await supabase
-      .from("attendance_records")
-      .select("check_in_time, check_out_time")
-      .eq("user_id", user.id)
-      .gte("check_in_time", `${today}T00:00:00`)
-      .lt("check_in_time", `${today}T23:59:59`)
-      .maybeSingle()
-
-    if (existingRecord && existingRecord.check_in_time) {
-      if (device_info?.device_id) {
-        const ipAddress = request.ip || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null
-
-        await supabase.from("device_security_violations").insert({
-          device_id: device_info.device_id,
-          ip_address: ipAddress,
-          attempted_user_id: user.id,
-          bound_user_id: user.id,
-          violation_type: "double_checkin_attempt",
-          device_info: device_info,
-        })
-      }
-
-      const checkInTime = new Date(existingRecord.check_in_time).toLocaleTimeString()
-
-      if (existingRecord.check_out_time) {
-        return NextResponse.json(
-          {
-            error: `DUPLICATE CHECK-IN BLOCKED: You have already completed your attendance for today. You checked in at ${checkInTime} and checked out at ${new Date(existingRecord.check_out_time).toLocaleTimeString()}. This attempt has been logged as a security violation.`,
-          },
-          { status: 400 },
-        )
-      } else {
-        return NextResponse.json(
-          {
-            error: `DUPLICATE CHECK-IN BLOCKED: You have already checked in today at ${checkInTime}. You are currently on duty. Please check out when you finish your work. This attempt has been logged.`,
-          },
-          { status: 400 },
-        )
       }
     }
 
@@ -310,12 +292,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Check if check-in is after 9:00 AM (late arrival)
+    const checkInTime = new Date()
+    const checkInHour = checkInTime.getHours()
+    const checkInMinutes = checkInTime.getMinutes()
+    const isLateArrival = checkInHour > 9 || (checkInHour === 9 && checkInMinutes > 0)
+
     const attendanceData = {
       user_id: user.id,
-      check_in_time: new Date().toISOString(),
+      check_in_time: checkInTime.toISOString(),
       check_in_location_id: location_id,
       device_session_id: deviceSessionId,
-      status: "present",
+      status: isLateArrival ? "late" : "present",
       check_in_method: qr_code_used ? "qr_code" : "gps",
       check_in_location_name: locationData?.name || null,
       is_remote_location: false, // Will be calculated based on user's assigned location
@@ -344,6 +332,19 @@ export async function POST(request: NextRequest) {
 
     if (attendanceError) {
       console.error("Attendance error:", attendanceError)
+
+      // Check if error is due to unique constraint violation
+      if (attendanceError.code === "23505" || attendanceError.message?.includes("idx_unique_daily_checkin")) {
+        console.log("[v0] RACE CONDITION CAUGHT - Unique constraint prevented duplicate check-in")
+        return NextResponse.json(
+          {
+            error:
+              "DUPLICATE CHECK-IN BLOCKED: You have already checked in today. This was a race condition that was prevented by the system. Please refresh your page.",
+          },
+          { status: 400 },
+        )
+      }
+
       return NextResponse.json(
         { error: "Failed to record attendance" },
         {
@@ -373,6 +374,16 @@ export async function POST(request: NextRequest) {
       user_agent: request.headers.get("user-agent"),
     })
 
+    // Prepare response with late arrival warning if applicable
+    let checkInMessage = attendanceData.is_remote_location
+      ? `Successfully checked in at ${locationData?.name} (different from your assigned location). Remember to check out at the end of your work today.`
+      : `Successfully checked in at ${locationData?.name}. Remember to check out at the end of your work today.`
+    
+    if (isLateArrival) {
+      const arrivalTime = `${checkInHour}:${checkInMinutes.toString().padStart(2, '0')}`
+      checkInMessage = `Late arrival detected - You checked in at ${arrivalTime} (after 9:00 AM). ${checkInMessage}`
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -385,10 +396,11 @@ export async function POST(request: NextRequest) {
             check_in_method: attendanceData.check_in_method,
           },
         },
-        message: attendanceData.is_remote_location
-          ? `Successfully checked in at ${locationData?.name} (different from your assigned location). Remember to check out at the end of your work today.`
-          : `Successfully checked in at ${locationData?.name}. Remember to check out at the end of your work today.`,
+        message: checkInMessage,
+        isLateArrival,
+        lateArrivalTime: isLateArrival ? checkInTime.toLocaleTimeString() : null,
         missedCheckoutWarning,
+        deviceSharingWarning,
       },
       {
         headers: {

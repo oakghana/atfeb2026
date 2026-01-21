@@ -139,13 +139,15 @@ export function StaffManagement() {
       const result = await response.json()
       console.log("[v0] Departments fetch result:", result)
 
-      if (result.success) {
+      if (result.success || Array.isArray(result.departments) || Array.isArray(result.data)) {
         setDepartments(result.departments || result.data || [])
       } else {
-        console.error("[v0] Failed to fetch departments:", result.error)
+        console.warn("[v0] No departments returned, using empty array")
+        setDepartments([])
       }
     } catch (error) {
       console.error("[v0] Departments fetch exception:", error)
+      setDepartments([])
     }
   }
 

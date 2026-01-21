@@ -8,8 +8,6 @@ import {
   validateCheckoutLocation,
   calculateDistance,
   detectWindowsLocationCapabilities,
-  isWithinBrowserProximity,
-  detectBrowser,
   type LocationData,
   type ProximitySettings,
   type GeoSettings,
@@ -175,6 +173,11 @@ export function AttendanceRecorder({
   const [recentCheckIn, setRecentCheckIn] = useState(false)
   const [recentCheckOut, setRecentCheckOut] = useState(false)
   const [localTodayAttendance, setLocalTodayAttendance] = useState(initialTodayAttendance)
+
+  const [checkoutTimeReached, setCheckoutTimeReached] = useState(false)
+
+  const [isCheckInProcessing, setIsCheckInProcessing] = useState(false)
+  const [lastCheckInAttempt, setLastCheckInAttempt] = useState<number>(0)
 
   // Check if cache should be cleared (new day)
   useEffect(() => {
@@ -458,26 +461,27 @@ export function AttendanceRecorder({
     if (localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time) {
       const checkInTime = new Date(localTodayAttendance.check_in_time)
       const now = new Date()
-      const hoursSinceCheckIn = (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
-
-      if (hoursSinceCheckIn < 1) {
-        // Calculate minutes until 1 hour has passed
-        const minutesLeft = Math.ceil((1 - hoursSinceCheckIn) * 60)
-        setMinutesUntilCheckout(minutesLeft)
+  const hoursSinceCheckIn = (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
+  
+  if (hoursSinceCheckIn < 2) {
+    // Calculate minutes until 2 hours have passed
+    const minutesLeft = Math.ceil((2 - hoursSinceCheckIn) * 60)
+    setMinutesUntilCheckout(minutesLeft)
 
         // Update every minute
-        const interval = setInterval(() => {
-          const currentNow = new Date()
-          const currentHoursSinceCheckIn = (currentNow.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
-
-          if (currentHoursSinceCheckIn >= 1) {
-            setMinutesUntilCheckout(null)
-            clearInterval(interval)
-          } else {
-            const currentMinutesLeft = Math.ceil((1 - currentHoursSinceCheckIn) * 60)
-            setMinutesUntilCheckout(currentMinutesLeft)
-          }
-        }, 60000) // Update every minute
+    const interval = setInterval(() => {
+      const currentNow = new Date()
+      const currentHoursSinceCheckIn = (currentNow.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
+      
+      if (currentHoursSinceCheckIn >= 2) {
+        setMinutesUntilCheckout(null)
+        setCheckoutTimeReached(true)
+        clearInterval(interval)
+      } else {
+        const currentMinutesLeft = Math.ceil((2 - currentHoursSinceCheckIn) * 60)
+        setMinutesUntilCheckout(currentMinutesLeft)
+      }
+    }, 60000) // Update every minute
 
         return () => clearInterval(interval)
       } else {
@@ -487,6 +491,25 @@ export function AttendanceRecorder({
       setMinutesUntilCheckout(null)
     }
   }, [localTodayAttendance?.check_in_time, localTodayAttendance?.check_out_time])
+
+  useEffect(() => {
+    const checkCheckoutTime = () => {
+      if (localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time) {
+        const checkInTime = new Date(localTodayAttendance.check_in_time)
+        const now = new Date()
+        const hoursSinceCheckIn = (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
+
+        setCheckoutTimeReached(hoursSinceCheckIn >= 1)
+      } else {
+        setCheckoutTimeReached(false)
+      }
+    }
+
+    checkCheckoutTime()
+    const interval = setInterval(checkCheckoutTime, 60000) // Check every minute
+
+    return () => clearInterval(interval)
+  }, [localTodayAttendance])
 
   const loadProximitySettings = async () => {
     try {
@@ -713,133 +736,193 @@ export function AttendanceRecorder({
   const handleCheckIn = async () => {
     console.log("[v0] Check-in initiated")
 
-    if (localTodayAttendance?.check_in_time) {
-      console.log("[v0] Duplicate check-in attempt blocked - already checked in today")
-
-      if (!localTodayAttendance?.check_out_time) {
-        // Already checked in, not checked out yet
-        setFlashMessage({
-          message: `You have already checked in today at ${new Date(localTodayAttendance.check_in_time).toLocaleTimeString()}! You're currently on duty. Remember to check out when you finish your shift.`,
-          type: "warning",
-        })
-      } else {
-        // Already completed check-in and check-out for today
-        setFlashMessage({
-          message: `You have already completed your attendance for today. Check-in: ${new Date(localTodayAttendance.check_in_time).toLocaleTimeString()}, Check-out: ${new Date(localTodayAttendance.check_out_time).toLocaleTimeString()}`,
-          type: "info",
-        })
-      }
+    if (isCheckInProcessing) {
+      console.log("[v0] Check-in already in progress - ignoring duplicate request")
       return
     }
 
-    setIsLoading(true)
-    setError(null)
+    const now = Date.now()
+    if (now - lastCheckInAttempt < 3000) {
+      console.log("[v0] Check-in attempted too soon after last attempt - ignoring")
+      toast({
+        title: "Please Wait",
+        description: "Processing your previous check-in request...",
+        variant: "default",
+      })
+      return
+    }
+
+    if (localTodayAttendance?.check_in_time) {
+      const checkInTime = new Date(localTodayAttendance.check_in_time).toLocaleTimeString()
+      toast({
+        title: "Already Checked In",
+        description: `You checked in today at ${checkInTime}. You cannot check in twice.`,
+        variant: "destructive",
+        duration: 5000,
+      })
+      return
+    }
+
+    setIsCheckInProcessing(true)
+    setLastCheckInAttempt(now)
+    setRecentCheckIn(true) // Disable button immediately
 
     try {
-      if (!realTimeLocations || realTimeLocations.length === 0) {
-        throw new Error("No QCC locations found")
+      console.log("[v0] Starting check-in process...")
+      setIsCheckingIn(true)
+      setCheckingMessage("Processing check-in...")
+      setError(null)
+      setFlashMessage(null)
+
+      const deviceInfo = getDeviceInfo()
+      console.log("[v0] Device info:", deviceInfo)
+
+      let resolvedNearestLocation = null // Declare nearestLocation here
+
+      const checkInData: any = {
+        device_info: deviceInfo,
       }
 
-      const locationData = await getCurrentLocationData()
-      if (!locationData) {
-        setIsLoading(false)
+      if (userLocation) {
+        checkInData.latitude = userLocation.latitude
+        checkInData.longitude = userLocation.longitude
+      } else {
+        // Attempt to get location if not available
+        const currentLocation = await getCurrentLocationData()
+        if (!currentLocation) {
+          throw new Error("Could not retrieve current location.")
+        }
+        checkInData.latitude = currentLocation.latitude
+        checkInData.longitude = currentLocation.longitude
+      }
+
+      // Find nearest location based on the possibly newly acquired userLocation
+      if (realTimeLocations && realTimeLocations.length > 0 && userLocation) {
+        const distances = realTimeLocations
+          .map((loc) => ({
+            location: loc,
+            distance: calculateDistance(userLocation.latitude, userLocation.longitude, loc.latitude, loc.longitude),
+          }))
+          .sort((a, b) => a.distance - b.distance)
+
+        if (distances.length > 0 && distances[0].distance <= proximitySettings.checkInProximityRange) {
+          resolvedNearestLocation = distances[0].location
+          checkInData.location_id = resolvedNearestLocation.id // Update checkInData with resolved nearest location
+        } else {
+          throw new Error(
+            `You must be within ${proximitySettings.checkInProximityRange}m of a valid location to check in.`,
+          )
+        }
+      } else {
+        throw new Error("No valid locations found or location data is unavailable.")
+      }
+
+      console.log("[v0] Sending check-in request to API...")
+      const response = await fetch("/api/attendance/check-in", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
+        body: JSON.stringify(checkInData),
+      })
+
+      const result = await response.json()
+      console.log("[v0] Check-in API response:", result)
+
+      if (!response.ok) {
+        if (result.error?.includes("DUPLICATE CHECK-IN BLOCKED") || result.error?.includes("already checked in")) {
+          console.log("[v0] Duplicate check-in prevented by server")
+          setFlashMessage({
+            message: result.error,
+            type: "error",
+          })
+
+          // Refresh attendance status
+          await fetchTodayAttendance()
+
+          toast({
+            title: "Duplicate Check-in Prevented",
+            description: result.error,
+            variant: "destructive",
+            duration: 8000,
+          })
+        } else {
+          throw new Error(result.error || "Failed to check in")
+        }
         return
       }
 
-      const browserInfo = detectBrowser()
-      console.log("[v0] Browser detected:", browserInfo.name)
+      console.log("[v0] ✓ Check-in successful")
 
-      const nearest = realTimeLocations.reduce(
-        (closest, loc) => {
-          const dist = calculateDistance(locationData.latitude, locationData.longitude, loc.latitude, loc.longitude)
-          if (!closest || dist < closest.distance) {
-            return { location: loc, distance: dist }
-          }
-          return closest
-        },
-        null as { location: GeofenceLocation; distance: number } | null,
-      )
-
-      if (!nearest) {
-        throw new Error("No QCC locations found")
+      if (result.data) {
+        // Add device sharing warning to the attendance data if present
+        const attendanceWithWarning = {
+          ...result.data,
+          device_sharing_warning: result.deviceSharingWarning?.message || null
+        }
+        setLocalTodayAttendance(attendanceWithWarning)
       }
 
-      const proximityCheck = await isWithinBrowserProximity(
-        locationData,
-        nearest.location.latitude,
-        nearest.location.longitude,
-        geoSettings || undefined,
-      )
-
-      console.log("[v0] Proximity check:", {
-        distance: proximityCheck.distance,
-        isWithin: proximityCheck.isWithin,
-      })
-
-      if (!proximityCheck.isWithin) {
-        throw new Error(
-          `You must be within 100 meters of your assigned location to check in. You are currently ${Math.round(proximityCheck.distance)}m away. Please use manual location code entry or move closer.`,
-        )
-      }
-
-      const response = await fetch("/api/attendance/check-in", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          location_id: nearest.location.id,
-          latitude: locationData.latitude,
-          longitude: locationData.longitude,
-          accuracy: locationData.accuracy,
-          reverse_geocoded_location: locationData.reverseGeocodedLocation,
-          device_info: locationData.device_info,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Check-in failed")
-      }
-
-      const result = await response.json()
-
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("check-in-complete"))
-      }
-
-      console.log("[v0] Check-in successful:", result)
-
-      if (result.success && result.data) {
-        console.log("[v0] Check-in successful:", result.data)
-
-        setLocalTodayAttendance(result.data)
-
-        clearAttendanceCache()
-
-        setRecentCheckIn(true)
-        setTimeout(() => setRecentCheckIn(false), 3000)
-
-        setFlashMessage({
-          message: `Successfully checked in at ${result.data.check_in_location_name}! Welcome to work. Remember to check out at the end of your shift.`,
-          type: "success",
-        })
-
-        setTimeout(() => {
-          fetchTodayAttendance()
-        }, 1000)
-      } else {
-        throw new Error(result.error || "Failed to record check-in")
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Check-in failed"
-      setError(errorMessage)
       setFlashMessage({
-        message: errorMessage,
+        message: result.message || "Successfully checked in!",
+        type: result.isLateArrival ? "warning" : "success",
+      })
+
+      // Refresh attendance data
+      await fetchTodayAttendance()
+
+      // Clear attendance cache
+      clearAttendanceCache()
+
+      // Show device sharing warning if applicable (highest priority)
+      if (result.deviceSharingWarning) {
+        toast({
+          title: "⚠️ Shared Device Detected",
+          description: result.deviceSharingWarning.message,
+          variant: "default",
+          className: "bg-yellow-50 border-yellow-400 text-yellow-900 dark:bg-yellow-900/20 dark:border-yellow-700 dark:text-yellow-200",
+          duration: 10000,
+        })
+      }
+      
+      // Show late arrival warning if applicable
+      if (result.isLateArrival) {
+        toast({
+          title: "Late Arrival Recorded",
+          description: `You checked in at ${result.lateArrivalTime} (after 9:00 AM). Your late arrival has been recorded and will be visible to your department head. Please provide a reason if prompted.`,
+          variant: "destructive",
+          duration: 8000,
+        })
+      } else if (!result.deviceSharingWarning) {
+        // Only show success toast if no other warnings
+        toast({
+          title: "Check-in Successful",
+          description: result.message || "You have successfully checked in.",
+          duration: 5000,
+        })
+      }
+
+      setTimeout(() => {
+        setRecentCheckIn(false)
+      }, 5000)
+    } catch (error: any) {
+      console.error("[v0] Check-in error:", error)
+      setFlashMessage({
+        message: error.message || "Failed to check in. Please try again.",
         type: "error",
       })
+
+      setTimeout(() => {
+        setRecentCheckIn(false)
+      }, 3000)
+    } finally {
       setIsCheckingIn(false)
       setCheckingMessage("")
-    } finally {
-      setIsLoading(false)
+      setTimeout(() => {
+        setIsCheckInProcessing(false)
+      }, 2000)
     }
   }
 
@@ -857,7 +940,7 @@ export function AttendanceRecorder({
 
     if (minutesUntilCheckout !== null && minutesUntilCheckout > 0) {
       setFlashMessage({
-        message: `You must wait ${minutesUntilCheckout} more minute${minutesUntilCheckout !== 1 ? "s" : ""} before checking out. A minimum of 1 hour is required between check-in and check-out.`,
+        message: `You must wait ${minutesUntilCheckout} more minute${minutesUntilCheckout !== 1 ? "s" : ""} before checking out. A minimum of 2 hours is required between check-in and check-out.`,
         type: "info",
       })
       return
@@ -1500,13 +1583,25 @@ export function AttendanceRecorder({
         </div>
       )}
 
-      {minutesUntilCheckout !== null && minutesUntilCheckout > 0 && isCheckedIn && !isCheckedOut && (
-        <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
-          <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
-          <AlertTitle className="text-yellow-800 dark:text-yellow-200">Check-Out Available Soon</AlertTitle>
+      {localTodayAttendance?.device_sharing_warning && (
+        <Alert className="bg-yellow-50 border-yellow-400 dark:bg-yellow-900/20 dark:border-yellow-700 mb-4">
+          <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+          <AlertTitle className="text-yellow-800 dark:text-yellow-300 font-semibold">
+            ⚠️ Shared Device Detected
+          </AlertTitle>
           <AlertDescription className="text-yellow-700 dark:text-yellow-300">
-            You can check out in {minutesUntilCheckout} minute{minutesUntilCheckout !== 1 ? "s" : ""}. A minimum of 1
-            hour is required between check-in and check-out.
+            {localTodayAttendance.device_sharing_warning}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {minutesUntilCheckout !== null && minutesUntilCheckout > 0 && isCheckedIn && !isCheckedOut && (
+        <Alert className="bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800">
+          <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+          <AlertTitle className="text-yellow-800 dark:text-yellow-300">Check-Out Pending</AlertTitle>
+          <AlertDescription className="text-yellow-700 dark:text-yellow-300">
+            You can check out in {minutesUntilCheckout} minute{minutesUntilCheckout !== 1 ? "s" : ""}. A minimum of 2
+            hours is required between check-in and check-out.
           </AlertDescription>
         </Alert>
       )}
@@ -1535,44 +1630,69 @@ export function AttendanceRecorder({
               {!localTodayAttendance?.check_in_time && (
                 <Button
                   onClick={handleCheckIn}
-                  disabled={!locationValidation?.canCheckIn || isCheckingIn || isProcessing || recentCheckIn}
-                  className="w-full"
+                  disabled={
+                    !locationValidation?.canCheckIn || isCheckingIn || isProcessing || recentCheckIn || isLoading
+                  }
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg relative overflow-hidden group"
                   size="lg"
                 >
-                  {isCheckingIn ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      {checkingMessage || "Checking In..."}
-                    </>
-                  ) : (
-                    <>
-                      <LogIn className="mr-2 h-5 w-5" />
-                      Check In
-                    </>
-                  )}
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="relative z-10 flex items-center justify-center w-full">
+                    {isCheckingIn ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        {checkingMessage || "Checking In..."}
+                      </>
+                    ) : (
+                      <>
+                        <LogIn className="mr-2 h-5 w-5" />
+                        Check In
+                        <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">Protected</span>
+                      </>
+                    )}
+                  </div>
                 </Button>
               )}
 
               {localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time && (
-                <Button
-                  onClick={handleCheckOut}
-                  disabled={!locationValidation?.canCheckOut || isCheckingIn || isProcessing || recentCheckOut}
-                  variant="outline"
-                  className="w-full bg-transparent"
-                  size="lg"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Checking Out...
-                    </>
+                <>
+                  {checkoutTimeReached ? (
+                    <Button
+                      onClick={handleCheckOut}
+                      disabled={
+                        !locationValidation?.canCheckOut || isCheckingIn || isProcessing || recentCheckOut || isLoading
+                      }
+                      variant="destructive"
+                      className="w-full transition-all duration-300 bg-red-600 hover:bg-red-700 text-white"
+                      size="lg"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Checking Out...
+                        </>
+                      ) : (
+                        <>
+                          <LogOut className="mr-2 h-5 w-5" />
+                          Check Out Now
+                        </>
+                      )}
+                    </Button>
                   ) : (
-                    <>
-                      <LogOut className="mr-2 h-5 w-5" />
-                      Check Out
-                    </>
+                    <div className="w-full p-4 bg-muted/50 border-2 border-dashed border-border rounded-lg text-center">
+                      <Clock className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm font-medium text-foreground mb-1">Check-Out Available Soon</p>
+                      <p className="text-xs text-muted-foreground">
+                        {minutesUntilCheckout !== null && minutesUntilCheckout > 0
+                          ? `Available in ${minutesUntilCheckout} minute${minutesUntilCheckout !== 1 ? "s" : ""}`
+                          : "Calculating..."}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Minimum 2 hours required between check-in and check-out
+                      </p>
+                    </div>
                   )}
-                </Button>
+                </>
               )}
             </div>
 
