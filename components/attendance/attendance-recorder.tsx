@@ -1195,9 +1195,19 @@ export function AttendanceRecorder({
   }
 
   const handleEarlyCheckoutConfirm = async () => {
-    if (!earlyCheckoutReason.trim()) {
+    const trimmedReason = earlyCheckoutReason.trim()
+    
+    if (!trimmedReason) {
       setFlashMessage({
         message: "Please provide a reason for early checkout before proceeding.",
+        type: "error",
+      })
+      return
+    }
+    
+    if (trimmedReason.length < 10) {
+      setFlashMessage({
+        message: "Early checkout reason must be at least 10 characters long. Please provide more details.",
         type: "error",
       })
       return
@@ -1248,9 +1258,10 @@ export function AttendanceRecorder({
         setEarlyCheckoutReason("")
         setPendingCheckoutData(null)
 
+        // Redirect to main page after 2 seconds
         setTimeout(() => {
-          fetchTodayAttendance()
-        }, 1000)
+          window.location.href = "/dashboard"
+        }, 2000)
       } else {
         throw new Error(result.error || "Failed to record checkout")
       }
@@ -1949,7 +1960,9 @@ export function AttendanceRecorder({
                   className="w-full min-h-[100px] p-3 border rounded-md resize-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   maxLength={500}
                 />
-                <p className="text-xs text-muted-foreground">{earlyCheckoutReason.length}/500 characters</p>
+                <p className={`text-xs ${earlyCheckoutReason.length < 10 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                  {earlyCheckoutReason.length}/500 characters (minimum 10 required)
+                </p>
               </div>
 
               <div className="flex gap-2">
@@ -1964,7 +1977,7 @@ export function AttendanceRecorder({
                 <Button
                   onClick={handleEarlyCheckoutConfirm}
                   className="flex-1 bg-orange-600 hover:bg-orange-700"
-                  disabled={isLoading || !earlyCheckoutReason.trim()}
+                  disabled={isLoading || earlyCheckoutReason.trim().length < 10}
                 >
                   {isLoading ? (
                     <>
