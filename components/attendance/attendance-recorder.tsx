@@ -951,7 +951,7 @@ export function AttendanceRecorder({
     const checkoutMinutes = now.getMinutes()
     
     // Check if user is assigned to Tema Port (working hours: 7 AM - 4 PM)
-    const assignedLocationName = assignedLocationInfo?.locationName?.toLowerCase() || ""
+    const assignedLocationName = assignedLocationInfo?.name?.toLowerCase() || ""
     const isTemaPort = assignedLocationName.includes("tema port")
     
     // Tema Port: Allow checkout at/after 4 PM, require reason before 4 PM
@@ -1938,7 +1938,7 @@ export function AttendanceRecorder({
                 Early Check-Out Notice
               </CardTitle>
               <CardDescription>
-                You are checking out before {assignedLocationInfo?.locationName?.toLowerCase().includes("tema port") ? "4:00 PM" : "5:00 PM"}. Please provide a reason.
+                You are checking out before {assignedLocationInfo?.name?.toLowerCase().includes("tema port") ? "4:00 PM" : "5:00 PM"}. Please provide a reason.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
