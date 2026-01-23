@@ -555,9 +555,9 @@ export function validateCheckoutLocation(
   accuracyWarning?: string
 } {
   const deviceInfo = detectDevice()
-  // Actual validation: 100m for mobile/tablet, 2000m for desktop
-  const internalProximityDistance = deviceInfo.isMobile || deviceInfo.isTablet ? 100 : 2000
-  const displayDistance = 100 // What we show to users in UI messages (trade secret - hide 2000m for desktop)
+  // Actual validation: 200m for mobile/tablet, 1000m for desktop/laptop
+  const internalProximityDistance = deviceInfo.isMobile || deviceInfo.isTablet ? 200 : 1000
+  const displayDistance = deviceInfo.isMobile || deviceInfo.isTablet ? 200 : 1000 // Show actual distance to users
 
   const nearest = findNearestLocation(userLocation, qccLocations)
 

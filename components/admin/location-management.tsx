@@ -44,6 +44,10 @@ interface GeofenceLocation {
   radius_meters: number
   is_active: boolean
   qr_code?: string
+  check_in_start_time?: string | null
+  check_out_end_time?: string | null
+  require_early_checkout_reason?: boolean
+  working_hours_description?: string | null
 }
 
 export function LocationManagement() {
@@ -66,6 +70,10 @@ export function LocationManagement() {
     latitude: "",
     longitude: "",
     radius_meters: "50",
+    check_in_start_time: "08:00",
+    check_out_end_time: "17:00",
+    require_early_checkout_reason: true,
+    working_hours_description: "",
   })
 
   useEffect(() => {
@@ -178,10 +186,15 @@ export function LocationManagement() {
             "Cache-Control": "no-cache",
           },
           body: JSON.stringify({
-            ...newLocation,
+            name: newLocation.name,
+            address: newLocation.address,
             latitude: Number.parseFloat(newLocation.latitude),
             longitude: Number.parseFloat(newLocation.longitude),
             radius_meters: Number.parseInt(newLocation.radius_meters),
+            check_in_start_time: newLocation.check_in_start_time || null,
+            check_out_end_time: newLocation.check_out_end_time || null,
+            require_early_checkout_reason: newLocation.require_early_checkout_reason,
+            working_hours_description: newLocation.working_hours_description || null,
           }),
         })
 
@@ -205,7 +218,17 @@ export function LocationManagement() {
         setSuccess("✅ Location added successfully - Only this new location was created")
         await fetchLocations()
         setIsAddingLocation(false)
-        setNewLocation({ name: "", address: "", latitude: "", longitude: "", radius_meters: "50" })
+        setNewLocation({ 
+          name: "", 
+          address: "", 
+          latitude: "", 
+          longitude: "", 
+          radius_meters: "50",
+          check_in_start_time: "08:00",
+          check_out_end_time: "17:00",
+          require_early_checkout_reason: true,
+          working_hours_description: "",
+        })
         setFormErrors({})
         setRetryCount(0)
 
@@ -249,6 +272,10 @@ export function LocationManagement() {
           longitude: editingLocation.longitude,
           radius_meters: editingLocation.radius_meters,
           is_active: editingLocation.is_active,
+          check_in_start_time: editingLocation.check_in_start_time || null,
+          check_out_end_time: editingLocation.check_out_end_time || null,
+          require_early_checkout_reason: editingLocation.require_early_checkout_reason ?? true,
+          working_hours_description: editingLocation.working_hours_description || null,
         }),
       })
 
@@ -753,12 +780,67 @@ export function LocationManagement() {
                     {formErrors.radius_meters}
                   </p>
                 )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  Recommended: 50m for standard attendance tracking, 10-30m for specific rooms
-                </p>
-              </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Recommended: 50m for standard attendance tracking, 10-30m for specific rooms
+                  </p>
+                </div>
 
-              <Button
+                <div className="space-y-4 border-t pt-4">
+                  <h3 className="font-medium text-sm">Working Hours Configuration</h3>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="check_in_start">Check-in Start Time</Label>
+                      <Input
+                        id="check_in_start"
+                        type="time"
+                        value={newLocation.check_in_start_time}
+                        onChange={(e) => setNewLocation((prev) => ({ ...prev, check_in_start_time: e.target.value }))}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Earliest time staff can check in
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="check_out_end">Check-out End Time</Label>
+                      <Input
+                        id="check_out_end"
+                        type="time"
+                        value={newLocation.check_out_end_time}
+                        onChange={(e) => setNewLocation((prev) => ({ ...prev, check_out_end_time: e.target.value }))}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Staff checking out before this time must provide reason
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="require_reason"
+                      checked={newLocation.require_early_checkout_reason}
+                      onChange={(e) => setNewLocation((prev) => ({ ...prev, require_early_checkout_reason: e.target.checked }))}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <Label htmlFor="require_reason" className="font-normal cursor-pointer">
+                      Require early checkout reason
+                    </Label>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="working_hours_desc">Working Hours Description (Optional)</Label>
+                    <Input
+                      id="working_hours_desc"
+                      value={newLocation.working_hours_description}
+                      onChange={(e) => setNewLocation((prev) => ({ ...prev, working_hours_description: e.target.value }))}
+                      placeholder="e.g., 7:00 AM - 5:00 PM Monday-Friday"
+                    />
+                  </div>
+                </div>
+                
+                <Button
                 type="button"
                 variant="outline"
                 onClick={getCurrentLocation}
@@ -946,24 +1028,74 @@ export function LocationManagement() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="editRadius">Radius (meters)</Label>
-                <Input
-                  id="editRadius"
-                  type="number"
-                  value={editingLocation.radius_meters}
-                  onChange={(e) =>
-                    setEditingLocation({ ...editingLocation, radius_meters: Number.parseInt(e.target.value) })
-                  }
-                  placeholder="50"
-                  required
-                />
+                  <Label htmlFor="editRadius">Radius (meters)</Label>
+                  <Input
+                    id="editRadius"
+                    type="number"
+                    value={editingLocation.radius_meters}
+                    onChange={(e) =>
+                      setEditingLocation({ ...editingLocation, radius_meters: Number.parseInt(e.target.value) })
+                    }
+                    placeholder="50"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-4 border-t pt-4">
+                  <h3 className="font-medium text-sm">Working Hours Configuration</h3>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit_check_in_start">Check-in Start Time</Label>
+                      <Input
+                        id="edit_check_in_start"
+                        type="time"
+                        value={editingLocation.check_in_start_time || "08:00"}
+                        onChange={(e) => setEditingLocation({ ...editingLocation, check_in_start_time: e.target.value })}
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="edit_check_out_end">Check-out End Time</Label>
+                      <Input
+                        id="edit_check_out_end"
+                        type="time"
+                        value={editingLocation.check_out_end_time || "17:00"}
+                        onChange={(e) => setEditingLocation({ ...editingLocation, check_out_end_time: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="edit_require_reason"
+                      checked={editingLocation.require_early_checkout_reason ?? true}
+                      onChange={(e) => setEditingLocation({ ...editingLocation, require_early_checkout_reason: e.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <Label htmlFor="edit_require_reason" className="font-normal cursor-pointer">
+                      Require early checkout reason
+                    </Label>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit_working_hours_desc">Working Hours Description</Label>
+                    <Input
+                      id="edit_working_hours_desc"
+                      value={editingLocation.working_hours_description || ""}
+                      onChange={(e) => setEditingLocation({ ...editingLocation, working_hours_description: e.target.value })}
+                      placeholder="e.g., 7:00 AM - 5:00 PM Monday-Friday"
+                    />
+                  </div>
+                </div>
+
+                <Button type="button" variant="outline" onClick={getCurrentLocation} className="w-full bg-transparent">
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Use Current Location
+                </Button>
               </div>
-              <Button type="button" variant="outline" onClick={getCurrentLocation} className="w-full bg-transparent">
-                <MapPin className="h-4 w-4 mr-2" />
-                Use Current Location
-              </Button>
-            </div>
-            <DialogFooter>
+              <DialogFooter>
               <Button variant="outline" onClick={() => setEditingLocation(null)}>
                 Cancel
               </Button>

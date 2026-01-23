@@ -50,6 +50,10 @@ export async function POST(request: Request) {
           longitude: body.longitude,
           radius_meters: body.radius_meters,
           is_active: true,
+          check_in_start_time: body.check_in_start_time || null,
+          check_out_end_time: body.check_out_end_time || null,
+          require_early_checkout_reason: body.require_early_checkout_reason ?? true,
+          working_hours_description: body.working_hours_description || null,
         },
       ])
       .select()

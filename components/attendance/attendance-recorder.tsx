@@ -950,24 +950,27 @@ export function AttendanceRecorder({
     const checkoutHour = now.getHours()
     const checkoutMinutes = now.getMinutes()
     
-    // Check if user is assigned to Tema Port (working hours: 7 AM - 4 PM)
-    const assignedLocationName = assignedLocationInfo?.name?.toLowerCase() || ""
-    const isTemaPort = assignedLocationName.includes("tema port")
+    // Fetch location-specific working hours configuration
+    const assignedLocation = realTimeLocations?.find(loc => loc.id === userProfile?.assigned_location_id)
+    const checkOutEndTime = assignedLocation?.check_out_end_time || "17:00" // Default to 5 PM
+    const requireEarlyCheckoutReason = assignedLocation?.require_early_checkout_reason ?? true
     
-    // Tema Port: Allow checkout at/after 4 PM, require reason before 4 PM
-    // Other locations: Allow checkout at/after 5 PM, require reason before 5 PM
-    const earlyCheckoutThreshold = isTemaPort ? 16 : 17 // 4 PM for Tema Port, 5 PM for others
-    const isBeforeCheckoutTime = checkoutHour < earlyCheckoutThreshold
+    // Parse checkout end time (HH:MM format)
+    const [endHour, endMinute] = checkOutEndTime.split(":").map(Number)
+    const checkoutEndTimeMinutes = endHour * 60 + (endMinute || 0)
+    const currentTimeMinutes = checkoutHour * 60 + checkoutMinutes
+    
+    const isBeforeCheckoutTime = currentTimeMinutes < checkoutEndTimeMinutes
     
     console.log("[v0] Checkout validation:", {
-      location: assignedLocationName,
-      isTemaPort,
+      location: assignedLocation?.name || "Unknown",
+      checkOutEndTime,
       currentTime: `${checkoutHour}:${checkoutMinutes.toString().padStart(2, '0')}`,
-      threshold: `${earlyCheckoutThreshold}:00`,
-      requiresReason: isBeforeCheckoutTime
+      isBeforeCheckoutTime,
+      requireEarlyCheckoutReason,
     })
 
-    if (isBeforeCheckoutTime && !earlyCheckoutReason) {
+    if (isBeforeCheckoutTime && requireEarlyCheckoutReason && !earlyCheckoutReason) {
       setIsLoading(true)
       try {
         // Get location data first to show in dialog
