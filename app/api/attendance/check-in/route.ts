@@ -330,6 +330,19 @@ export async function POST(request: NextRequest) {
       .select("*")
       .single()
 
+    // Calculate check-in position for the location today
+    let checkInPosition = null
+    if (attendanceRecord && location_id) {
+      const { count } = await supabase
+        .from("attendance_records")
+        .select("id", { count: "exact", head: true })
+        .eq("check_in_location_id", location_id)
+        .gte("check_in_time", `${today}T00:00:00`)
+        .lte("check_in_time", attendanceRecord.check_in_time)
+
+      checkInPosition = count || 1
+    }
+
     if (attendanceError) {
       console.error("Attendance error:", attendanceError)
 
@@ -397,6 +410,7 @@ export async function POST(request: NextRequest) {
           },
         },
         message: checkInMessage,
+        checkInPosition,
         isLateArrival,
         lateArrivalTime: isLateArrival ? checkInTime.toLocaleTimeString() : null,
         missedCheckoutWarning,

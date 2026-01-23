@@ -68,6 +68,8 @@ interface AssignedLocationInfo {
   distance?: number
   isAtAssignedLocation: boolean
   name: string // Added for convenience
+  check_in_start_time?: string | null
+  check_out_end_time?: string | null
 }
 
 interface AttendanceRecorderProps {
@@ -92,6 +94,22 @@ interface AttendanceRecorderProps {
 type WindowsCapabilities = ReturnType<typeof detectWindowsLocationCapabilities>
 
 const REFRESH_PAUSE_DURATION = 50000 // 50 seconds instead of 120000 (2 minutes)
+
+// Helper function to get ordinal suffix for numbers (1st, 2nd, 3rd, etc.)
+function getOrdinalSuffix(num: number): string {
+  const j = num % 10
+  const k = num % 100
+  if (j === 1 && k !== 11) {
+    return "st"
+  }
+  if (j === 2 && k !== 12) {
+    return "nd"
+  }
+  if (j === 3 && k !== 13) {
+    return "rd"
+  }
+  return "th"
+}
 
 export function AttendanceRecorder({
   todayAttendance: initialTodayAttendance,
@@ -412,13 +430,6 @@ export function AttendanceRecorder({
         setUserLocation(location)
         setLocationPermissionStatus({ granted: true, message: "Location access granted" })
         console.log("[v0] Location auto-loaded successfully:", location)
-
-        const capabilities = detectWindowsLocationCapabilities()
-        if (capabilities.isWindows && location.accuracy > 200) {
-          setError(
-            `GPS accuracy is ${Math.round(location.accuracy)}m. Click the refresh button to update your location for better accuracy.`,
-          )
-        }
       } catch (error) {
         console.log("[v0] Auto-load location failed, user can try manual check-in or QR code:", error)
       }
@@ -558,6 +569,8 @@ export function AttendanceRecorder({
           distance: Math.round(distance),
           isAtAssignedLocation,
           name: assignedLocation.name,
+          check_in_start_time: assignedLocation.check_in_start_time,
+          check_out_end_time: assignedLocation.check_out_end_time,
         })
 
         console.log("[v0] Assigned location info:", {
@@ -897,10 +910,14 @@ export function AttendanceRecorder({
         })
       } else if (!result.deviceSharingWarning) {
         // Only show success toast if no other warnings
+        const positionText = result.checkInPosition 
+          ? `You are the ${result.checkInPosition}${getOrdinalSuffix(result.checkInPosition)} staff to check in at this location today.` 
+          : ""
+        
         toast({
           title: "Check-in Successful",
-          description: result.message || "You have successfully checked in.",
-          duration: 5000,
+          description: `${result.message || "You have successfully checked in."} ${positionText}`,
+          duration: 6000,
         })
       }
 
@@ -1793,16 +1810,26 @@ export function AttendanceRecorder({
         <CardContent className="space-y-4">
           <div className="rounded-lg border p-4 md:p-6">
             <div className="flex items-start justify-between">
-              <div className="space-y-1 flex-1">
-                <p className="text-sm font-medium text-muted-foreground">Your Assigned Location</p>
-                <p className="text-lg md:text-xl font-semibold">{assignedLocationInfo?.name || "Loading..."}</p>
-                {assignedLocationInfo && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4" />
-                    <span>Distance: {(assignedLocationInfo.distance / 1000).toFixed(2)}km away</span>
-                  </div>
-                )}
-              </div>
+                <div className="space-y-1 flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">Your Assigned Location</p>
+                  <p className="text-lg md:text-xl font-semibold">{assignedLocationInfo?.name || "Loading..."}</p>
+                  {assignedLocationInfo && (
+                    <>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="h-4 w-4" />
+                        <span>Distance: {(assignedLocationInfo.distance / 1000).toFixed(2)}km away</span>
+                      </div>
+                      {(assignedLocationInfo.check_in_start_time || assignedLocationInfo.check_out_end_time) && (
+                        <div className="flex items-center gap-2 text-sm font-medium text-foreground mt-2">
+                          <Clock className="h-4 w-4" />
+                          <span>
+                            Working Hours: {assignedLocationInfo.check_in_start_time || "8:00"} - {assignedLocationInfo.check_out_end_time || "17:00"}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               {assignedLocationInfo && (
                 <Badge variant={assignedLocationInfo.isAtAssignedLocation ? "default" : "secondary"}>
                   {assignedLocationInfo.isAtAssignedLocation ? "At Location" : "Remote Location"}
@@ -1856,42 +1883,7 @@ export function AttendanceRecorder({
             </div>
           </div>
 
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-foreground">All QCC Locations</p>
-            <div className="space-y-2">
-              {realTimeLocations && realTimeLocations.length > 0 ? (
-                realTimeLocations.map((location) => {
-                  const distance = userLocation
-                    ? calculateDistance(
-                        userLocation.latitude,
-                        userLocation.longitude,
-                        location.latitude,
-                        location.longitude,
-                      )
-                    : null
 
-                  return (
-                    <div
-                      key={location.id}
-                      className="flex items-center justify-between p-3 md:p-4 rounded-lg border hover:bg-accent transition-colors"
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium text-sm md:text-base">{location.name}</p>
-                        <p className="text-xs md:text-sm text-muted-foreground">{location.address}</p>
-                      </div>
-                      {distance !== null && (
-                        <Badge variant="outline" className="ml-2">
-                          {distance < 1000 ? `${distance.toFixed(0)}m` : `${(distance / 1000).toFixed(1)}km`}
-                        </Badge>
-                      )}
-                    </div>
-                  )
-                })
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">Loading locations...</p>
-              )}
-            </div>
-          </div>
         </CardContent>
       </Card>
 
