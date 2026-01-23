@@ -959,17 +959,6 @@ export function AttendanceRecorder({
     const earlyCheckoutThreshold = isTemaPort ? 16 : 17 // 4 PM for Tema Port, 5 PM for others
     const isBeforeCheckoutTime = checkoutHour < earlyCheckoutThreshold
     
-    console.log("[v0] ===== TEMA PORT CHECKOUT VALIDATION =====")
-    console.log("[v0] assignedLocationInfo:", assignedLocationInfo)
-    console.log("[v0] Raw location name:", assignedLocationInfo?.name)
-    console.log("[v0] Lowercase location name:", assignedLocationName)
-    console.log("[v0] Contains 'tema port'?:", isTemaPort)
-    console.log("[v0] Current time:", `${checkoutHour}:${checkoutMinutes.toString().padStart(2, '0')}`)
-    console.log("[v0] Threshold hour:", earlyCheckoutThreshold, isTemaPort ? "(Tema Port)" : "(Other)")
-    console.log("[v0] Is before checkout time?:", isBeforeCheckoutTime)
-    console.log("[v0] Will require reason?:", isBeforeCheckoutTime && !earlyCheckoutReason)
-    console.log("[v0] ==========================================")
-    
     console.log("[v0] Checkout validation:", {
       location: assignedLocationName,
       isTemaPort,
