@@ -8,11 +8,11 @@ The QCC Attendance app now has a smart, streamlined leave management system that
 ## System Architecture
 
 ### 1. Leave Status Flow
-```
+\`\`\`
 PENDING → APPROVED → ACTIVE (with document) → COMPLETED
    ↓          ↓
  REJECTED   (reject flow)
-```
+\`\`\`
 
 ### 2. Inactive Status Management
 
@@ -81,7 +81,7 @@ PENDING → APPROVED → ACTIVE (with document) → COMPLETED
 
 ### Department Summaries Filtering (`/components/admin/department-summaries-client.tsx`)
 
-```typescript
+\`\`\`typescript
 // SMART LEAVE FILTERING: Exclude inactive staff on leave from analytics
 filtered = filtered.filter((staff) => {
   // Include only if staff is active
@@ -99,7 +99,7 @@ filtered = filtered.filter((staff) => {
   
   return true
 })
-```
+\`\`\`
 
 **Benefits:**
 - Staff on leave don't skew attendance percentages
@@ -111,7 +111,7 @@ filtered = filtered.filter((staff) => {
 ## Database Schema
 
 ### user_profiles Table
-```sql
+\`\`\`sql
 -- Leave-related columns (added in migration 024_add_leave_status.sql)
 - leave_status: VARCHAR (active, pending, approved, rejected, completed)
 - leave_start_date: DATE
@@ -119,7 +119,7 @@ filtered = filtered.filter((staff) => {
 - leave_reason: TEXT
 - leave_document_url: TEXT
 - is_active: BOOLEAN (existing, now used for leave status too)
-```
+\`\`\`
 
 ---
 
@@ -180,20 +180,20 @@ Staff on active leave are:
 ## Configuration
 
 ### Environment Variables
-```env
+\`\`\`env
 # For cron job authentication (optional)
 CRON_SECRET=your-secret-key
-```
+\`\`\`
 
 ### Vercel Cron Setup (vercel.json)
-```json
+\`\`\`json
 {
   "crons": [{
     "path": "/api/cron/reactivate-after-leave",
     "schedule": "0 1 * * *"  // Daily at 1 AM UTC
   }]
 }
-```
+\`\`\`
 
 ---
 

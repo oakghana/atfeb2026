@@ -57,12 +57,12 @@
 - Automatic cache invalidation on location change
 
 **Code Added** (lines 387-421):
-```typescript
+\`\`\`typescript
 const distanceCache = new Map<string, number>()
 export function calculateDistanceMemoized(lat1, lon1, lat2, lon2): number {
   // Returns cached result if available, calculates and caches otherwise
 }
-```
+\`\`\`
 
 **Performance Impact**:
 - **Before**: 10-20 distance calculations during checkout
@@ -84,14 +84,14 @@ export function calculateDistanceMemoized(lat1, lon1, lat2, lon2): number {
 - 5-second TTL to balance freshness with performance
 
 **Usage Example**:
-```typescript
+\`\`\`typescript
 // Instead of multiple .select() calls:
 const result = await getDedupedRequest(
   'device_radius_settings',
   { is_active: true },
   () => supabase.from('device_radius_settings').select(...).eq('is_active', true)
 )
-```
+\`\`\`
 
 **Performance Impact**:
 - **Before**: 2-3 duplicate database queries during checkout modal open
@@ -103,7 +103,7 @@ const result = await getDedupedRequest(
 ## Performance Summary: Checkout Flow
 
 ### Before Optimizations:
-```
+\`\`\`
 User clicks "Check Out Now"
   ├─ Sequential DB queries: ~2-3s
   ├─ React re-renders: 10-15x
@@ -112,10 +112,10 @@ User clicks "Check Out Now"
   └─ Save to database: ~1-2s
   
 TOTAL: 5-7 seconds from button click to modal display
-```
+\`\`\`
 
 ### After Optimizations:
-```
+\`\`\`
 User clicks "Check Out Now"
   ├─ Parallel DB queries: ~800ms-1.2s
   ├─ React re-renders: 2-3x (optimized with useCallback)
@@ -124,7 +124,7 @@ User clicks "Check Out Now"
   └─ Save to database: ~800ms-1s
   
 TOTAL: 1.5-2 seconds from button click to modal display
-```
+\`\`\`
 
 ## Estimated Improvement:
 - **Modal Display**: 50-70% faster

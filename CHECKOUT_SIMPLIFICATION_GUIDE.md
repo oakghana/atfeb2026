@@ -32,13 +32,13 @@
 - **Result**: No unnecessary confirmation screens when checkout time is reached
 
 #### Auto-Decision Flow
-```
+\`\`\`
 User taps "Check Out" →
   System validates location silently →
     IF within range AND checkout time passed → IMMEDIATE checkout
     IF within range AND early checkout → Show reason modal
     IF out of range → Show error
-```
+\`\`\`
 
 ### 4. **Performance Optimizations**
 
@@ -50,25 +50,25 @@ User taps "Check Out" →
 ## User Experience Flow
 
 ### Standard Checkout (Time Reached)
-```
+\`\`\`
 1. User taps "Check Out Now" button
 2. System auto-detects location (visible spinner)
 3. Records checkout and shows "Checked Out Successfully" (< 2 seconds)
 4. Button disabled, shows status "Completed for Today"
-```
+\`\`\`
 
 ### Early Checkout (Reason Required)
-```
+\`\`\`
 1. User taps "Check Out Now" button  
 2. System auto-detects location
 3. Detects early checkout needed
 4. Shows modal requesting reason
 5. User enters reason and confirms
 6. Checkout recorded, success shown
-```
+\`\`\`
 
 ### Error Scenarios
-```
+\`\`\`
 Out of Range:
   - Shows "You are out of range" error
   - Button stays enabled for retry
@@ -81,7 +81,7 @@ Already Checked Out:
 No Check-in:
   - Shows "Please check in first"
   - Button disabled until check-in completed
-```
+\`\`\`
 
 ## Key Metrics
 

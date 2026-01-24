@@ -10,7 +10,7 @@ A staff member (e.g., MRS Rose Manu) attempts to check out while being **OUT OF 
 ### Stage 1: UI State (canCheckOutButton Logic)
 **Location:** `components/attendance/attendance-recorder.tsx` Line 307-313
 
-```javascript
+\`\`\`javascript
 const canCheckOutButton =
   (initialCanCheckOut ?? true) &&          // ✓ Checkout enabled in settings
   !recentCheckOut &&                       // ✓ Not checked out recently
@@ -18,7 +18,7 @@ const canCheckOutButton =
   !localTodayAttendance?.check_out_time && // ✓ Not already checked out
   !isOnLeave &&                            // ✓ Not on leave
   locationValidation?.canCheckOut === true // ❌ USER IS OUT OF RANGE = FALSE
-```
+\`\`\`
 
 **Expected Result:** 
 - `canCheckOutButton = FALSE`
@@ -57,7 +57,7 @@ If someone manually enables the button via DevTools, the server-side validation 
 
 The backend ALSO validates location independently:
 
-```typescript
+\`\`\`typescript
 if (!validation.canCheckOut) {
   return NextResponse.json(
     {
@@ -66,7 +66,7 @@ if (!validation.canCheckOut) {
     { status: 400 },
   )
 }
-```
+\`\`\`
 
 **Expected Result:**
 - API returns **400 Bad Request**
@@ -80,14 +80,14 @@ if (!validation.canCheckOut) {
 **Location:** `components/attendance/attendance-recorder.tsx` Line 1023+
 
 ### Step 1: Initial Validation (Line 1065-1083)
-```javascript
+\`\`\`javascript
 const checkoutValidation = validateCheckoutLocation(locationData, realTimeLocations || [], checkOutRadius)
 
 if (!checkoutValidation.canCheckOut) {
   console.log("[v0] Location validation failed - user out of range:", checkoutValidation.message)
   throw new Error(checkoutValidation.message)
 }
-```
+\`\`\`
 
 **If OUT OF RANGE:**
 - ❌ `canCheckOut = false`
@@ -105,12 +105,12 @@ Only reached if location validation passes.
 ### Step 3: Early Checkout Modal (Line 1110+)
 If showing early checkout modal, **RE-VALIDATES LOCATION** (Line 1131-1138):
 
-```javascript
+\`\`\`javascript
 const earlyCheckoutLocationValidation = validateCheckoutLocation(locationData, realTimeLocations || [], checkOutRadius)
 if (!earlyCheckoutLocationValidation.canCheckOut) {
   throw new Error(`You are out of range. ${earlyCheckoutLocationValidation.message}`)
 }
-```
+\`\`\`
 
 **Protection Layer 2:** Even if somehow time check passed, location is checked AGAIN before modal.
 
@@ -121,13 +121,13 @@ if (!earlyCheckoutLocationValidation.canCheckOut) {
 **Location:** `lib/geolocation.ts` Line 621-696
 
 ### Input
-```javascript
+\`\`\`javascript
 validateCheckoutLocation(
   userLocation,      // { latitude, longitude, accuracy }
   qccLocations,      // Array of QCC office locations
   checkOutRadius     // 1000 (meters for desktop)
 )
-```
+\`\`\`
 
 ### Processing
 1. Finds nearest QCC location
@@ -136,7 +136,7 @@ validateCheckoutLocation(
 4. If accuracy is poor (>100m), adds warning
 
 ### Output (OUT OF RANGE)
-```javascript
+\`\`\`javascript
 {
   canCheckOut: false,
   distance: 160286,           // meters to nearest location
@@ -147,7 +147,7 @@ validateCheckoutLocation(
   message: "You must be within 100 meters of a QCC location to check out",
   accuracyWarning: "GPS accuracy is low (160286m)..."
 }
-```
+\`\`\`
 
 ---
 

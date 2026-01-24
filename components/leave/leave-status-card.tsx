@@ -33,8 +33,10 @@ export function LeaveStatusCard({
   const startDate = leaveStartDate ? new Date(leaveStartDate) : null
   const endDate = leaveEndDate ? new Date(leaveEndDate) : null
 
+  // User is on leave if they have leave dates and today is within that range
+  // Note: leave_status "active" means working at post, NOT on leave
   const isCurrentlyOnLeave =
-    leaveStatus === "active" && startDate && endDate && today >= startDate && today <= endDate
+    startDate && endDate && today >= startDate && today <= endDate
 
   const handleSubmitApprovedLeave = async (data: LeaveRequestData) => {
     setIsSubmitting(true)
@@ -69,8 +71,8 @@ export function LeaveStatusCard({
     }
   }
 
-  // Show nothing if no active/pending/approved leave
-  if (!leaveStatus || (leaveStatus === "rejected" && !startDate)) {
+  // Show nothing if user is working normally (no leave request or dates)
+  if (!leaveStatus || leaveStatus === "active" || (leaveStatus === "rejected" && !startDate)) {
     return null
   }
 

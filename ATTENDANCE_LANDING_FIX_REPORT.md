@@ -25,11 +25,11 @@ The Dashboard page was not removed or redirected - it was still a fully function
 #### 1. **Fixed `/app/dashboard/page.tsx`** (Primary Fix)
 **Before:** Fully rendered the Dashboard component with all stats, charts, and admin features
 **After:** Simple redirect to `/dashboard/attendance`
-```typescript
+\`\`\`typescript
 export default function DashboardPage() {
   redirect("/dashboard/attendance")
 }
-```
+\`\`\`
 **Impact:** Now any direct access to `/dashboard` redirects to Attendance immediately
 
 #### 2. **Created `/app/dashboard/overview/page.tsx`** (Alternative Access)
