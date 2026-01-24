@@ -3,83 +3,32 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { AlertDescription } from "@/components/ui/alert"
 import { Alert } from "@/components/ui/alert"
-import { CardContent } from "@/components/ui/card"
-import { CardDescription } from "@/components/ui/card"
-import { CardTitle } from "@/components/ui/card"
-import { CardHeader } from "@/components/ui/card"
-import { Card } from "@/components/ui/card"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
-import { UserCheck, AlertCircle, Clock, Users, Activity, TrendingUp } from "lucide-react"
-import WeeklySummaryModal from "@/components/WeeklySummaryModal"
-import StaffWarningModal from "@/components/StaffWarningModal"
-import GPSStatusBanner from "@/components/GPSStatusBanner"
-import StatsCard from "@/components/StatsCard"
-import AdminLocationsOverview from "@/components/AdminLocationsOverview"
-import MobileAppDownload from "@/components/MobileAppDownload"
-import QuickActions from "@/components/dashboard/quick-actions" // Import QuickActions component
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { UserCheck } from "lucide-react"
+import { WeeklySummaryModal } from "@/components/dashboard/weekly-summary-modal"
+import { StaffWarningModal } from "@/components/dashboard/staff-warning-modal"
+import { GPSStatusBanner } from "@/components/dashboard/gps-status-banner"
+import { AlertCircle } from "lucide-react"
+import { StatsCard } from "@/components/dashboard/stats-card"
+import { Clock } from "lucide-react"
+import { Users } from "lucide-react"
+import { QuickActions } from "@/components/dashboard/quick-actions"
+import { Activity } from "lucide-react"
+import { TrendingUp } from "lucide-react"
+import { AdminLocationsOverview } from "@/components/dashboard/admin-locations-overview"
+import { MobileAppDownload } from "@/components/dashboard/mobile-app-download"
 
 export default async function DashboardPage() {
   // OPTIMIZATION: Direct all users accessing /dashboard to /dashboard/attendance
   // This ensures Attendance is always the landing page, not Dashboard
-  // Dashboard remains accessible via the sidebar button when needed
   redirect("/dashboard/attendance")
 
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect("/auth/login")
-
-  // Get user profile with error handling
-  const { data: profile, error: profileError } = await supabase
-    .from("user_profiles")
-    .select(`
-      *,
-      departments (
-        name,
-        code
-      )
-    `)
-    .eq("id", user.id)
-    .maybeSingle() // Use maybeSingle instead of single to handle missing records
-
-  // If no profile exists, show a message to contact admin
-  if (!profile && !profileError) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <Card className="w-full max-w-lg shadow-lg border-0 bg-gradient-to-br from-card to-card/50">
-            <CardHeader className="text-center pb-6">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <UserCheck className="w-8 h-8 text-primary" />
-              </div>
-              <CardTitle className="text-2xl font-heading font-bold text-primary">Profile Setup Required</CardTitle>
-              <CardDescription className="text-base">
-                Your account needs to be set up by an administrator.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center space-y-6">
-              <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
-                <p className="text-sm font-medium text-muted-foreground">Account Details</p>
-                <p className="text-sm font-mono bg-background/50 px-3 py-2 rounded border">User ID: {user.id}</p>
-                <p className="text-sm font-mono bg-background/50 px-3 py-2 rounded border">
-                  Email: {user.email?.split("@")[0]}
-                </p>
-              </div>
-              <p className="text-sm leading-relaxed">
-                Please contact your IT administrator to complete your profile setup and gain access to the attendance
-                system.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </DashboardLayout>
-    )
-  }
+  const supabase = createClient()
+  const { data: user } = await supabase.auth.getUser()
+  const { data: profile } = await supabase.from("user_profiles").select("*").eq("user_id", user.id).single()
 
   let pendingApprovals = 0
   if (profile?.role === "admin") {
