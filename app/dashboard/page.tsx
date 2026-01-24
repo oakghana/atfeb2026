@@ -9,27 +9,30 @@ import { CardTitle } from "@/components/ui/card"
 import { CardHeader } from "@/components/ui/card"
 import { Card } from "@/components/ui/card"
 import { redirect } from "next/navigation"
-import { supabase } from "@/lib/supabase"
-import { user } from "@/lib/user"
-import DashboardLayout from "@/components/DashboardLayout"
-import UserCheck from "@/components/icons/UserCheck"
+import { createClient } from "@/lib/supabase/server"
+import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
+import { UserCheck, AlertCircle, Clock, Users, Activity, TrendingUp } from "lucide-react"
 import WeeklySummaryModal from "@/components/WeeklySummaryModal"
 import StaffWarningModal from "@/components/StaffWarningModal"
 import GPSStatusBanner from "@/components/GPSStatusBanner"
-import AlertCircle from "@/components/icons/AlertCircle"
 import StatsCard from "@/components/StatsCard"
-import Clock from "@/components/icons/Clock"
-import Users from "@/components/icons/Users"
-import Activity from "@/components/icons/Activity"
-import TrendingUp from "@/components/icons/TrendingUp"
 import AdminLocationsOverview from "@/components/AdminLocationsOverview"
 import MobileAppDownload from "@/components/MobileAppDownload"
+import QuickActions from "@/components/dashboard/quick-actions" // Import QuickActions component
 
 export default async function DashboardPage() {
   // OPTIMIZATION: Direct all users accessing /dashboard to /dashboard/attendance
   // This ensures Attendance is always the landing page, not Dashboard
   // Dashboard remains accessible via the sidebar button when needed
   redirect("/dashboard/attendance")
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) redirect("/auth/login")
 
   // Get user profile with error handling
   const { data: profile, error: profileError } = await supabase
