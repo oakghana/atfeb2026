@@ -1,137 +1,115 @@
-import { Calendar } from "@/components/ui/calendar"
-import Link from "next/link"
+"use client"
+
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
+import { StatsCard } from "@/components/dashboard/stats-card"
+import { QuickActions } from "@/components/dashboard/quick-actions"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { AlertDescription } from "@/components/ui/alert"
-import { Alert } from "@/components/ui/alert"
-import { CardContent } from "@/components/ui/card"
-import { CardDescription } from "@/components/ui/card"
-import { CardTitle } from "@/components/ui/card"
-import { CardHeader } from "@/components/ui/card"
-import { Card } from "@/components/ui/card"
-import { redirect } from "next/navigation"
-import { supabase } from "@/lib/supabase"
-import { user } from "@/lib/user"
-import DashboardLayout from "@/components/DashboardLayout"
-import UserCheck from "@/components/icons/UserCheck"
-import WeeklySummaryModal from "@/components/WeeklySummaryModal"
-import StaffWarningModal from "@/components/StaffWarningModal"
-import GPSStatusBanner from "@/components/GPSStatusBanner"
-import AlertCircle from "@/components/icons/AlertCircle"
-import StatsCard from "@/components/StatsCard"
-import Clock from "@/components/icons/Clock"
-import Users from "@/components/icons/Users"
-import Activity from "@/components/icons/Activity"
-import TrendingUp from "@/components/icons/TrendingUp"
-import AdminLocationsOverview from "@/components/AdminLocationsOverview"
-import MobileAppDownload from "@/components/MobileAppDownload"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Clock, Calendar, Users, TrendingUp, UserCheck, AlertCircle, Activity, Loader } from "lucide-react"
+import Link from "next/link"
+import { MobileAppDownload } from "@/components/ui/mobile-app-download"
 
-export default async function DashboardPage() {
-  // OPTIMIZATION: Direct all users accessing /dashboard to /dashboard/attendance
-  // This ensures Attendance is always the landing page, not Dashboard
-  // Dashboard remains accessible via the sidebar button when needed
-  redirect("/dashboard/attendance")
+export default function DashboardOverviewPage() {
+  const supabase = createClient()
+  const [profile, setProfile] = useState<any>(null)
+  const [todayAttendance, setTodayAttendance] = useState<any>(null)
+  const [monthlyAttendance, setMonthlyAttendance] = useState(0)
+  const [pendingApprovals, setPendingApprovals] = useState(0)
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-  // Get user profile with error handling
-  const { data: profile, error: profileError } = await supabase
-    .from("user_profiles")
-    .select(`
-      *,
-      departments (
-        name,
-        code
-      )
-    `)
-    .eq("id", user.id)
-    .maybeSingle() // Use maybeSingle instead of single to handle missing records
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Get user
+        const {
+          data: { user: currentUser },
+        } = await supabase.auth.getUser()
+        
+        if (!currentUser) return
 
-  // If no profile exists, show a message to contact admin
-  if (!profile && !profileError) {
+        setUser(currentUser)
+
+        // Get profile
+        const { data: profileData } = await supabase
+          .from("user_profiles")
+          .select(`
+            *,
+            departments (
+              name,
+              code
+            )
+          `)
+          .eq("id", currentUser.id)
+          .maybeSingle()
+
+        setProfile(profileData)
+
+        // Get today's attendance
+        const today = new Date().toISOString().split("T")[0]
+        const { data: todayData } = await supabase
+          .from("attendance_records")
+          .select("*")
+          .eq("user_id", currentUser.id)
+          .gte("check_in_time", `${today}T00:00:00`)
+          .lt("check_in_time", `${today}T23:59:59`)
+          .maybeSingle()
+
+        setTodayAttendance(todayData)
+
+        // Get monthly attendance count
+        const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+        const { count: monthCount } = await supabase
+          .from("attendance_records")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", currentUser.id)
+          .gte("check_in_time", startOfMonth)
+
+        setMonthlyAttendance(monthCount || 0)
+
+        // Get pending approvals if admin
+        if (profileData?.role === "admin") {
+          const { count } = await supabase
+            .from("user_profiles")
+            .select("*", { count: "exact", head: true })
+            .eq("is_active", false)
+
+          setPendingApprovals(count || 0)
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [supabase])
+
+  if (loading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-[60vh]">
-          <Card className="w-full max-w-lg shadow-lg border-0 bg-gradient-to-br from-card to-card/50">
-            <CardHeader className="text-center pb-6">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <UserCheck className="w-8 h-8 text-primary" />
-              </div>
-              <CardTitle className="text-2xl font-heading font-bold text-primary">Profile Setup Required</CardTitle>
-              <CardDescription className="text-base">
-                Your account needs to be set up by an administrator.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center space-y-6">
-              <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
-                <p className="text-sm font-medium text-muted-foreground">Account Details</p>
-                <p className="text-sm font-mono bg-background/50 px-3 py-2 rounded border">User ID: {user.id}</p>
-                <p className="text-sm font-mono bg-background/50 px-3 py-2 rounded border">
-                  Email: {user.email?.split("@")[0]}
-                </p>
-              </div>
-              <p className="text-sm leading-relaxed">
-                Please contact your IT administrator to complete your profile setup and gain access to the attendance
-                system.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col items-center gap-4">
+            <Loader className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading dashboard...</p>
+          </div>
         </div>
       </DashboardLayout>
     )
   }
 
-  let pendingApprovals = 0
-  if (profile?.role === "admin") {
-    const { count } = await supabase
-      .from("user_profiles")
-      .select("*", { count: "exact", head: true })
-      .eq("is_active", false)
-
-    pendingApprovals = count || 0
-  }
-
-  // Get today's attendance with error handling
-  const today = new Date().toISOString().split("T")[0]
-  const { data: todayAttendance, error: attendanceError } = await supabase
-    .from("attendance_records")
-    .select("*")
-    .eq("user_id", user.id)
-    .gte("check_in_time", `${today}T00:00:00`)
-    .lt("check_in_time", `${today}T23:59:59`)
-    .maybeSingle()
-
-  // Get this month's attendance count with error handling
-  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-  const { count: monthlyAttendance, error: monthlyError } = await supabase
-    .from("attendance_records")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", user.id)
-    .gte("check_in_time", startOfMonth)
-
-  // Get total locations with error handling
-  const { count: totalLocations, error: locationsError } = await supabase
-    .from("geofence_locations")
-    .select("*", { count: "exact", head: true })
-    .eq("is_active", true)
-
-  // Fetch all locations for admin view
-  const { data: allLocations } = await supabase
-    .from("geofence_locations")
-    .select("*")
-    .eq("is_active", true)
-    .order("name")
-
   return (
     <DashboardLayout>
-      <WeeklySummaryModal />
-      <StaffWarningModal />
-
       <div className="space-y-8">
-        <GPSStatusBanner />
-
         <div className="space-y-2">
           <h1 className="text-4xl font-heading font-bold text-foreground tracking-tight">Dashboard</h1>
           <p className="text-lg text-muted-foreground font-medium">
             Welcome back,{" "}
-            <span className="text-primary font-semibold">{profile?.first_name || user.email?.split("@")[0]}</span>{" "}
+            <span className="text-primary font-semibold">{profile?.first_name || user?.email?.split("@")[0]}</span>{" "}
             {profile?.last_name || ""}
           </p>
         </div>
@@ -183,12 +161,10 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid gap-8 lg:grid-cols-5">
-          {/* Quick Actions */}
           <div className="lg:col-span-2">
             <QuickActions />
           </div>
 
-          {/* Recent Activity */}
           <div className="lg:col-span-3">
             <Card className="shadow-sm border-0 bg-gradient-to-br from-card to-card/50">
               <CardHeader className="pb-4">
@@ -261,11 +237,6 @@ export default async function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Admin Locations Overview */}
-        {profile?.role === "admin" && allLocations && allLocations.length > 0 && (
-          <AdminLocationsOverview locations={allLocations} />
-        )}
       </div>
       <MobileAppDownload variant="dashboard" />
     </DashboardLayout>

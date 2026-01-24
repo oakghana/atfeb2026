@@ -41,6 +41,7 @@ import {
   Archive,
   ShieldAlert,
   TrendingUp,
+  Calendar,
 } from "lucide-react"
 import Image from "next/image"
 
@@ -64,7 +65,7 @@ interface SidebarProps {
 const navigationItems = [
   {
     title: "Dashboard",
-    href: "/dashboard",
+    href: "/dashboard/overview",
     icon: Home,
     roles: ["admin", "department_head", "staff"],
     category: "main",
@@ -82,6 +83,13 @@ const navigationItems = [
     icon: FileText,
     roles: ["admin", "it-admin", "department_head", "staff"],
     category: "main",
+  },
+  {
+    title: "Leave Management",
+    href: "/dashboard/leave-management",
+    icon: Calendar,
+    roles: ["admin", "department_head"],
+    category: "admin",
   },
   {
     title: "Excuse Duty Review",

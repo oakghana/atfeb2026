@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { AttendanceRecorder } from "@/components/attendance/attendance-recorder"
 import { PersonalAttendanceHistory } from "@/components/attendance/personal-attendance-history"
 import { LocationPreviewCard } from "@/components/attendance/location-preview-card"
+import { LeaveStatusCard } from "@/components/leave/leave-status-card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createClient } from "@/lib/supabase/server"
 import { Clock, History } from "lucide-react"
@@ -45,10 +46,10 @@ export default async function AttendancePage() {
       }
     : null
 
-  // Fetch user profile to get assigned location
+  // Fetch user profile with leave status
   const { data: userProfile } = await supabase
     .from("user_profiles")
-    .select("assigned_location_id")
+    .select("assigned_location_id, leave_status, leave_start_date, leave_end_date, leave_reason, first_name, last_name")
     .eq("id", user.id)
     .single()
 
@@ -78,6 +79,17 @@ export default async function AttendancePage() {
           </div>
         </div>
 
+        {/* Leave Status Card - Shows if user is on leave */}
+        {userProfile?.leave_status && (
+          <LeaveStatusCard
+            leaveStatus={userProfile.leave_status as "active" | "pending" | "rejected" | null}
+            leaveStartDate={userProfile.leave_start_date}
+            leaveEndDate={userProfile.leave_end_date}
+            leaveReason={userProfile.leave_reason}
+            onRequestLeave={() => {}} // This will be handled in the client component
+          />
+        )}
+
         <Tabs defaultValue="today" className="space-y-8">
           <TabsList className="grid w-full grid-cols-2 h-12 p-1 bg-muted/50 rounded-xl">
             <TabsTrigger
@@ -98,7 +110,7 @@ export default async function AttendancePage() {
 
           <TabsContent value="today" className="space-y-6 mt-8">
             <LocationPreviewCard assignedLocation={assignedLocation} locations={locations || []} />
-            <AttendanceRecorder todayAttendance={enhancedAttendance} />
+            <AttendanceRecorder todayAttendance={enhancedAttendance} userLeaveStatus={userProfile?.leave_status} />
           </TabsContent>
 
           <TabsContent value="history" className="space-y-6 mt-8">

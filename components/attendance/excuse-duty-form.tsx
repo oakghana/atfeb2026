@@ -171,8 +171,6 @@ export function ExcuseDutyForm({ onSuccess, onSubmitSuccess }: ExcuseDutyFormPro
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="medical">Medical Certificate</SelectItem>
-                  <SelectItem value="emergency">Emergency Leave</SelectItem>
-                  <SelectItem value="personal">Personal Leave</SelectItem>
                   <SelectItem value="official">Official Business</SelectItem>
                 </SelectContent>
               </Select>

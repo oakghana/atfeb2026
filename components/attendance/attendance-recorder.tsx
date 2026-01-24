@@ -88,10 +88,11 @@ interface AttendanceRecorderProps {
     different_checkout_location?: boolean
   } | null
   geoSettings?: GeoSettings
-  locations: GeofenceLocation[]
+  locations?: GeofenceLocation[]
   canCheckIn?: boolean
   canCheckOut?: boolean
-  className?: string // Added className prop
+  className?: string
+  userLeaveStatus?: "active" | "pending" | "rejected" | null
 }
 
 // Placeholder for WindowsCapabilities, assuming it's defined elsewhere or inferred
@@ -118,10 +119,11 @@ function getOrdinalSuffix(num: number): string {
 export function AttendanceRecorder({
   todayAttendance: initialTodayAttendance,
   geoSettings,
-  locations: propLocations, // Renamed to avoid conflict with realTimeLocations
+  locations: propLocations,
   canCheckIn: initialCanCheckIn,
   canCheckOut: initialCanCheckOut,
-  className, // Added className prop
+  className,
+  userLeaveStatus,
 }: AttendanceRecorderProps) {
   const [isCheckingIn, setIsCheckingIn] = useState(false)
   const [checkingMessage, setCheckingMessage] = useState("")
@@ -294,8 +296,8 @@ export function AttendanceRecorder({
 
 
   // Removed leave status logic
-  // const isOnLeave = leaveStatus !== "active"
-  const isOnLeave = false // Placeholder: Assume not on leave if leave status is removed
+  // SMART LEAVE HANDLING: Disable check-in/check-out when user is on active leave
+  const isOnLeave = userLeaveStatus === "active"
   
   // Default canCheckIn to true if not explicitly set, allowing staff to check in any time after midnight
   // MUST also verify user is within proximity range (matches checkout validation logic)
