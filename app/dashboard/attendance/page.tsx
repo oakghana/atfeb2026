@@ -3,6 +3,7 @@ import { AttendanceRecorder } from "@/components/attendance/attendance-recorder"
 import { PersonalAttendanceHistory } from "@/components/attendance/personal-attendance-history"
 import { LocationPreviewCard } from "@/components/attendance/location-preview-card"
 import { LeaveStatusCard } from "@/components/leave/leave-status-card"
+import { StaffStatusBadge } from "@/components/attendance/staff-status-badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createClient } from "@/lib/supabase/server"
 import { Clock, History } from "lucide-react"
@@ -62,20 +63,31 @@ export default async function AttendancePage() {
 
   const assignedLocation = locations?.find((loc) => loc.id === userProfile?.assigned_location_id) || null
 
+  // Determine if staff is currently on leave
+  const isOnLeave = userProfile?.leave_status === "active"
+  const isCheckedIn = !!enhancedAttendance && !enhancedAttendance.check_out_time
+
   return (
     <DashboardLayout>
       <div className="space-y-8">
         <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Clock className="h-6 w-6 text-primary" />
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Clock className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-heading font-bold text-foreground tracking-tight">Attendance</h1>
+                <p className="text-lg text-muted-foreground font-medium mt-1">
+                  Record your daily attendance and view your history at QCC locations
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-4xl font-heading font-bold text-foreground tracking-tight">Attendance</h1>
-              <p className="text-lg text-muted-foreground font-medium mt-1">
-                Record your daily attendance and view your history at QCC locations
-              </p>
-            </div>
+            <StaffStatusBadge
+              isCheckedIn={isCheckedIn}
+              isOnLeave={isOnLeave}
+              leaveStatus={userProfile?.leave_status as "active" | "pending" | "approved" | "rejected" | null}
+            />
           </div>
         </div>
 
