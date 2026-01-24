@@ -42,6 +42,7 @@ import { Label } from "@/components/ui/label"
 import { clearAttendanceCache, shouldClearCache, setCachedDate } from "@/lib/utils/attendance-cache"
 import { cn } from "@/lib/utils" // Import cn
 import { DeviceActivityHistory } from "@/components/attendance/device-activity-history"
+import { ActiveSessionTimer } from "@/components/attendance/active-session-timer"
 
 interface GeofenceLocation {
   id: string
@@ -1720,6 +1721,19 @@ export function AttendanceRecorder({
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Active Session Timer - Show when checked in but not checked out */}
+            {localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time && (
+              <ActiveSessionTimer
+                checkInTime={localTodayAttendance.check_in_time}
+                checkInLocation={
+                  realTimeLocations?.find((loc) => loc.id === localTodayAttendance.check_in_location_id)?.name ||
+                  "Unknown Location"
+                }
+                checkOutLocation={assignedLocationInfo?.name}
+                minimumWorkMinutes={120}
+              />
+            )}
+
             {/* Check-in/Check-out Buttons */}
             <div className="space-y-4">
               {!localTodayAttendance?.check_in_time && (
