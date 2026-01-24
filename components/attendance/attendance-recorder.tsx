@@ -16,6 +16,7 @@ import {
 import { getDeviceInfo } from "@/lib/device-info"
 import type { QRCodeData } from "@/lib/qr-code"
 import { useRealTimeLocations } from "@/hooks/use-real-time-locations"
+import { useDeviceRadiusSettings } from "@/hooks/use-device-radius-settings"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "@/hooks/use-toast"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -135,6 +136,7 @@ export function AttendanceRecorder({
     error: locationsError,
     isConnected,
   } = useRealTimeLocations()
+  const { settings: deviceRadiusSettings, loading: deviceRadiusLoading } = useDeviceRadiusSettings()
   const [proximitySettings, setProximitySettings] = useState<ProximitySettings>({
     checkInProximityRange: 50,
     defaultRadius: 20,
@@ -830,10 +832,10 @@ export function AttendanceRecorder({
           }))
           .sort((a, b) => a.distance - b.distance)
 
-        // Use device-specific proximity radius: 100m for mobile/tablet, 700m for laptop, 2000m for desktop PC
-        let deviceProximityRadius = 100
+        // Use device-specific proximity radius: 400m for mobile/tablet, 700m for laptop, 2000m for desktop PC
+        let deviceProximityRadius = 400
         if (deviceInfo.isMobile || deviceInfo.isTablet) {
-          deviceProximityRadius = 100
+          deviceProximityRadius = 400
         } else if (deviceInfo.isLaptop) {
           deviceProximityRadius = 700
         } else {

@@ -478,6 +478,7 @@ export function validateAttendanceLocation(
   userLocation: LocationData,
   qccLocations: GeofenceLocation[],
   proximitySettings?: ProximitySettings,
+  deviceRadiusCheckIn?: number, // From database settings
 ): {
   canCheckIn: boolean
   nearestLocation?: GeofenceLocation
@@ -489,14 +490,17 @@ export function validateAttendanceLocation(
   availableLocations?: Array<{ location: GeofenceLocation; distance: number }>
 } {
   const deviceInfo = detectDevice()
-  // Proximity distances: 100m for mobile/tablet, 700m for laptop, 2000m for desktop PC
-  let internalProximityDistance = 100
-  if (deviceInfo.isMobile || deviceInfo.isTablet) {
-    internalProximityDistance = 100
-  } else if (deviceInfo.isLaptop) {
-    internalProximityDistance = 700
-  } else {
-    internalProximityDistance = 2000 // Desktop PC
+  // Use database-configured device radius if provided, otherwise use defaults
+  // Default: mobile/tablet 400m, laptop 700m, desktop 2000m
+  let deviceProximityBase = deviceRadiusCheckIn
+  if (!deviceProximityBase) {
+    if (deviceInfo.isMobile || deviceInfo.isTablet) {
+      deviceProximityBase = 400
+    } else if (deviceInfo.isLaptop) {
+      deviceProximityBase = 700
+    } else {
+      deviceProximityBase = 2000 // Desktop PC
+    }
   }
   const displayDistance = 50 // What we show to users in UI messages (trade secret)
 
@@ -507,7 +511,7 @@ export function validateAttendanceLocation(
     isTablet: deviceInfo.isTablet,
     isLaptop: deviceInfo.isLaptop,
     isDesktop: deviceInfo.isDesktop,
-    proximityRadius: internalProximityDistance,
+    deviceProximityBase: deviceProximityBase,
     userAgent: deviceInfo.browser_info
   })
 
@@ -520,21 +524,29 @@ export function validateAttendanceLocation(
     }
   }
 
+  // Calculate distances using device-specific radius (overrides location radius)
   const allLocationsWithDistance = qccLocations
-    .map((location) => ({
-      location,
-      distance: Math.round(
+    .map((location) => {
+      const distance = Math.round(
         calculateDistance(userLocation.latitude, userLocation.longitude, location.latitude, location.longitude),
-      ),
-    }))
+      )
+      // Use device-specific radius (location radius is ignored)
+      const withinRange = distance <= deviceProximityBase
+      return {
+        location,
+        distance,
+        effectiveRadius: deviceProximityBase,
+        withinRange
+      }
+    })
     .sort((a, b) => a.distance - b.distance)
 
-  const availableLocations = allLocationsWithDistance.filter(({ distance }) => distance <= internalProximityDistance)
+  const availableLocations = allLocationsWithDistance.filter(({ withinRange }) => withinRange)
 
   console.log("[v0] Check-in validation - Locations:", {
     nearestLocation: allLocationsWithDistance[0]?.location.name,
     nearestDistance: allLocationsWithDistance[0]?.distance,
-    proximityRadius: internalProximityDistance,
+    proximityRadius: deviceProximityBase, // Changed from internalProximityDistance to deviceProximityBase
     availableLocationsCount: availableLocations.length,
     allLocations: allLocationsWithDistance.map(l => `${l.location.name}: ${l.distance}m`)
   })
@@ -544,13 +556,10 @@ export function validateAttendanceLocation(
   let message: string
 
   if (canCheckIn) {
-    if (availableLocations.length === 1) {
-      message = `You can check in at ${availableLocations[0].location.name}`
-    } else {
-      message = `You can check in at ${availableLocations.length} locations`
-    }
+    message = `You can check in at ${nearest.location.name}`
   } else {
-    message = `You must be within ${displayDistance} meters of a QCC location to check in`
+    const nearestDistanceKm = (nearest.distance / 1000).toFixed(1)
+    message = `You are too far from ${nearest.location.name}. You must be within ${displayDistance} meters of a QCC location to check in.`
   }
 
   let accuracyWarning: string | undefined
@@ -607,7 +616,7 @@ RECOMMENDED: Use QR code or switch to Chrome/Edge for better accuracy.`
 export function validateCheckoutLocation(
   userLocation: LocationData,
   qccLocations: GeofenceLocation[],
-  proximitySettings?: ProximitySettings,
+  deviceRadiusCheckOut?: number, // From database settings
 ): {
   canCheckOut: boolean
   nearestLocation?: GeofenceLocation
@@ -616,14 +625,17 @@ export function validateCheckoutLocation(
   accuracyWarning?: string
 } {
   const deviceInfo = detectDevice()
-  // Actual validation: 200m for mobile/tablet, 700m for laptop, 1000m for desktop PC
-  let internalProximityDistance = 200
-  if (deviceInfo.isMobile || deviceInfo.isTablet) {
-    internalProximityDistance = 200
-  } else if (deviceInfo.isLaptop) {
-    internalProximityDistance = 700
-  } else {
-    internalProximityDistance = 1000 // Desktop PC
+  // Use database-configured device radius if provided, otherwise use defaults
+  // Default: mobile/tablet 400m, laptop 700m, desktop 1000m
+  let deviceProximityBase = deviceRadiusCheckOut
+  if (!deviceProximityBase) {
+    if (deviceInfo.isMobile || deviceInfo.isTablet) {
+      deviceProximityBase = 400
+    } else if (deviceInfo.isLaptop) {
+      deviceProximityBase = 700
+    } else {
+      deviceProximityBase = 1000 // Desktop PC
+    }
   }
   const displayDistance = 100 // Always show 100m to users (trade secret)
 
@@ -636,10 +648,22 @@ export function validateCheckoutLocation(
     }
   }
 
+  // Use device-specific radius (location radius is ignored)
+  const baseProximity = deviceProximityBase
+
   // More lenient validation: if accuracy is poor but distance is reasonable, still allow
   const effectiveProximity = userLocation.accuracy > 1000 
-    ? internalProximityDistance + userLocation.accuracy * 0.5 // Add 50% of accuracy as buffer
-    : internalProximityDistance
+    ? baseProximity + userLocation.accuracy * 0.5 // Add 50% of accuracy as buffer
+    : baseProximity
+
+  console.log("[v0] Check-out validation:", {
+    location: nearest.location.name,
+    distance: nearest.distance,
+    deviceProximityBase,
+    baseProximity,
+    effectiveProximity,
+    userAccuracy: userLocation.accuracy,
+  })
 
   const canCheckOut = nearest.distance <= effectiveProximity
 
