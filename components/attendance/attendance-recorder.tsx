@@ -1101,68 +1101,43 @@ export function AttendanceRecorder({
         requireEarlyCheckoutReason,
       })
 
-      // If checkout time is NOT reached, show modal for early checkout reason
-      if (isBeforeCheckoutTime && requireEarlyCheckoutReason && !earlyCheckoutReason) {
-        // OPTIMIZATION: Calculate location info ONCE, reuse for modal
-        const effectiveCheckOutRadius = checkOutRadius ?? proximitySettings.checkInProximityRange
+      // Find nearest location first (reuse for both paths)
+      const effectiveCheckOutRadius = checkOutRadius ?? proximitySettings.checkInProximityRange
+      let nearestLocation = null
+      if (realTimeLocations && realTimeLocations.length > 0) {
+        if (userProfile?.assigned_location_id && assignedLocationInfo?.isAtAssignedLocation) {
+          nearestLocation = realTimeLocations.find((loc) => loc.id === userProfile.assigned_location_id)
+        } else {
+          const locationDistances = realTimeLocations
+            .map((loc) => {
+              const distance = calculateDistance(
+                locationData.latitude,
+                locationData.longitude,
+                loc.latitude,
+                loc.longitude,
+              )
+              return { location: loc, distance: Math.round(distance) }
+            })
+            .sort((a, b) => a.distance - b.distance)
+            .filter(({ distance }) => distance <= effectiveCheckOutRadius)
 
-        let nearestLocation = null
-        if (realTimeLocations && realTimeLocations.length > 0) {
-          if (userProfile?.assigned_location_id && assignedLocationInfo?.isAtAssignedLocation) {
-            nearestLocation = realTimeLocations.find((loc) => loc.id === userProfile.assigned_location_id)
-          } else {
-            const locationDistances = realTimeLocations
-              .map((loc) => {
-                const distance = calculateDistance(
-                  locationData.latitude,
-                  locationData.longitude,
-                  loc.latitude,
-                  loc.longitude,
-                )
-                return { location: loc, distance: Math.round(distance) }
-              })
-              .sort((a, b) => a.distance - b.distance)
-              .filter(({ distance }) => distance <= effectiveCheckOutRadius)
-
-            nearestLocation = locationDistances[0]?.location
-          }
+          nearestLocation = locationDistances[0]?.location
         }
+      }
 
-        // Store pending checkout data and show dialog - THEN release loading
-        setPendingCheckoutData({ location: locationData, nearestLocation })
-        setShowEarlyCheckoutDialog(true)
-        setIsLoading(false)
+      // SMART LOGIC: If checkout time PASSED, skip modal and checkout immediately
+      // This is the "one-tap" optimization - no unnecessary modal delays
+      if (!isBeforeCheckoutTime || !requireEarlyCheckoutReason) {
+        console.log("[v0] SMART CHECKOUT: Checkout time passed or no reason needed - immediate checkout")
+        await performCheckoutAPI(locationData, nearestLocation, "")
         return
       }
 
-      // CHECKOUT TIME HAS PASSED or no early checkout reason needed
-      // Proceed with immediate checkout without delays
-      console.log("[v0] Checkout time passed or no reason needed - proceeding with immediate checkout")
-      
-      // Find nearest location for checkout location name
-      let nearestLocation = null
-      if (userProfile?.assigned_location_id && assignedLocationInfo?.isAtAssignedLocation) {
-        nearestLocation = realTimeLocations?.find((loc) => loc.id === userProfile.assigned_location_id)
-      } else {
-        const effectiveCheckOutRadius = checkOutRadius ?? proximitySettings.checkInProximityRange
-        const locationDistances = (realTimeLocations || [])
-          .map((loc) => {
-            const distance = calculateDistance(
-              locationData.latitude,
-              locationData.longitude,
-              loc.latitude,
-              loc.longitude,
-            )
-            return { location: loc, distance: Math.round(distance) }
-          })
-          .sort((a, b) => a.distance - b.distance)
-          .filter(({ distance }) => distance <= effectiveCheckOutRadius)
-
-        nearestLocation = locationDistances[0]?.location
-      }
-
-      // Immediately proceed with checkout API call
-      await performCheckoutAPI(locationData, nearestLocation, earlyCheckoutReason)
+      // If checkout time is NOT reached and reason required, show modal
+      // Store pending checkout data and show dialog - THEN release loading
+      setPendingCheckoutData({ location: locationData, nearestLocation })
+      setShowEarlyCheckoutDialog(true)
+      setIsLoading(false)
     } catch (error) {
       setIsLoading(false)
       setFlashMessage({

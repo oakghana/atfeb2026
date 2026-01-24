@@ -9,7 +9,9 @@ export default async function HomePage() {
   } = await supabase.auth.getUser()
 
   if (user) {
-    redirect("/dashboard")
+    // OPTIMIZATION: Direct staff to Attendance page for faster check-in/check-out
+    // Reduces friction and improves adoption
+    redirect("/dashboard/attendance")
   } else {
     redirect("/auth/login")
   }

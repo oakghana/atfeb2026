@@ -289,7 +289,6 @@ export async function POST(request: NextRequest) {
           work_hours: Math.round(workHours * 100) / 100,
           check_out_method: "auto_system",
           check_out_location_name: "Auto Check-out (Missed)",
-          missed_checkout: true,
           updated_at: new Date().toISOString(),
         })
         .eq("id", yesterdayRecord.id)
