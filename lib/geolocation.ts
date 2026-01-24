@@ -502,7 +502,7 @@ export function validateAttendanceLocation(
       deviceProximityBase = 2000 // Desktop PC
     }
   }
-  const displayDistance = 50 // What we show to users in UI messages (trade secret)
+  const displayDistance = 100 // What we show to users in UI messages (standard requirement)
 
   console.log("[v0] Check-in validation - Device Detection:", {
     deviceType: deviceInfo.device_type,
@@ -637,7 +637,8 @@ export function validateCheckoutLocation(
       deviceProximityBase = 1000 // Desktop PC
     }
   }
-  const displayDistance = 100 // Always show 100m to users (trade secret)
+  const displayDistance = 100 // What we show to users in UI messages (standard requirement, regardless of device)
+
 
   const nearest = findNearestLocation(userLocation, qccLocations)
 

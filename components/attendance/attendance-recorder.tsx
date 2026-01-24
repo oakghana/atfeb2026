@@ -674,7 +674,7 @@ export function AttendanceRecorder({
       console.log("[v0] Can check out:", checkoutValidation.canCheckOut)
       console.log("[v0] Distance:", validation.distance)
       console.log("[v0] Nearest location being checked:", validation.nearestLocation?.name)
-      console.log("[v0] Using proximity range:", proximitySettings.checkInProximityRange)
+      console.log("[v0] Using checkout proximity range:", checkOutRadius)
 
       const criticalAccuracyIssue =
         userLocation.accuracy > 1000 || (windowsCapabilities?.isWindows && userLocation.accuracy > 100)
@@ -1074,33 +1074,49 @@ export function AttendanceRecorder({
           return
         }
 
-        const checkoutValidation = validateCheckoutLocation(locationData, realTimeLocations || [], proximitySettings)
+      // Get device-specific checkout radius
+      let checkOutRadius: number | undefined
+      if (deviceRadiusSettings) {
+        if (deviceInfo.device_type === "mobile") {
+          checkOutRadius = deviceRadiusSettings.mobile.checkOut
+        } else if (deviceInfo.device_type === "tablet") {
+          checkOutRadius = deviceRadiusSettings.tablet.checkOut
+        } else if (deviceInfo.device_type === "laptop") {
+          checkOutRadius = deviceRadiusSettings.laptop.checkOut
+        } else if (deviceInfo.device_type === "desktop") {
+          checkOutRadius = deviceRadiusSettings.desktop.checkOut
+        }
+      }
+      // Fallback to proximity settings if device radius not available
+      const effectiveCheckOutRadius = checkOutRadius ?? proximitySettings.checkInProximityRange
+
+      const checkoutValidation = validateCheckoutLocation(locationData, realTimeLocations || [], checkOutRadius)
 
         if (!checkoutValidation.canCheckOut) {
           throw new Error(checkoutValidation.message)
         }
 
-        let nearestLocation = null
-        if (realTimeLocations && realTimeLocations.length > 0) {
-          if (userProfile?.assigned_location_id && assignedLocationInfo?.isAtAssignedLocation) {
-            nearestLocation = realTimeLocations.find((loc) => loc.id === userProfile.assigned_location_id)
-          } else {
-            const locationDistances = realTimeLocations
-              .map((loc) => {
-                const distance = calculateDistance(
-                  locationData.latitude,
-                  locationData.longitude,
-                  loc.latitude,
-                  loc.longitude,
-                )
-                return { location: loc, distance: Math.round(distance) }
-              })
-              .sort((a, b) => a.distance - b.distance)
-              .filter(({ distance }) => distance <= proximitySettings.checkInProximityRange)
+      let nearestLocation = null
+      if (realTimeLocations && realTimeLocations.length > 0) {
+        if (userProfile?.assigned_location_id && assignedLocationInfo?.isAtAssignedLocation) {
+          nearestLocation = realTimeLocations.find((loc) => loc.id === userProfile.assigned_location_id)
+        } else {
+          const locationDistances = realTimeLocations
+            .map((loc) => {
+              const distance = calculateDistance(
+                locationData.latitude,
+                locationData.longitude,
+                loc.latitude,
+                loc.longitude,
+              )
+              return { location: loc, distance: Math.round(distance) }
+            })
+            .sort((a, b) => a.distance - b.distance)
+            .filter(({ distance }) => distance <= effectiveCheckOutRadius)
 
-            nearestLocation = locationDistances[0]?.location
-          }
+          nearestLocation = locationDistances[0]?.location
         }
+      }
 
         // Store pending checkout data and show dialog
         setPendingCheckoutData({ location: locationData, nearestLocation })
@@ -1262,8 +1278,16 @@ export function AttendanceRecorder({
 
       if (result.success) {
         if (result.earlyCheckoutWarning) {
+          // Format the checkout end time dynamically based on assigned location
+          const assignedLoc = realTimeLocations?.find(loc => loc.id === userProfile?.assigned_location_id)
+          const checkOutTime = assignedLoc?.check_out_end_time || "17:00"
+          const [hours, minutes] = checkOutTime.split(":").map(Number)
+          const period = hours >= 12 ? "PM" : "AM"
+          const displayHours = hours % 12 || 12
+          const formattedTime = `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`
+          
           setError(
-            `⚠️ EARLY CHECKOUT WARNING: ${result.earlyCheckoutWarning.message}\n\nYou are checking out before the standard 5:00 PM end time. This will be recorded and visible to your department head.`,
+            `⚠️ EARLY CHECKOUT WARNING: ${result.earlyCheckoutWarning.message}\n\nYou are checking out before the standard ${formattedTime} end time for ${assignedLoc?.name}. This will be recorded and visible to your department head.`,
           )
           setTimeout(() => {
             setError(null)
