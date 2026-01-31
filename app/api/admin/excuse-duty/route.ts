@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })
     }
 
-    // Check if user has admin or department_head role
-    if (!["admin", "department_head"].includes(profile.role)) {
+    // Check if user has admin, regional_manager, or department_head role
+    if (!["admin", "regional_manager", "department_head"].includes(profile.role)) {
       console.log("[v0] HOD Excuse duty API - Insufficient permissions")
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
     }
@@ -151,7 +151,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })
     }
 
-    if (!["admin", "department_head"].includes(profile.role)) {
+    if (!["admin", "regional_manager", "department_head"].includes(profile.role)) {
       console.log("[v0] HOD Excuse duty API - Insufficient permissions")
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
     }

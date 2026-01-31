@@ -27,8 +27,8 @@ export default async function ExcuseDutyReviewPage() {
     redirect("/dashboard")
   }
 
-  // Check if user has admin or department_head role
-  if (!["admin", "department_head"].includes(profile.role)) {
+  // Check if user has admin, regional_manager, or department_head role
+  if (!["admin", "regional_manager", "department_head"].includes(profile.role)) {
     redirect("/dashboard")
   }
 
