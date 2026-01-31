@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
 import { clearAppCache } from "@/lib/cache-manager"
 import {
   Home,
@@ -208,6 +207,13 @@ const navigationItems = [
     category: "admin",
   },
   {
+    title: "Diagnostics",
+    href: "/dashboard/diagnostics",
+    icon: Settings,
+    roles: ["admin"],
+    category: "admin",
+  },
+  {
     title: "Settings",
     href: "/dashboard/settings",
     icon: Settings,
@@ -343,13 +349,15 @@ export function Sidebar({ user, profile }: SidebarProps) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
                     className={cn(
                       "group flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px]",
                       isActive
                         ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/25 scale-[1.02]"
                         : "text-sidebar-foreground hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 hover:text-foreground hover:shadow-md hover:scale-[1.01]",
                     )}
+                    onClick={() => {
+                      setIsMobileMenuOpen(false)
+                    }}
                   >
                     <Icon
                       className={cn(
@@ -408,8 +416,8 @@ export function Sidebar({ user, profile }: SidebarProps) {
                             <DropdownMenuItem asChild key={subItem.href}>
                               <Link
                                 href={subItem.href}
-                                onClick={() => setIsMobileMenuOpen(false)}
                                 className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-muted/50 rounded-lg transition-all duration-200 touch-manipulation min-h-[44px]"
+                                onClick={() => setIsMobileMenuOpen(false)}
                               >
                                 <span className="font-medium">{subItem.title}</span>
                               </Link>
@@ -460,13 +468,15 @@ export function Sidebar({ user, profile }: SidebarProps) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
                     className={cn(
                       "group flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px]",
                       isActive
                         ? "bg-gradient-to-r from-accent to-accent/90 text-accent-foreground shadow-lg shadow-accent/25 scale-[1.02]"
                         : "text-sidebar-foreground hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 hover:text-foreground hover:shadow-md hover:scale-[1.01]",
                     )}
+                    onClick={() => {
+                      setIsMobileMenuOpen(false)
+                    }}
                   >
                     <Icon
                       className={cn(
