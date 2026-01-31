@@ -2,6 +2,9 @@ import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 import { getDeviceInfo } from "@/lib/device-info"
 
+export const dynamic = "force-dynamic"
+export const maxDuration = 30
+
 export async function POST(request: NextRequest) {
   const startTime = performance.now()
 
@@ -90,12 +93,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: "1mb",
-    },
-  },
 }
