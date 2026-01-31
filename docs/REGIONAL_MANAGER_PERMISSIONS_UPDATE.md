@@ -7,6 +7,7 @@ Regional managers now have **restricted access** to specific administrative feat
 1. **Defaulters** (Compliance Monitoring)
 2. **Device Monitoring** (Device Security) 
 3. **Staff Management**
+4. **Audit Logs**
 
 ---
 
@@ -23,13 +24,13 @@ Regional managers now have **restricted access** to specific administrative feat
 - Warnings Archive
 - Department Summaries
 - Schedule
-- Audit Logs
 - Help & Settings
 
 ### ✗ Cannot Access
 - Defaulters (Compliance Monitoring) - Only admin and department heads
 - Device Monitoring (Device Security) - Admin only
 - Staff Management - Admin and IT-admin only
+- Audit Logs - Admin only
 - Locations Management - Admin only
 - Staff Activation - Admin only
 - Data Management - Admin only

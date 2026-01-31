@@ -47,11 +47,35 @@ export function LeaveNotificationsClient({ userRole }: LeaveNotificationsClientP
 
   const fetchNotifications = async () => {
     try {
+      console.log("Fetching notifications...")
+
       const {
         data: { user },
+        error: userError
       } = await supabase.auth.getUser()
 
-      if (!user) return
+      if (userError) {
+        console.error("Auth error:", userError)
+        throw new Error(`Authentication error: ${userError.message}`)
+      }
+
+      if (!user) {
+        console.log("No authenticated user found")
+        return
+      }
+
+      // First try a simple query to check if table access works
+      const { data: simpleData, error: simpleError } = await supabase
+        .from("leave_notifications")
+        .select("id, created_at")
+        .limit(1)
+
+      if (simpleError) {
+        console.error("Simple query error:", simpleError)
+        throw new Error(`Database access error: ${simpleError.message}`)
+      }
+
+      console.log("Simple query successful, found", simpleData?.length || 0, "notifications")
 
       const { data, error } = await supabase
         .from("leave_notifications")
@@ -77,11 +101,21 @@ export function LeaveNotificationsClient({ userRole }: LeaveNotificationsClientP
         `)
         .order("created_at", { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error("Database query error:", error)
+        throw error
+      }
 
+      console.log("Fetched notifications:", data?.length || 0, "items")
       setNotifications(data || [])
     } catch (error) {
       console.error("Error fetching notifications:", error)
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        error
+      })
+      // Don't re-throw the error, just log it and continue
     } finally {
       setLoading(false)
     }

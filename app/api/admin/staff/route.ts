@@ -238,6 +238,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if ((role === "admin" || role === "regional_manager") && profile.role !== "admin") {
+      console.error("[v0] Staff API - Non-admin tried to create admin or regional_manager user")
+      return createJsonResponse(
+        {
+          success: false,
+          error: "Only administrators can create Admin or Regional Manager accounts",
+          details: "You can only create: Staff, Department Head, IT-Admin, NSP, Intern, or Contract users",
+        },
+        403,
+      )
+    }
+
     const { data: existingAuthUser } = await adminSupabase.auth.admin.listUsers()
     const userExists = existingAuthUser.users.find((u) => u.email === email)
 

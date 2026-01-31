@@ -83,6 +83,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
 
+    if (role && (role === "admin" || role === "regional_manager") && profile.role !== "admin") {
+      console.error("[v0] Staff API PUT - Non-admin tried to assign admin or regional_manager role")
+      return NextResponse.json(
+        {
+          error: "Only administrators can assign Admin or Regional Manager roles",
+        },
+        { status: 403 },
+      )
+    }
+
     let locationId = null
     if (assigned_location_id && assigned_location_id !== "none") {
       // Verify location exists

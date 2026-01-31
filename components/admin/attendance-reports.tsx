@@ -39,6 +39,8 @@ import {
   Loader2,
   Search,
   Eye,
+  User,
+  AlertCircle,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -503,51 +505,66 @@ export function AttendanceReports() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Enhanced Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Advanced Attendance Analytics & Export
-          </CardTitle>
-          <CardDescription>
-            Comprehensive attendance reports with location and district filtering, plus Excel/PDF export
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {exportError && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>{exportError}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="grid gap-4 md:grid-cols-7">
+    <div className="space-y-8">
+      {/* Advanced Filters - Modern Design */}
+      <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-700 p-8 text-white">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm">
+              <BarChart3 className="h-8 w-8" />
+            </div>
             <div>
-              <Label htmlFor="startDate">Start Date</Label>
+              <h2 className="text-2xl font-bold">Advanced Analytics Dashboard</h2>
+              <p className="text-blue-100">Comprehensive attendance reports with intelligent filtering</p>
+            </div>
+          </div>
+
+          {exportError && (
+            <div className="bg-red-500/20 backdrop-blur-sm border border-red-400/30 rounded-xl p-4 mt-4">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="h-5 w-5 text-red-300" />
+                <p className="text-red-200 font-medium">{exportError}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-8">
+          {/* Primary Filters */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4 text-blue-600" />
+                Start Date
+              </label>
               <input
-                id="startDate"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white"
               />
             </div>
-            <div>
-              <Label htmlFor="endDate">End Date</Label>
+
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4 text-blue-600" />
+                End Date
+              </label>
               <input
-                id="endDate"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white"
               />
             </div>
-            <div>
-              <Label htmlFor="location">Location</Label>
+
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-green-600" />
+                Location
+              </label>
               <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white">
                   <SelectValue placeholder="All Locations" />
                 </SelectTrigger>
                 <SelectContent>
@@ -560,26 +577,14 @@ export function AttendanceReports() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="district">District</Label>
-              <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Districts" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Districts</SelectItem>
-                  {districts.map((district) => (
-                    <SelectItem key={district.id} value={district.id}>
-                      {district.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="department">Department</Label>
+
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Users className="h-4 w-4 text-purple-600" />
+                Department
+              </label>
               <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white">
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>
@@ -592,10 +597,17 @@ export function AttendanceReports() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="user">Employee</Label>
+          </div>
+
+          {/* Secondary Filters */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <User className="h-4 w-4 text-indigo-600" />
+                Employee
+              </label>
               <Select value={selectedUser} onValueChange={setSelectedUser}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white">
                   <SelectValue placeholder="All Employees" />
                 </SelectTrigger>
                 <SelectContent>
@@ -608,32 +620,14 @@ export function AttendanceReports() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col gap-2">
-              <Label>Actions</Label>
-              <div className="flex gap-1">
-                <Button onClick={fetchReport} size="sm" className="flex-1" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="mr-1 h-3 w-3" />
-                      Generate
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
 
-          {/* Advanced Filters Row */}
-          <div className="grid gap-4 md:grid-cols-6 pt-4 border-t">
-            <div>
-              <Label htmlFor="status">Status</Label>
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+                Status
+              </label>
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white">
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -646,513 +640,654 @@ export function AttendanceReports() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="locationStatus">Location Status</Label>
-              <Select value={selectedLocationStatus} onValueChange={setSelectedLocationStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Location Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Location Statuses</SelectItem>
-                  <SelectItem value="onsite">On-site</SelectItem>
-                  <SelectItem value="remote">Remote Work</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="minHours">Min Hours</Label>
-              <input
-                id="minHours"
-                type="number"
-                step="0.5"
-                min="0"
-                value={minHours}
-                onChange={(e) => setMinHours(e.target.value)}
-                placeholder="0"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <Label htmlFor="maxHours">Max Hours</Label>
-              <input
-                id="maxHours"
-                type="number"
-                step="0.5"
-                min="0"
-                value={maxHours}
-                onChange={(e) => setMaxHours(e.target.value)}
-                placeholder="24"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <Label htmlFor="search">Search</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Clock className="h-4 w-4 text-teal-600" />
+                Hours Range
+              </label>
+              <div className="flex gap-2">
                 <input
-                  id="search"
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={minHours}
+                  onChange={(e) => setMinHours(e.target.value)}
+                  placeholder="Min"
+                  className="flex-1 px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white text-sm"
+                />
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={maxHours}
+                  onChange={(e) => setMaxHours(e.target.value)}
+                  placeholder="Max"
+                  className="flex-1 px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Search className="h-4 w-4 text-pink-600" />
+                Search
+              </label>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by name, ID, department..."
-                  className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white"
                 />
               </div>
             </div>
           </div>
 
-          <div className="mt-4 pt-4 border-t">
-            <Label>Quick Date Selection</Label>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Button size="sm" variant="outline" onClick={() => setQuickDate("today")}>
-                Today
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setQuickDate("week")}>
-                This Week
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setQuickDate("month")}>
-                This Month
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setQuickDate("quarter")}>
-                This Quarter
-              </Button>
+          {!loading && records.length === 0 && (
+            <div className="text-center py-12">
+              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FileText className="h-12 w-12 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Data Found</h3>
+              <p className="text-gray-500">Try adjusting your filters or date range to see attendance records.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {summary && (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+          {/* Total Records Card - Primary */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="absolute top-4 right-4">
+              <Badge className="bg-white/20 text-white border-white/30 backdrop-blur-sm">
+                <FileText className="w-3 h-3 mr-1" />
+                Primary
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-white/20 rounded-xl">
+                <FileText className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-white/80 text-sm font-medium">Total Records</p>
+              <p className="text-3xl font-bold">{summary.totalRecords.toLocaleString()}</p>
+              <p className="text-white/60 text-xs">Attendance entries</p>
             </div>
           </div>
 
-          <div className="flex gap-2 mt-4 pt-4 border-t">
+          {/* Present Count Card */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="absolute top-4 right-4">
+              <Badge className="bg-white/20 text-white border-white/30 backdrop-blur-sm">
+                <CheckCircle className="w-3 h-3 mr-1" />
+                On Time
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-white/20 rounded-xl">
+                <CheckCircle className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-white/80 text-sm font-medium">Present</p>
+              <p className="text-3xl font-bold">{presentCount.toLocaleString()}</p>
+              <p className="text-white/60 text-xs">On time arrivals</p>
+            </div>
+          </div>
+
+          {/* Late Arrivals Card */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="absolute top-4 right-4">
+              <Badge className="bg-white/20 text-white border-white/30 backdrop-blur-sm">
+                <AlertTriangle className="w-3 h-3 mr-1" />
+                Attention
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-white/20 rounded-xl">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-white/80 text-sm font-medium">Late</p>
+              <p className="text-3xl font-bold">{summary.statusCounts.late || 0}</p>
+              <p className="text-white/60 text-xs">Late arrivals</p>
+            </div>
+          </div>
+
+          {/* Total Hours Card */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-purple-600 to-purple-700 rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="absolute top-4 right-4">
+              <Badge className="bg-white/20 text-white border-white/30 backdrop-blur-sm">
+                <Clock className="w-3 h-3 mr-1" />
+                Productivity
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-white/20 rounded-xl">
+                <Clock className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-white/80 text-sm font-medium">Total Hours</p>
+              <p className="text-3xl font-bold">{Math.round(summary.totalWorkHours).toLocaleString()}</p>
+              <p className="text-white/60 text-xs">Work hours logged</p>
+            </div>
+          </div>
+
+          {/* Departments Card */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="absolute top-4 right-4">
+              <Badge className="bg-white/20 text-white border-white/30 backdrop-blur-sm">
+                <Users className="w-3 h-3 mr-1" />
+                Teams
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-white/20 rounded-xl">
+                <Users className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-white/80 text-sm font-medium">Departments</p>
+              <p className="text-3xl font-bold">{Object.keys(summary.departmentStats).length}</p>
+              <p className="text-white/60 text-xs">Active departments</p>
+            </div>
+          </div>
+
+          {/* Locations Card */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-teal-600 to-teal-700 rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="absolute top-4 right-4">
+              <Badge className="bg-white/20 text-white border-white/30 backdrop-blur-sm">
+                <MapPin className="w-3 h-3 mr-1" />
+                Locations
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-white/20 rounded-xl">
+                <MapPin className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-white/80 text-sm font-medium">Locations</p>
+              <p className="text-3xl font-bold">{locations.length}</p>
+              <p className="text-white/60 text-xs">Active locations</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="flex flex-wrap gap-4 items-center justify-between pt-6 border-t border-gray-100">
+        <div className="flex gap-3">
+          <Button
+            onClick={fetchReport}
+            disabled={loading}
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Generating Report...
+              </>
+            ) : (
+              <>
+                <FileText className="mr-2 h-5 w-5" />
+                Generate Report
+              </>
+            )}
+          </Button>
+
+          <div className="flex gap-2">
             <Button
               onClick={() => exportReport("excel")}
               variant="outline"
               disabled={exporting || records.length === 0 || loading}
-              className="bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+              className="border-green-200 text-green-700 hover:bg-green-50 px-6 py-3 rounded-xl transition-all duration-200"
             >
               {exporting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
               )}
-              {exporting ? "Exporting..." : "Export Excel"}
+              Excel
             </Button>
             <Button
               onClick={() => exportReport("csv")}
               variant="outline"
               disabled={exporting || records.length === 0 || loading}
-              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+              className="border-blue-200 text-blue-700 hover:bg-blue-50 px-6 py-3 rounded-xl transition-all duration-200"
             >
               {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              {exporting ? "Exporting..." : "Export CSV"}
+              CSV
             </Button>
           </div>
-
-          {/* Column Visibility Controls */}
-          <div className="mt-4 pt-4 border-t">
-            <div className="flex items-center gap-2 mb-3">
-              <Eye className="h-4 w-4" />
-              <Label className="text-sm font-medium">Visible Columns</Label>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-              {Object.entries(visibleColumns).map(([key, isVisible]) => (
-                <div key={key} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id={`col-${key}`}
-                    checked={isVisible}
-                    onChange={(e) => setVisibleColumns(prev => ({ ...prev, [key]: e.target.checked }))}
-                    className="rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <Label htmlFor={`col-${key}`} className="text-xs capitalize">
-                    {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {!loading && records.length === 0 && (
-            <Alert className="mt-4">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                No attendance records found for the selected criteria. Try adjusting your filters or date range.
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
-
-      {summary && (
-        <div className="grid gap-4 md:grid-cols-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Locations</CardTitle>
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">{locations.length}</div>
-              <p className="text-xs text-muted-foreground">Active locations</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Records</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">{summary.totalRecords}</div>
-              <p className="text-xs text-muted-foreground">Attendance entries</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-orange-50 to-yellow-50 border-orange-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-orange-800">Quick Select</CardTitle>
-              <CalendarIcon className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start text-xs h-6 text-orange-700 hover:bg-orange-100"
-                  onClick={() => setQuickDate("today")}
-                >
-                  Today
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start text-xs h-6 text-orange-700 hover:bg-orange-100"
-                  onClick={() => setQuickDate("week")}
-                >
-                  This Week
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start text-xs h-6 text-orange-700 hover:bg-orange-100"
-                  onClick={() => setQuickDate("month")}
-                >
-                  This Month
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Present</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{presentCount}</div>
-              <p className="text-xs text-muted-foreground">On time arrivals</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Late</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-500">{summary.statusCounts.late || 0}</div>
-              <p className="text-xs text-muted-foreground">Late arrivals</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">{Math.round(summary.totalWorkHours)}</div>
-              <p className="text-xs text-muted-foreground">Work hours logged</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Departments</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">{Object.keys(summary.departmentStats).length}</div>
-              <p className="text-xs text-muted-foreground">Active departments</p>
-            </CardContent>
-          </Card>
         </div>
-      )}
 
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="trends">Trends</TabsTrigger>
-          <TabsTrigger value="departments">Departments</TabsTrigger>
-          <TabsTrigger value="details">Details</TabsTrigger>
-        </TabsList>
+        {/* Quick Date Select */}
+        <div className="flex gap-2">
+          <span className="text-sm font-medium text-gray-600 self-center mr-2">Quick:</span>
+          {[
+            { label: "Today", value: "today" },
+            { label: "Week", value: "week" },
+            { label: "Month", value: "month" },
+            { label: "Quarter", value: "quarter" }
+          ].map((option) => (
+            <Button
+              key={option.value}
+              variant="ghost"
+              size="sm"
+              onClick={() => setQuickDate(option.value as any)}
+              className="text-gray-600 hover:text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg transition-all duration-200"
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      </div>
 
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Attendance by Department</CardTitle>
-                <CardDescription>Total attendance records per department</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={departmentChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#4B8B3B" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+      {/* Column Visibility */}
+      <div className="pt-6 border-t border-gray-100">
+        <div className="flex items-center gap-3 mb-4">
+          <Eye className="h-5 w-5 text-gray-600" />
+          <span className="text-sm font-semibold text-gray-700">Visible Columns</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {Object.entries(visibleColumns).map(([key, isVisible]) => (
+            <label key={key} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={isVisible}
+                onChange={(e) => setVisibleColumns(prev => ({ ...prev, [key]: e.target.checked }))}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+              />
+              <span className="text-sm text-gray-700 capitalize">
+                {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Status Distribution</CardTitle>
-                <CardDescription>Breakdown of attendance statuses</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={statusChartData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {statusChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+      <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+        <div className="border-b border-gray-100">
+          <Tabs defaultValue="overview" className="w-full">
+            <div className="px-8 pt-6">
+              <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-2xl h-14">
+                <TabsTrigger
+                  value="overview"
+                  className="rounded-xl text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all duration-200"
+                >
+                  📊 Overview
+                </TabsTrigger>
+                <TabsTrigger
+                  value="trends"
+                  className="rounded-xl text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all duration-200"
+                >
+                  📈 Trends
+                </TabsTrigger>
+                <TabsTrigger
+                  value="departments"
+                  className="rounded-xl text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all duration-200"
+                >
+                  🏢 Departments
+                </TabsTrigger>
+                <TabsTrigger
+                  value="details"
+                  className="rounded-xl text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all duration-200"
+                >
+                  📋 Details
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-        <TabsContent value="trends" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Daily Attendance Trend</CardTitle>
-                <CardDescription>Attendance patterns over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={departmentChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="count" stroke="#4B8B3B" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Work Hours Distribution</CardTitle>
-                <CardDescription>Average work hours by department</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={departmentChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="hours" stroke="#ea580c" fill="#ea580c" fillOpacity={0.3} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="departments" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Department Performance</CardTitle>
-              <CardDescription>Detailed breakdown by department</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(summary?.departmentStats || {}).map(([dept, stats]) => (
-                  <div key={dept} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h4 className="font-medium">{dept}</h4>
-                      <p className="text-sm text-muted-foreground">{stats.count} attendance records</p>
+            <TabsContent value="overview" className="px-8 py-8 space-y-8">
+              <div className="grid gap-8 md:grid-cols-2">
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-100">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="p-3 bg-blue-100 rounded-xl">
+                      <BarChart3 className="h-6 w-6 text-blue-600" />
                     </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold">{Math.round(stats.totalHours)}h</div>
-                      <p className="text-sm text-muted-foreground">Total hours</p>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Attendance by Department</h3>
+                      <p className="text-gray-600">Distribution of attendance records</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={Object.entries(summary?.departmentStats || {}).map(([dept, stats]: [string, any]) => ({
+                            name: dept,
+                            value: stats.count,
+                            hours: stats.totalHours,
+                          }))}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {Object.entries(summary?.departmentStats || {}).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value, name) => [
+                            `${value} records`,
+                            name
+                          ]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
 
-        <TabsContent value="details" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Detailed Attendance Records</CardTitle>
-              <CardDescription>
-                Complete attendance entries for the selected period with location tracking
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-lg">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {visibleColumns.date && <TableHead>Date</TableHead>}
-                      {visibleColumns.employee && <TableHead>Employee</TableHead>}
-                      {visibleColumns.department && <TableHead>Department</TableHead>}
-                      {visibleColumns.checkIn && <TableHead>Check In</TableHead>}
-                      {visibleColumns.checkInLocation && <TableHead>Check In Location</TableHead>}
-                      {visibleColumns.checkOut && <TableHead>Check Out</TableHead>}
-                      {visibleColumns.checkOutLocation && <TableHead>Check Out Location</TableHead>}
-                      {visibleColumns.earlyCheckoutReason && <TableHead>Early Checkout Reason</TableHead>}
-                      {visibleColumns.hours && <TableHead>Hours</TableHead>}
-                      {visibleColumns.status && <TableHead>Status</TableHead>}
-                      {visibleColumns.locationStatus && <TableHead>Location Status</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      <TableRow>
-                        <TableCell colSpan={visibleColumnCount} className="text-center py-8">
-                          Loading records...
-                        </TableCell>
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 border border-green-100">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="p-3 bg-green-100 rounded-xl">
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Attendance Status</h3>
+                      <p className="text-gray-600">Breakdown of attendance statuses</p>
+                    </div>
+                  </div>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={Object.entries(summary?.statusCounts || {}).map(([status, count]) => ({
+                        status: status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' '),
+                        count,
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis
+                          dataKey="status"
+                          tick={{ fontSize: 12, fill: '#6b7280' }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 12, fill: '#6b7280' }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'white',
+                            border: 'none',
+                            borderRadius: '12px',
+                            boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                          }}
+                        />
+                        <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="trends" className="px-8 py-8 space-y-8">
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 border border-purple-100">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="p-3 bg-purple-100 rounded-xl">
+                    <BarChart3 className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Attendance Trends</h3>
+                    <p className="text-gray-600">Daily attendance patterns over time</p>
+                  </div>
+                </div>
+                <div className="h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={analyticsData.dailyTrends}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 12, fill: '#6b7280' }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 12, fill: '#6b7280' }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: 'none',
+                          borderRadius: '12px',
+                          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="present"
+                        stroke="#8b5cf6"
+                        strokeWidth={3}
+                        dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, stroke: '#8b5cf6', strokeWidth: 2 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="late"
+                        stroke="#f59e0b"
+                        strokeWidth={3}
+                        dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, stroke: '#f59e0b', strokeWidth: 2 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="departments" className="px-8 py-8 space-y-8">
+              <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-8 border border-indigo-100">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="p-3 bg-indigo-100 rounded-xl">
+                    <Users className="h-6 w-6 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Department Performance</h3>
+                    <p className="text-gray-600">Comparative analysis across departments</p>
+                  </div>
+                </div>
+                <div className="h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={Object.entries(summary?.departmentStats || {}).map(([dept, stats]: [string, any]) => ({
+                      department: dept,
+                      attendance: stats.count,
+                      hours: Math.round(stats.totalHours),
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis
+                        dataKey="department"
+                        tick={{ fontSize: 12, fill: '#6b7280' }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 12, fill: '#6b7280' }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: 'none',
+                          borderRadius: '12px',
+                          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                        }}
+                      />
+                      <Bar dataKey="attendance" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="details" className="px-8 py-8">
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Detailed Records</h3>
+                      <p className="text-gray-600 mt-1">
+                        Showing {filteredRecords.length} of {records.length} records
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="px-4 py-2">
+                      {filteredRecords.length} Records
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50 hover:bg-gray-50">
+                        {visibleColumns.date && (
+                          <TableHead className="font-semibold text-gray-700 py-4">Date</TableHead>
+                        )}
+                        {visibleColumns.employee && (
+                          <TableHead className="font-semibold text-gray-700 py-4">Employee</TableHead>
+                        )}
+                        {visibleColumns.department && (
+                          <TableHead className="font-semibold text-gray-700 py-4">Department</TableHead>
+                        )}
+                        {visibleColumns.checkIn && (
+                          <TableHead className="font-semibold text-gray-700 py-4">Check In</TableHead>
+                        )}
+                        {visibleColumns.checkInLocation && (
+                          <TableHead className="font-semibold text-gray-700 py-4">Check In Location</TableHead>
+                        )}
+                        {visibleColumns.checkOut && (
+                          <TableHead className="font-semibold text-gray-700 py-4">Check Out</TableHead>
+                        )}
+                        {visibleColumns.checkOutLocation && (
+                          <TableHead className="font-semibold text-gray-700 py-4">Check Out Location</TableHead>
+                        )}
+                        {visibleColumns.hours && (
+                          <TableHead className="font-semibold text-gray-700 py-4">Hours</TableHead>
+                        )}
+                        {visibleColumns.status && (
+                          <TableHead className="font-semibold text-gray-700 py-4">Status</TableHead>
+                        )}
                       </TableRow>
-                    ) : filteredRecords.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={visibleColumnCount} className="text-center py-8">
-                          No records found for the selected period
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredRecords.map((record) => (
-                        <TableRow key={record.id}>
-                          {visibleColumns.date && <TableCell>{new Date(record.check_in_time).toLocaleDateString()}</TableCell>}
+                    </TableHeader>
+                    <TableBody>
+                      {filteredRecords.slice(0, 100).map((record) => (
+                        <TableRow key={record.id} className="hover:bg-gray-50 transition-colors">
+                          {visibleColumns.date && (
+                            <TableCell className="py-4">
+                              {new Date(record.check_in_time).toLocaleDateString()}
+                            </TableCell>
+                          )}
                           {visibleColumns.employee && (
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">
-                                  {record.user_profiles.first_name} {record.user_profiles.last_name}
+                            <TableCell className="py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-xs font-medium">
+                                  {record.user_profiles.first_name[0]}{record.user_profiles.last_name[0]}
                                 </div>
-                                <div className="text-sm text-muted-foreground">{record.user_profiles.employee_id}</div>
-                                {record.user_profiles.assigned_location && (
-                                  <div className="text-xs text-blue-600">
-                                    Assigned: {record.user_profiles.assigned_location.name}
-                                  </div>
-                                )}
+                                <div>
+                                  <p className="font-medium text-gray-900">
+                                    {record.user_profiles.first_name} {record.user_profiles.last_name}
+                                  </p>
+                                  <p className="text-sm text-gray-500">
+                                    {record.user_profiles.employee_id}
+                                  </p>
+                                </div>
                               </div>
                             </TableCell>
                           )}
-                          {visibleColumns.department && <TableCell>{record.user_profiles.departments?.name || "N/A"}</TableCell>}
-                          {visibleColumns.checkIn && <TableCell>{new Date(record.check_in_time).toLocaleTimeString()}</TableCell>}
+                          {visibleColumns.department && (
+                            <TableCell className="py-4">
+                              <Badge variant="outline" className="font-medium">
+                                {record.user_profiles.departments?.name || 'N/A'}
+                              </Badge>
+                            </TableCell>
+                          )}
+                          {visibleColumns.checkIn && (
+                            <TableCell className="py-4">
+                              {new Date(record.check_in_time).toLocaleTimeString()}
+                            </TableCell>
+                          )}
                           {visibleColumns.checkInLocation && (
-                            <TableCell>
+                            <TableCell className="py-4">
                               <div className="flex items-center gap-2">
-                                <span>{record.check_in_location?.name || record.check_in_location_name || "N/A"}</span>
-                                {record.is_check_in_outside_location && (
-                                  <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
-                                    <MapPin className="h-3 w-3 mr-1" />
-                                    Outside
-                                  </Badge>
-                                )}
+                                <MapPin className="h-4 w-4 text-gray-400" />
+                                <span className="text-sm">
+                                  {record.check_in_location_name || 'N/A'}
+                                </span>
                               </div>
                             </TableCell>
                           )}
                           {visibleColumns.checkOut && (
-                            <TableCell>
-                              {record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : "N/A"}
+                            <TableCell className="py-4">
+                              {record.check_out_time
+                                ? new Date(record.check_out_time).toLocaleTimeString()
+                                : <span className="text-gray-400">-</span>
+                              }
                             </TableCell>
                           )}
                           {visibleColumns.checkOutLocation && (
-                            <TableCell>
+                            <TableCell className="py-4">
                               <div className="flex items-center gap-2">
-                                <span>{record.check_out_location?.name || record.check_out_location_name || "N/A"}</span>
-                                {record.is_check_out_outside_location && (
-                                  <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
-                                    <MapPin className="h-3 w-3 mr-1" />
-                                    Outside
-                                  </Badge>
-                                )}
+                                <MapPin className="h-4 w-4 text-gray-400" />
+                                <span className="text-sm">
+                                  {record.check_out_location_name || 'N/A'}
+                                </span>
                               </div>
                             </TableCell>
                           )}
-                          {visibleColumns.earlyCheckoutReason && (
-                            <TableCell>
-                              {record.early_checkout_reason ? (
-                                <div className="max-w-xs">
-                                  <Badge
-                                    variant="outline"
-                                    className="text-orange-600 border-orange-300 bg-orange-50 mb-1"
-                                  >
-                                    Early Checkout
-                                  </Badge>
-                                  <p className="text-sm text-muted-foreground">{record.early_checkout_reason}</p>
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
+                          {visibleColumns.hours && (
+                            <TableCell className="py-4">
+                              <span className="font-medium">
+                                {record.work_hours ? `${record.work_hours.toFixed(1)}h` : '-'}
+                              </span>
                             </TableCell>
                           )}
-                          {visibleColumns.hours && <TableCell>{record.work_hours?.toFixed(2) || "0"}</TableCell>}
                           {visibleColumns.status && (
-                            <TableCell>
-                              <Badge variant={record.status === "present" ? "default" : "secondary"}>
-                                {record.status.replace("_", " ")}
+                            <TableCell className="py-4">
+                              <Badge
+                                variant={
+                                  record.status === 'present' ? 'default' :
+                                  record.status === 'late' ? 'secondary' :
+                                  record.status === 'absent' ? 'destructive' : 'outline'
+                                }
+                                className="font-medium"
+                              >
+                                {record.status.charAt(0).toUpperCase() + record.status.slice(1).replace('_', ' ')}
                               </Badge>
                             </TableCell>
                           )}
-                          {visibleColumns.locationStatus && (
-                            <TableCell>
-                              {record.is_check_in_outside_location || record.is_check_out_outside_location ? (
-                                <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50">
-                                  <AlertTriangle className="h-3 w-3 mr-1" />
-                                  Remote Work
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                  On-site
-                                </Badge>
-                              )}
-                            </TableCell>
-                          )}
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {filteredRecords.length > 100 && (
+                  <div className="p-6 border-t border-gray-200 bg-gray-50">
+                    <p className="text-sm text-gray-600 text-center">
+                      Showing first 100 records. Use filters to narrow down results or export for full data.
+                    </p>
+                  </div>
+                )}
               </div>
-              {records.length > 50 && (
-                <p className="text-sm text-muted-foreground mt-4">
-                  Showing first 50 records. Export CSV for complete data.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
     </div>
   )
 }

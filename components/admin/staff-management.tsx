@@ -564,11 +564,11 @@ export function StaffManagement() {
                         <SelectContent>
                           <SelectItem value="staff">Staff</SelectItem>
                           <SelectItem value="department_head">Department Head</SelectItem>
-                          <SelectItem value="regional_manager">Regional Manager</SelectItem>
-                          {(currentUserRole === "admin" || currentUserRole === "it-admin" || currentUserRole === "regional_manager") && (
+                          {currentUserRole === "admin" && <SelectItem value="regional_manager">Regional Manager</SelectItem>}
+                          {(currentUserRole === "admin" || currentUserRole === "it-admin") && (
                             <SelectItem value="it-admin">IT Admin</SelectItem>
                           )}
-                          {(currentUserRole === "admin" || currentUserRole === "regional_manager") && <SelectItem value="admin">Admin</SelectItem>}
+                          {currentUserRole === "admin" && <SelectItem value="admin">Admin</SelectItem>}
                           <SelectItem value="nsp">NSP</SelectItem>
                           <SelectItem value="intern">Intern</SelectItem>
                           <SelectItem value="contract">Contract</SelectItem>
@@ -724,11 +724,11 @@ export function StaffManagement() {
                       <SelectContent>
                         <SelectItem value="staff">Staff</SelectItem>
                         <SelectItem value="department_head">Department Head</SelectItem>
-                        <SelectItem value="regional_manager">Regional Manager</SelectItem>
-                        {(currentUserRole === "admin" || currentUserRole === "it-admin" || currentUserRole === "regional_manager") && (
+                        {currentUserRole === "admin" && <SelectItem value="regional_manager">Regional Manager</SelectItem>}
+                        {(currentUserRole === "admin" || currentUserRole === "it-admin") && (
                           <SelectItem value="it-admin">IT Admin</SelectItem>
                         )}
-                        {(currentUserRole === "admin" || currentUserRole === "regional_manager") && <SelectItem value="admin">Admin</SelectItem>}
+                        {currentUserRole === "admin" && <SelectItem value="admin">Admin</SelectItem>}
                         <SelectItem value="nsp">NSP</SelectItem>
                         <SelectItem value="intern">Intern</SelectItem>
                         <SelectItem value="contract">Contract</SelectItem>

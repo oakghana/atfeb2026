@@ -183,7 +183,7 @@ const navigationItems = [
     title: "Staff Management",
     href: "/dashboard/staff",
     icon: Users,
-    roles: ["admin", "it-admin", "regional_manager"],
+    roles: ["admin", "it-admin"],
     category: "admin",
   },
   {

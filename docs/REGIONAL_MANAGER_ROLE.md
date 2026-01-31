@@ -33,7 +33,6 @@ Regional managers have enhanced admin capabilities compared to department heads:
 - **Department Summaries** - See aggregated performance metrics
 
 #### Special Regional Manager Privileges
-- **Audit Logs** - Full audit trail of system activities and user actions
 - **Schedule** - View and manage organizational schedules and events
 
 ### Staff-Facing Features
@@ -66,13 +65,13 @@ Regional managers can:
 Regional managers can:
 - Review excuse duty submissions and approve/reject them
 - Create and manage QR code attendance events
-- Access complete audit logs for accountability
 - Generate department summaries and performance reports
 
 ### Restrictions (Cannot Do)
 - Cannot access Device Monitoring or Device Security (admin only)
 - Cannot access Staff Management features (admin and IT-admin only)
 - Cannot view Defaulters/Compliance Monitoring (admin and department heads only)
+- Cannot access Audit Logs (admin only)
 - Cannot create or delete locations (admin only)
 - Cannot perform data bulk management (admin only)
 - Cannot activate new staff accounts (admin only)
@@ -93,7 +92,7 @@ Regional managers can:
 | View **Nationwide** Reports | ✗ | ✗ | ✓ | ✓ |
 | Manage QR Events | ✗ | ✓ | ✓ | ✓ |
 | Excuse Duty Review | ✗ | ✓ | ✓ | ✓ |
-| View Audit Logs | ✗ | ✗ | ✓ | ✓ |
+| View Audit Logs | ✗ | ✗ | ✗ | ✓ |
 | Device Monitoring | ✗ | ✗ | ✗ | ✓ |
 | Staff Management | ✗ | ✗ | ✗ | ✓ |
 | Defaulters Monitoring | ✗ | ✓ | ✗ | ✓ |
