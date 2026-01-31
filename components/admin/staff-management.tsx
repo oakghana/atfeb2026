@@ -418,6 +418,7 @@ export function StaffManagement() {
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="regional_manager">Regional Manager</SelectItem>
                   <SelectItem value="it-admin">IT-Admin</SelectItem>
                   <SelectItem value="department_head">Department Head</SelectItem>
                   <SelectItem value="staff">Staff</SelectItem>
@@ -563,6 +564,7 @@ export function StaffManagement() {
                         <SelectContent>
                           <SelectItem value="staff">Staff</SelectItem>
                           <SelectItem value="department_head">Department Head</SelectItem>
+                          <SelectItem value="regional_manager">Regional Manager</SelectItem>
                           {(currentUserRole === "admin" || currentUserRole === "it-admin") && (
                             <SelectItem value="it-admin">IT Admin</SelectItem>
                           )}
@@ -722,6 +724,7 @@ export function StaffManagement() {
                       <SelectContent>
                         <SelectItem value="staff">Staff</SelectItem>
                         <SelectItem value="department_head">Department Head</SelectItem>
+                        <SelectItem value="regional_manager">Regional Manager</SelectItem>
                         {(currentUserRole === "admin" || currentUserRole === "it-admin") && (
                           <SelectItem value="it-admin">IT Admin</SelectItem>
                         )}

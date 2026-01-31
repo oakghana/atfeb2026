@@ -119,11 +119,15 @@ export async function validateSupabaseCRUDOperations(): Promise<CRUDTestResult[]
   // Test 5: Real-time subscription
   console.log("[v0] Testing real-time subscriptions...")
   const subStart = performance.now()
+  let channelRemoved = false
+
   try {
     const channel = supabase
       .channel("test-subscription")
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance_records" }, () => {})
       .subscribe((status) => {
+        if (channelRemoved) return // Prevent double removal
+
         const isConnected = status === "SUBSCRIBED"
         results.push({
           operation: "Real-time Subscription",
@@ -131,12 +135,26 @@ export async function validateSupabaseCRUDOperations(): Promise<CRUDTestResult[]
           message: isConnected ? "Real-time subscription active" : `Subscription status: ${status}`,
           duration: performance.now() - subStart,
         })
-        supabase.removeChannel(channel)
+
+        // Only remove channel once
+        if (!channelRemoved) {
+          channelRemoved = true
+          supabase.removeChannel(channel)
+        }
       })
 
     // Timeout if subscription doesn't connect
     setTimeout(() => {
-      supabase.removeChannel(channel)
+      if (!channelRemoved) {
+        channelRemoved = true
+        supabase.removeChannel(channel)
+        results.push({
+          operation: "Real-time Subscription",
+          status: "warning",
+          message: "Subscription timed out",
+          duration: performance.now() - subStart,
+        })
+      }
     }, 5000)
   } catch (error) {
     results.push({

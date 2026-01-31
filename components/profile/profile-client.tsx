@@ -46,8 +46,13 @@ interface AttendanceSummary {
   lateDays: number
 }
 
-export function ProfileClient() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+interface ProfileClientProps {
+  initialUser: any
+  initialProfile: UserProfile | null
+}
+
+export function ProfileClient({ initialUser, initialProfile }: ProfileClientProps) {
+  const [profile, setProfile] = useState<UserProfile | null>(initialProfile)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -71,20 +76,77 @@ export function ProfileClient() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
-    fetchProfile()
+    if (!initialProfile) {
+      fetchProfile()
+    } else {
+      setLoading(false)
+      // Initialize edit form with profile data
+      setEditForm({
+        first_name: initialProfile.first_name || "",
+        last_name: initialProfile.last_name || "",
+      })
+    }
     fetchAttendanceSummary()
-  }, [])
+  }, [initialProfile])
 
   const fetchProfile = async () => {
     try {
       const supabase = createClient()
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser()
 
-      if (user) {
-        const { data: profileData, error } = await supabase
+      if (userError) {
+        console.error("Auth error:", userError)
+        throw new Error(`Authentication error: ${userError.message}`)
+      }
+
+      if (!user) {
+        throw new Error("No authenticated user found")
+      }
+
+      const { data: profileData, error } = await supabase
+        .from("user_profiles")
+        .select(`
+          *,
+          departments (
+            id,
+            name,
+            code
+          ),
+          assigned_location:assigned_location_id (
+            id,
+            name,
+            address,
+            district_id,
+            districts (
+              id,
+              name
+            )
+          )
+        `)
+        .eq("id", user.id)
+        .maybeSingle()
+
+      if (error) {
+        console.error("Database query error:", error)
+        throw new Error(`Database error: ${error.message}`)
+      }
+
+      if (!profileData) {
+        // Create a basic profile for the user if it doesn't exist
+        console.log("Creating new profile for user:", user.id)
+        const { data: newProfile, error: createError } = await supabase
           .from("user_profiles")
+          .insert({
+            id: user.id,
+            email: user.email,
+            first_name: user.user_metadata?.first_name || "",
+            last_name: user.user_metadata?.last_name || "",
+            role: "staff", // Default role for new users
+            is_active: true,
+          })
           .select(`
             *,
             departments (
@@ -92,30 +154,40 @@ export function ProfileClient() {
               name,
               code
             ),
-            districts (
+            assigned_location:assigned_location_id (
               id,
-              name
+              name,
+              address,
+              district_id,
+              districts (
+                id,
+                name
+              )
             )
           `)
-          .eq("id", user.id)
           .single()
 
-        if (error) throw error
-
-        if (!profileData) {
-          console.error("Profile not found for user ID:", user.id);
-          setError("Profile not found. Please contact support.");
-          return;
+        if (createError) {
+          console.error("Profile creation error:", createError)
+          throw new Error(`Failed to create profile: ${createError.message}`)
         }
 
+        setProfile(newProfile)
+        setEditForm({
+          first_name: newProfile.first_name || "",
+          last_name: newProfile.last_name || "",
+        })
+      } else {
         setProfile(profileData)
         setEditForm({
           first_name: profileData.first_name || "",
           last_name: profileData.last_name || "",
         })
       }
-    } catch (error) {
-      setError("Failed to load profile")
+    } catch (error: any) {
+      console.error("Failed to load profile:", error)
+      const errorMessage = error?.message || "Unknown error occurred"
+      setError(`Failed to load profile: ${errorMessage}`)
     } finally {
       setLoading(false)
     }
@@ -403,7 +475,7 @@ export function ProfileClient() {
                   <Label>Location</Label>
                   <div className="p-2 bg-muted rounded-md flex items-center gap-2">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
-                    {profile.districts?.name || "No location assigned"}
+                    {profile.assigned_location?.districts?.name || "No location assigned"}
                   </div>
                 </div>
               </div>

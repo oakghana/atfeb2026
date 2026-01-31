@@ -13,7 +13,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { start_date, end_date, reason, leave_type } = await request.json()
+    // Handle FormData for file uploads
+    const formData = await request.formData()
+    const start_date = formData.get("start_date") as string
+    const end_date = formData.get("end_date") as string
+    const reason = formData.get("reason") as string
+    const leave_type = formData.get("leave_type") as string
+    const document = formData.get("document") as File | null
+
+    if (!start_date || !end_date || !reason) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    }
+
+    let document_url = null
+
+    // Handle file upload if provided
+    if (document) {
+      const fileExt = document.name.split('.').pop()
+      const fileName = `${user.id}_${Date.now()}.${fileExt}`
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('leave-documents')
+        .upload(fileName, document)
+
+      if (uploadError) {
+        console.error("File upload error:", uploadError)
+        return NextResponse.json({ error: "Failed to upload document" }, { status: 500 })
+      }
+
+      document_url = uploadData.path
+    }
 
     // Create leave request
     const { data: leaveRequest, error: requestError } = await supabase
@@ -25,6 +54,7 @@ export async function POST(request: NextRequest) {
         reason,
         leave_type,
         status: "pending",
+        document_url,
       })
       .select()
       .single()

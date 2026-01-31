@@ -203,7 +203,7 @@ const navigationItems = [
     title: "Audit Logs",
     href: "/dashboard/audit-logs",
     icon: Shield,
-    roles: ["admin", "regional_manager"],
+    roles: ["admin"],
     category: "admin",
   },
   {

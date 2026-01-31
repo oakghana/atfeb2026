@@ -2,9 +2,10 @@ import { createClient } from "@/lib/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    console.log("[v0] Staff update API called for ID:", params.id)
+    const { id } = await params
+    console.log("[v0] Staff update API called for ID:", id)
 
     const supabase = await createClient()
 
@@ -56,7 +57,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "First name, last name, and employee ID are required" }, { status: 400 })
     }
 
-    const { data: targetProfile } = await supabase.from("user_profiles").select("role").eq("id", params.id).single()
+    const { data: targetProfile } = await supabase.from("user_profiles").select("role").eq("id", id).single()
 
     if (!targetProfile) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
@@ -115,8 +116,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     if (email) {
       try {
-        console.log("[v0] Attempting to update email for user:", params.id)
-        const { error: emailUpdateError } = await adminSupabase.auth.admin.updateUserById(params.id, {
+        console.log("[v0] Attempting to update email for user:", id)
+        const { error: emailUpdateError } = await adminSupabase.auth.admin.updateUserById(id, {
           email: email,
         })
 
@@ -137,7 +138,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const { data: updatedProfile, error: updateError } = await supabase
       .from("user_profiles")
       .update(updateData)
-      .eq("id", params.id)
+      .eq("id", id)
       .select(`
         *,
         departments:department_id(id, name, code),
@@ -163,7 +164,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       user_id: user.id,
       action: "update_staff",
       table_name: "user_profiles",
-      record_id: params.id,
+      record_id: id,
       new_values: updatedProfile,
       ip_address: request.ip || null,
       user_agent: request.headers.get("user-agent"),
@@ -186,8 +187,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const supabase = await createClient()
 
     // Get authenticated user and check admin role
@@ -214,7 +216,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         is_active: false,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", params.id)
+      .eq("id", id)
       .select("*")
       .single()
 
@@ -228,7 +230,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       user_id: user.id,
       action: "deactivate_staff",
       table_name: "user_profiles",
-      record_id: params.id,
+      record_id: id,
       new_values: deactivatedProfile,
       ip_address: request.ip || null,
       user_agent: request.headers.get("user-agent"),

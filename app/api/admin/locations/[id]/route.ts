@@ -14,9 +14,10 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    console.log("[v0] Location update request for ID:", params.id)
+    const { id } = await params
+    console.log("[v0] Location update request for ID:", id)
 
     const supabase = await createClient()
 

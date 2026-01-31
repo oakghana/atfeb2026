@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Settings2, MapPin, Users, Bell, Shield, Smartphone } from "lucide-react"
+import { Settings2, MapPin, Users, Bell, Shield, Smartphone, Database } from "lucide-react"
 import Link from "next/link"
 
 export default async function SettingsPage() {
@@ -30,6 +30,14 @@ export default async function SettingsPage() {
       href: "/dashboard/settings/device-radius",
       roles: ["admin"],
       badge: "System-wide",
+    },
+    {
+      title: "Database Backup & Restore",
+      description: "Create backups and restore system data",
+      icon: Database,
+      href: "/dashboard/settings/backup",
+      roles: ["admin"],
+      badge: "Critical",
     },
     {
       title: "Location Management",

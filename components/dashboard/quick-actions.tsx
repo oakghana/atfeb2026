@@ -43,17 +43,15 @@ export function QuickActions() {
   ]
 
   return (
-    <Card className="shadow-lg hover:shadow-xl transition-all duration-300 border-0 bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-sm">
+    <Card className="bg-gradient-to-br from-white/90 to-white/50 dark:from-slate-900/90 dark:to-slate-800/50 backdrop-blur-xl border-white/20 dark:border-slate-700/20 shadow-2xl">
       <CardHeader className="pb-6">
-        <CardTitle className="text-xl font-heading font-bold flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-green-100 to-green-200 rounded-xl shadow-sm">
-            <Zap className="h-5 w-5 text-green-600" />
+        <CardTitle className="text-xl font-bold flex items-center gap-3">
+          <div className="p-2 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-950/50 dark:to-blue-900/50 rounded-xl border border-blue-200/50 dark:border-blue-800/50">
+            <Zap className="h-5 w-5 text-blue-600" />
           </div>
           Quick Actions
         </CardTitle>
-        <CardDescription className="text-base font-medium">
-          Common tasks and shortcuts for daily operations
-        </CardDescription>
+        <CardDescription className="text-lg">Access your most frequently used features</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {actions.map((action) => {

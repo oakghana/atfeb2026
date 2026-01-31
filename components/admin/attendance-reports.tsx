@@ -37,6 +37,8 @@ import {
   FileSpreadsheet,
   MapPin,
   Loader2,
+  Search,
+  Eye,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -108,6 +110,27 @@ export function AttendanceReports() {
   const [districts, setDistricts] = useState([])
   const [selectedLocation, setSelectedLocation] = useState("all")
   const [selectedDistrict, setSelectedDistrict] = useState("all")
+  const [selectedStatus, setSelectedStatus] = useState("all")
+  const [selectedLocationStatus, setSelectedLocationStatus] = useState("all")
+  const [minHours, setMinHours] = useState("")
+  const [maxHours, setMaxHours] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [visibleColumns, setVisibleColumns] = useState({
+    date: true,
+    employee: true,
+    department: true,
+    checkIn: true,
+    checkInLocation: true,
+    checkOut: true,
+    checkOutLocation: true,
+    earlyCheckoutReason: true,
+    hours: true,
+    status: true,
+    locationStatus: true,
+  })
+
+  const visibleColumnCount = useMemo(() => Object.values(visibleColumns).filter(Boolean).length, [visibleColumns])
+
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
 
@@ -128,7 +151,7 @@ export function AttendanceReports() {
     fetchUsers()
     fetchLocations()
     fetchDistricts()
-  }, [startDate, endDate, selectedDepartment, selectedUser, selectedLocation, selectedDistrict])
+  }, [startDate, endDate, selectedDepartment, selectedUser, selectedLocation, selectedDistrict, selectedStatus, selectedLocationStatus, minHours, maxHours])
 
   const fetchReport = async () => {
     setLoading(true)
@@ -145,6 +168,10 @@ export function AttendanceReports() {
       if (selectedUser !== "all") params.append("user_id", selectedUser)
       if (selectedLocation !== "all") params.append("location_id", selectedLocation)
       if (selectedDistrict !== "all") params.append("district_id", selectedDistrict)
+      if (selectedStatus !== "all") params.append("status", selectedStatus)
+      if (selectedLocationStatus !== "all") params.append("location_status", selectedLocationStatus)
+      if (minHours) params.append("min_hours", minHours)
+      if (maxHours) params.append("max_hours", maxHours)
 
       console.log("[v0] API call URL:", `/api/admin/reports/attendance?${params}`)
 
@@ -375,26 +402,75 @@ export function AttendanceReports() {
   const filteredRecords = useMemo(() => {
     let filtered = records
 
+    // Department filter
     if (selectedDepartment !== "all") {
-      filtered = filtered.filter((r) => r.user_profiles?.departments?.name === selectedDepartment)
+      filtered = filtered.filter((r) => r.user_profiles?.departments?.id === selectedDepartment)
     }
 
+    // User filter
     if (selectedUser !== "all") {
-      filtered = filtered.filter((r) => r.user_profiles?.employee_id === selectedUser)
+      filtered = filtered.filter((r) => r.id === selectedUser)
     }
 
+    // Location filter
     if (selectedLocation !== "all") {
       filtered = filtered.filter(
-        (r) => r.check_in_location?.name === selectedLocation || r.check_out_location?.name === selectedLocation,
+        (r) => r.check_in_location?.id === selectedLocation || r.check_out_location?.id === selectedLocation,
       )
     }
 
+    // District filter
     if (selectedDistrict !== "all") {
-      filtered = filtered.filter((r) => r.user_profiles?.districts?.name === selectedDistrict)
+      filtered = filtered.filter((r) => r.user_profiles?.assigned_location?.districts?.id === selectedDistrict)
+    }
+
+    // Status filter
+    if (selectedStatus !== "all") {
+      filtered = filtered.filter((r) => r.status === selectedStatus)
+    }
+
+    // Location status filter
+    if (selectedLocationStatus !== "all") {
+      const isRemote = selectedLocationStatus === "remote"
+      filtered = filtered.filter((r) =>
+        isRemote
+          ? r.is_check_in_outside_location || r.is_check_out_outside_location
+          : !r.is_check_in_outside_location && !r.is_check_out_outside_location
+      )
+    }
+
+    // Hours range filter
+    if (minHours) {
+      const min = parseFloat(minHours)
+      filtered = filtered.filter((r) => (r.work_hours || 0) >= min)
+    }
+    if (maxHours) {
+      const max = parseFloat(maxHours)
+      filtered = filtered.filter((r) => (r.work_hours || 0) <= max)
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim()
+      filtered = filtered.filter((r) => {
+        const fullName = `${r.user_profiles.first_name} ${r.user_profiles.last_name}`.toLowerCase()
+        const employeeId = r.user_profiles.employee_id?.toLowerCase() || ""
+        const department = r.user_profiles.departments?.name?.toLowerCase() || ""
+        const assignedLocation = r.user_profiles.assigned_location?.name?.toLowerCase() || ""
+        const district = r.user_profiles.assigned_location?.districts?.name?.toLowerCase() || ""
+
+        return (
+          fullName.includes(query) ||
+          employeeId.includes(query) ||
+          department.includes(query) ||
+          assignedLocation.includes(query) ||
+          district.includes(query)
+        )
+      })
     }
 
     return filtered
-  }, [records, selectedDepartment, selectedUser, selectedLocation, selectedDistrict])
+  }, [records, selectedDepartment, selectedUser, selectedLocation, selectedDistrict, selectedStatus, selectedLocationStatus, minHours, maxHours, searchQuery])
 
   const presentCount = useMemo(() => records.filter((r) => r.status === "present" || r.check_in_time).length, [records])
 
@@ -552,6 +628,79 @@ export function AttendanceReports() {
             </div>
           </div>
 
+          {/* Advanced Filters Row */}
+          <div className="grid gap-4 md:grid-cols-6 pt-4 border-t">
+            <div>
+              <Label htmlFor="status">Status</Label>
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="present">Present</SelectItem>
+                  <SelectItem value="absent">Absent</SelectItem>
+                  <SelectItem value="late">Late</SelectItem>
+                  <SelectItem value="half_day">Half Day</SelectItem>
+                  <SelectItem value="early_checkout">Early Checkout</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="locationStatus">Location Status</Label>
+              <Select value={selectedLocationStatus} onValueChange={setSelectedLocationStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Location Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Location Statuses</SelectItem>
+                  <SelectItem value="onsite">On-site</SelectItem>
+                  <SelectItem value="remote">Remote Work</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="minHours">Min Hours</Label>
+              <input
+                id="minHours"
+                type="number"
+                step="0.5"
+                min="0"
+                value={minHours}
+                onChange={(e) => setMinHours(e.target.value)}
+                placeholder="0"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <Label htmlFor="maxHours">Max Hours</Label>
+              <input
+                id="maxHours"
+                type="number"
+                step="0.5"
+                min="0"
+                value={maxHours}
+                onChange={(e) => setMaxHours(e.target.value)}
+                placeholder="24"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label htmlFor="search">Search</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  id="search"
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by name, ID, department..."
+                  className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="mt-4 pt-4 border-t">
             <Label>Quick Date Selection</Label>
             <div className="flex flex-wrap gap-2 mt-2">
@@ -593,6 +742,30 @@ export function AttendanceReports() {
               {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               {exporting ? "Exporting..." : "Export CSV"}
             </Button>
+          </div>
+
+          {/* Column Visibility Controls */}
+          <div className="mt-4 pt-4 border-t">
+            <div className="flex items-center gap-2 mb-3">
+              <Eye className="h-4 w-4" />
+              <Label className="text-sm font-medium">Visible Columns</Label>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+              {Object.entries(visibleColumns).map(([key, isVisible]) => (
+                <div key={key} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id={`col-${key}`}
+                    checked={isVisible}
+                    onChange={(e) => setVisibleColumns(prev => ({ ...prev, [key]: e.target.checked }))}
+                    className="rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor={`col-${key}`} className="text-xs capitalize">
+                    {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                  </Label>
+                </div>
+              ))}
+            </div>
           </div>
 
           {!loading && records.length === 0 && (
@@ -847,110 +1020,124 @@ export function AttendanceReports() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Employee</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Check In</TableHead>
-                      <TableHead>Check In Location</TableHead>
-                      <TableHead>Check Out</TableHead>
-                      <TableHead>Check Out Location</TableHead>
-                      <TableHead>Early Checkout Reason</TableHead>
-                      <TableHead>Hours</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Location Status</TableHead>
+                      {visibleColumns.date && <TableHead>Date</TableHead>}
+                      {visibleColumns.employee && <TableHead>Employee</TableHead>}
+                      {visibleColumns.department && <TableHead>Department</TableHead>}
+                      {visibleColumns.checkIn && <TableHead>Check In</TableHead>}
+                      {visibleColumns.checkInLocation && <TableHead>Check In Location</TableHead>}
+                      {visibleColumns.checkOut && <TableHead>Check Out</TableHead>}
+                      {visibleColumns.checkOutLocation && <TableHead>Check Out Location</TableHead>}
+                      {visibleColumns.earlyCheckoutReason && <TableHead>Early Checkout Reason</TableHead>}
+                      {visibleColumns.hours && <TableHead>Hours</TableHead>}
+                      {visibleColumns.status && <TableHead>Status</TableHead>}
+                      {visibleColumns.locationStatus && <TableHead>Location Status</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center py-8">
+                        <TableCell colSpan={visibleColumnCount} className="text-center py-8">
                           Loading records...
                         </TableCell>
                       </TableRow>
                     ) : filteredRecords.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center py-8">
+                        <TableCell colSpan={visibleColumnCount} className="text-center py-8">
                           No records found for the selected period
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredRecords.map((record) => (
                         <TableRow key={record.id}>
-                          <TableCell>{new Date(record.check_in_time).toLocaleDateString()}</TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">
-                                {record.user_profiles.first_name} {record.user_profiles.last_name}
-                              </div>
-                              <div className="text-sm text-muted-foreground">{record.user_profiles.employee_id}</div>
-                              {record.user_profiles.assigned_location && (
-                                <div className="text-xs text-blue-600">
-                                  Assigned: {record.user_profiles.assigned_location.name}
+                          {visibleColumns.date && <TableCell>{new Date(record.check_in_time).toLocaleDateString()}</TableCell>}
+                          {visibleColumns.employee && (
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">
+                                  {record.user_profiles.first_name} {record.user_profiles.last_name}
                                 </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>{record.user_profiles.departments?.name || "N/A"}</TableCell>
-                          <TableCell>{new Date(record.check_in_time).toLocaleTimeString()}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span>{record.check_in_location?.name || record.check_in_location_name || "N/A"}</span>
-                              {record.is_check_in_outside_location && (
-                                <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
-                                  <MapPin className="h-3 w-3 mr-1" />
-                                  Outside
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : "N/A"}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span>{record.check_out_location?.name || record.check_out_location_name || "N/A"}</span>
-                              {record.is_check_out_outside_location && (
-                                <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
-                                  <MapPin className="h-3 w-3 mr-1" />
-                                  Outside
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {record.early_checkout_reason ? (
-                              <div className="max-w-xs">
-                                <Badge
-                                  variant="outline"
-                                  className="text-orange-600 border-orange-300 bg-orange-50 mb-1"
-                                >
-                                  Early Checkout
-                                </Badge>
-                                <p className="text-sm text-muted-foreground">{record.early_checkout_reason}</p>
+                                <div className="text-sm text-muted-foreground">{record.user_profiles.employee_id}</div>
+                                {record.user_profiles.assigned_location && (
+                                  <div className="text-xs text-blue-600">
+                                    Assigned: {record.user_profiles.assigned_location.name}
+                                  </div>
+                                )}
                               </div>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>{record.work_hours?.toFixed(2) || "0"}</TableCell>
-                          <TableCell>
-                            <Badge variant={record.status === "present" ? "default" : "secondary"}>
-                              {record.status.replace("_", " ")}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {record.is_check_in_outside_location || record.is_check_out_outside_location ? (
-                              <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50">
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                Remote Work
+                            </TableCell>
+                          )}
+                          {visibleColumns.department && <TableCell>{record.user_profiles.departments?.name || "N/A"}</TableCell>}
+                          {visibleColumns.checkIn && <TableCell>{new Date(record.check_in_time).toLocaleTimeString()}</TableCell>}
+                          {visibleColumns.checkInLocation && (
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span>{record.check_in_location?.name || record.check_in_location_name || "N/A"}</span>
+                                {record.is_check_in_outside_location && (
+                                  <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
+                                    <MapPin className="h-3 w-3 mr-1" />
+                                    Outside
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
+                          {visibleColumns.checkOut && (
+                            <TableCell>
+                              {record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : "N/A"}
+                            </TableCell>
+                          )}
+                          {visibleColumns.checkOutLocation && (
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span>{record.check_out_location?.name || record.check_out_location_name || "N/A"}</span>
+                                {record.is_check_out_outside_location && (
+                                  <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
+                                    <MapPin className="h-3 w-3 mr-1" />
+                                    Outside
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
+                          {visibleColumns.earlyCheckoutReason && (
+                            <TableCell>
+                              {record.early_checkout_reason ? (
+                                <div className="max-w-xs">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-orange-600 border-orange-300 bg-orange-50 mb-1"
+                                  >
+                                    Early Checkout
+                                  </Badge>
+                                  <p className="text-sm text-muted-foreground">{record.early_checkout_reason}</p>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                          )}
+                          {visibleColumns.hours && <TableCell>{record.work_hours?.toFixed(2) || "0"}</TableCell>}
+                          {visibleColumns.status && (
+                            <TableCell>
+                              <Badge variant={record.status === "present" ? "default" : "secondary"}>
+                                {record.status.replace("_", " ")}
                               </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                On-site
-                              </Badge>
-                            )}
-                          </TableCell>
+                            </TableCell>
+                          )}
+                          {visibleColumns.locationStatus && (
+                            <TableCell>
+                              {record.is_check_in_outside_location || record.is_check_out_outside_location ? (
+                                <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  Remote Work
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  On-site
+                                </Badge>
+                              )}
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))
                     )}

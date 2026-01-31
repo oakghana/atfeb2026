@@ -229,6 +229,7 @@ export default function UserManagementClient({
   const getRoleBadge = (role: string) => {
     const colors = {
       admin: "bg-red-100 text-red-800",
+      regional_manager: "bg-blue-100 text-blue-800",
       department_head: "bg-green-100 text-green-800",
       staff: "bg-gray-100 text-gray-800",
       nsp: "bg-purple-100 text-purple-800",
@@ -343,6 +344,7 @@ export default function UserManagementClient({
                   <SelectContent>
                     <SelectItem value="staff">Staff</SelectItem>
                     <SelectItem value="department_head">Department Head</SelectItem>
+                    <SelectItem value="regional_manager">Regional Manager</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="nsp">NSP</SelectItem>
                     <SelectItem value="intern">Intern</SelectItem>
@@ -449,6 +451,7 @@ export default function UserManagementClient({
                     <SelectContent>
                       <SelectItem value="all">All Roles</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="regional_manager">Regional Manager</SelectItem>
                       <SelectItem value="department_head">Dept Head</SelectItem>
                       <SelectItem value="staff">Staff</SelectItem>
                       <SelectItem value="nsp">NSP</SelectItem>

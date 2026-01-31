@@ -26,14 +26,22 @@ export async function GET(request: NextRequest) {
       .select(
         `
         id,
-        user_id,
-        staff:user_profiles(first_name, last_name),
-        leave_type,
-        start_date,
-        end_date,
-        reason,
-        status,
-        created_at
+        leave_request_id,
+        leave_requests (
+          user_id,
+          leave_type,
+          start_date,
+          end_date,
+          reason,
+          status,
+          user:user_profiles (
+            first_name,
+            last_name,
+            employee_id
+          )
+        ),
+        created_at,
+        is_dismissed
       `
       )
 
@@ -45,7 +53,7 @@ export async function GET(request: NextRequest) {
       // Regional manager sees staff in their region
       query = query
         .eq("is_dismissed", false)
-        .in("status", ["pending", "approved", "rejected"])
+        .eq("leave_requests.status", "pending")
     } else if (profile.role === "department_head") {
       // Department head sees their department's staff
       const { data: deptStaff } = await supabase
@@ -54,10 +62,15 @@ export async function GET(request: NextRequest) {
         .eq("department_id", profile.department_id)
 
       const staffIds = deptStaff?.map(s => s.id) || []
-      query = query.in("user_id", staffIds).eq("is_dismissed", false)
+      query = query
+        .eq("is_dismissed", false)
+        .in("leave_requests.user_id", staffIds)
+        .eq("leave_requests.status", "pending")
     } else {
       // Staff only sees their own notifications
-      query = query.eq("user_id", user.id)
+      query = query
+        .eq("leave_requests.user_id", user.id)
+        .eq("is_dismissed", false)
     }
 
     const { data: notifications, error } = await query.order("created_at", { ascending: false })
@@ -67,15 +80,16 @@ export async function GET(request: NextRequest) {
     // Format the response
     const formattedNotifications = notifications?.map(notif => ({
       id: notif.id,
-      user_id: notif.user_id,
-      staff_name: `${notif.staff?.first_name} ${notif.staff?.last_name}`,
-      leave_type: notif.leave_type,
-      start_date: notif.start_date,
-      end_date: notif.end_date,
-      reason: notif.reason,
-      status: notif.status,
+      user_id: notif.leave_requests?.user_id,
+      staff_name: notif.leave_requests?.user ? `${notif.leave_requests.user.first_name} ${notif.leave_requests.user.last_name}` : "Unknown",
+      employee_id: notif.leave_requests?.user?.employee_id,
+      leave_type: notif.leave_requests?.leave_type,
+      start_date: notif.leave_requests?.start_date,
+      end_date: notif.leave_requests?.end_date,
+      reason: notif.leave_requests?.reason,
+      status: notif.leave_requests?.status,
       created_at: notif.created_at,
-      can_dismiss: profile.role !== "staff" || notif.status !== "pending",
+      can_dismiss: profile.role !== "staff" || notif.leave_requests?.status !== "pending",
     })) || []
 
     return NextResponse.json(formattedNotifications)
@@ -111,6 +125,17 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "approve" || action === "reject") {
+      // First get the leave_request_id from the notification
+      const { data: notification } = await supabase
+        .from("leave_notifications")
+        .select("leave_request_id")
+        .eq("id", notificationId)
+        .single()
+
+      if (!notification) {
+        return NextResponse.json({ error: "Notification not found" }, { status: 404 })
+      }
+
       // Check if user has permission to approve/reject
       const { data: profile } = await supabase
         .from("user_profiles")
@@ -123,33 +148,33 @@ export async function POST(request: NextRequest) {
       }
 
       const { error: updateError } = await supabase
-        .from("leave_notifications")
+        .from("leave_requests")
         .update({
           status: action === "approve" ? "approved" : "rejected",
-          reviewed_by: user.id,
-          reviewed_at: new Date().toISOString(),
+          approved_by: user.id,
+          updated_at: new Date().toISOString(),
         })
-        .eq("id", notificationId)
+        .eq("id", notification.leave_request_id)
 
       if (updateError) throw updateError
 
       // If approved, update the user's leave status
       if (action === "approve") {
-        const { data: notif } = await supabase
-          .from("leave_notifications")
+        const { data: leaveRequest } = await supabase
+          .from("leave_requests")
           .select("user_id, start_date, end_date")
-          .eq("id", notificationId)
+          .eq("id", notification.leave_request_id)
           .single()
 
-        if (notif) {
+        if (leaveRequest) {
           await supabase
             .from("user_profiles")
             .update({
               leave_status: "on_leave",
-              leave_start_date: notif.start_date,
-              leave_end_date: notif.end_date,
+              leave_start_date: leaveRequest.start_date,
+              leave_end_date: leaveRequest.end_date,
             })
-            .eq("id", notif.user_id)
+            .eq("id", leaveRequest.user_id)
         }
       }
 

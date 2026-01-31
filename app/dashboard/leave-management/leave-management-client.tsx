@@ -34,6 +34,9 @@ import {
   AlertCircle,
   Plus,
   Send,
+  Upload,
+  FileText,
+  X,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
@@ -86,6 +89,7 @@ export function LeaveManagementClient({
     leave_type: "annual",
     reason: "",
   })
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
 
   const handleSubmitLeave = async () => {
     if (!formData.start_date || !formData.end_date || !formData.reason) {
@@ -100,13 +104,26 @@ export function LeaveManagementClient({
 
     setSubmitting(true)
     try {
-      const response = await fetch("/api/leave/requests", {
+      // Create FormData for file upload
+      const formDataToSend = new FormData()
+      formDataToSend.append("start_date", formData.start_date)
+      formDataToSend.append("end_date", formData.end_date)
+      formDataToSend.append("reason", formData.reason)
+      formDataToSend.append("leave_type", formData.leave_type)
+      
+      if (uploadedFile) {
+        formDataToSend.append("document", uploadedFile)
+      }
+
+      const response = await fetch("/api/leave/request-leave", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: formDataToSend, // Remove Content-Type header for FormData
       })
 
       if (response.ok) {
+        setFormData({ start_date: "", end_date: "", leave_type: "annual", reason: "" })
+        setNewLeaveOpen(false)
+        setUploadedFile(null)
         // Refresh the page to get updated data
         window.location.reload()
       } else {
@@ -255,6 +272,60 @@ export function LeaveManagementClient({
                         onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
                         rows={4}
                       />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="document">Attachment (Optional)</Label>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            id="document"
+                            type="file"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                // Check file size (max 5MB)
+                                if (file.size > 5 * 1024 * 1024) {
+                                  alert("File size must be less than 5MB")
+                                  return
+                                }
+                                setUploadedFile(file)
+                              }
+                            }}
+                            className="hidden"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => document.getElementById("document")?.click()}
+                            className="w-full gap-2"
+                          >
+                            <Upload className="h-4 w-4" />
+                            {uploadedFile ? "Change File" : "Upload Document"}
+                          </Button>
+                        </div>
+                        {uploadedFile && (
+                          <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground flex-1 truncate">
+                              {uploadedFile.name}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setUploadedFile(null)}
+                              className="h-6 w-6 p-0"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Upload supporting documents (PDF, DOC, DOCX, JPG, PNG - Max 5MB)
+                        </p>
+                      </div>
                     </div>
 
                     <Button onClick={handleSubmitLeave} disabled={submitting} className="w-full gap-2">

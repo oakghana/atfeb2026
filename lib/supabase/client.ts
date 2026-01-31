@@ -7,10 +7,10 @@ export function createClient() {
     return clientInstance
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://vgtajtqxgczhykxtdcdz.supabase.co"
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://vgtajtqxgczhjboatvol.supabase.co"
   const supabaseAnonKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZndGFqdHF4Z2N6aHlreHRkY2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU0ODE3ODUsImV4cCI6MjA0MTA1Nzc4NX0.N_pqSB1rcr4SCXO-Ix9c-FwjvL4BZvO2TM7KjR9GGXA"
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZndGFqdHF4Z2N6aGpib2F0dm9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5NzUyNDgsImV4cCI6MjA3MjU1MTI0OH0.EuuTCRC-rDoz_WHl4pwpV6_fEqrqcgGroa4nTjAEn1k"
 
   console.log("[v0] Supabase client initialization:", {
     hasUrl: !!supabaseUrl,
