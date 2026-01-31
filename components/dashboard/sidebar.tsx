@@ -144,7 +144,7 @@ const navigationItems = [
     title: "Defaulters",
     href: "/dashboard/defaulters",
     icon: AlertCircle,
-    roles: ["admin", "regional_manager", "department_head"],
+    roles: ["admin", "department_head"],
     category: "admin",
   },
   {
@@ -165,7 +165,7 @@ const navigationItems = [
     title: "Device Monitoring",
     href: "/dashboard/device-violations",
     icon: ShieldAlert,
-    roles: ["admin", "regional_manager"],
+    roles: ["admin"],
     category: "admin",
     subItems: [
       {
@@ -182,7 +182,7 @@ const navigationItems = [
     title: "Staff Management",
     href: "/dashboard/staff",
     icon: Users,
-    roles: ["admin", "it-admin", "regional_manager"],
+    roles: ["admin", "it-admin"],
     category: "admin",
   },
   {

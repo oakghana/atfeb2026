@@ -29,16 +29,10 @@ Regional managers have enhanced admin capabilities compared to department heads:
 #### Compliance & Monitoring
 - **Excuse Duty Review** - Approve or reject excuse duty submissions
 - **QR Events** - Create and manage QR code attendance events
-- **Defaulters** - Monitor staff with attendance issues
 - **Warnings Archive** - View historical warnings and mass notification records
 - **Department Summaries** - See aggregated performance metrics
 
 #### Special Regional Manager Privileges
-- **Device Monitoring** - Track device security violations nationwide
-  - Security Violations dashboard with full nationwide visibility
-  - Weekly Device Sharing reports across all regions
-  - Only admin and regional manager can access this
-- **Staff Management** - View and manage staff profiles across the region
 - **Audit Logs** - Full audit trail of system activities and user actions
 - **Schedule** - View and manage organizational schedules and events
 
@@ -72,12 +66,13 @@ Regional managers can:
 Regional managers can:
 - Review excuse duty submissions and approve/reject them
 - Create and manage QR code attendance events
-- View device security violations
 - Access complete audit logs for accountability
 - Generate department summaries and performance reports
-- Manage staff profiles and information
 
 ### Restrictions (Cannot Do)
+- Cannot access Device Monitoring or Device Security (admin only)
+- Cannot access Staff Management features (admin and IT-admin only)
+- Cannot view Defaulters/Compliance Monitoring (admin and department heads only)
 - Cannot create or delete locations (admin only)
 - Cannot perform data bulk management (admin only)
 - Cannot activate new staff accounts (admin only)
@@ -96,10 +91,12 @@ Regional managers can:
 | View Own Reports | ✓ | ✓ | ✓ | ✓ |
 | View Dept Reports | ✗ | ✓ | ✓ | ✓ |
 | View **Nationwide** Reports | ✗ | ✗ | ✓ | ✓ |
-| Device Monitoring | ✗ | ✗ | ✓ | ✓ |
 | Manage QR Events | ✗ | ✓ | ✓ | ✓ |
+| Excuse Duty Review | ✗ | ✓ | ✓ | ✓ |
 | View Audit Logs | ✗ | ✗ | ✓ | ✓ |
-| Staff Management | ✗ | ✗ | ✓ | ✓ |
+| Device Monitoring | ✗ | ✗ | ✗ | ✓ |
+| Staff Management | ✗ | ✗ | ✗ | ✓ |
+| Defaulters Monitoring | ✗ | ✓ | ✗ | ✓ |
 | Create Locations | ✗ | ✗ | ✗ | ✓ |
 | Bulk Data Mgmt | ✗ | ✗ | ✗ | ✓ |
 
