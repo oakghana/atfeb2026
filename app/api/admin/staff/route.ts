@@ -218,8 +218,8 @@ export async function POST(request: NextRequest) {
 
     const { data: profile } = await supabase.from("user_profiles").select("role").eq("id", user.id).single()
 
-    if (!profile || (profile.role !== "admin" && profile.role !== "it-admin")) {
-      return createJsonResponse({ success: false, error: "Admin or IT-Admin access required" }, 403)
+    if (!profile || (profile.role !== "admin" && profile.role !== "it-admin" && profile.role !== "regional_manager")) {
+      return createJsonResponse({ success: false, error: "Admin, IT-Admin, or Regional Manageror Regional Manager access required" }, 403)
     }
 
     const body = await request.json()

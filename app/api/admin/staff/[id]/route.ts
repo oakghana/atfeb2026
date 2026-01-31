@@ -33,7 +33,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { data: profile } = await supabase.from("user_profiles").select("role").eq("id", user.id).single()
 
-    if (!profile || !["admin", "it-admin", "department_head"].includes(profile.role)) {
+    if (!profile || !["admin", "it-admin", "department_head", "regional_manager"].includes(profile.role)) {
       console.log("[v0] Insufficient permissions for user:", profile?.role)
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
     }
@@ -205,7 +205,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     // Check if user has admin role
     const { data: profile } = await supabase.from("user_profiles").select("role").eq("id", user.id).single()
 
-    if (!profile || profile.role !== "admin") {
+    if (!profile || !["admin", "regional_manager"].includes(profile.role)) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
     }
 

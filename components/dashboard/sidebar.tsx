@@ -42,6 +42,7 @@ import {
   TrendingUp,
   Calendar,
   Bell,
+  AlertTriangle,
 } from "lucide-react"
 import Image from "next/image"
 
@@ -182,14 +183,14 @@ const navigationItems = [
     title: "Staff Management",
     href: "/dashboard/staff",
     icon: Users,
-    roles: ["admin", "it-admin"],
+    roles: ["admin", "it-admin", "regional_manager"],
     category: "admin",
   },
   {
     title: "Staff Activation",
     href: "/dashboard/staff-activation",
     icon: UserCheck,
-    roles: ["admin"],
+    roles: ["admin", "regional_manager"],
     category: "admin",
   },
   {
@@ -203,6 +204,13 @@ const navigationItems = [
     title: "Audit Logs",
     href: "/dashboard/audit-logs",
     icon: Shield,
+    roles: ["admin"],
+    category: "admin",
+  },
+  {
+    title: "Emergency Admin",
+    href: "/dashboard/emergency-admin",
+    icon: AlertTriangle,
     roles: ["admin"],
     category: "admin",
   },
