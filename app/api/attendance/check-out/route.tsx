@@ -50,6 +50,39 @@ export async function POST(request: NextRequest) {
         .maybeSingle(),
     ])
 
+    // Prefer per-day `leave_status` table for accurate leave checks for today
+    const { data: onLeave } = await supabase
+      .from("leave_status")
+      .select("date, leave_request_id")
+      .eq("user_id", user.id)
+      .eq("date", today)
+      .eq("status", "on_leave")
+      .maybeSingle()
+
+    if (onLeave) {
+      let startDate: string | null = null
+      let endDate: string | null = null
+      if (onLeave.leave_request_id) {
+        const { data: lr } = await supabase
+          .from("leave_requests")
+          .select("start_date, end_date")
+          .eq("id", onLeave.leave_request_id)
+          .maybeSingle()
+        if (lr) {
+          startDate = lr.start_date
+          endDate = lr.end_date
+        }
+      }
+
+      return NextResponse.json(
+        {
+          error: `You are currently on approved leave${startDate && endDate ? ` from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` : ""}. You cannot check out during this period.`,
+        },
+        { status: 403 },
+      )
+    }
+
+    // Fallback: respect legacy `user_profiles.leave_status` if present
     if (userProfile && userProfile.leave_status && userProfile.leave_status !== "active") {
       const leaveType = userProfile.leave_status === "on_leave" ? "on leave" : "on sick leave"
       const endDate = userProfile.leave_end_date

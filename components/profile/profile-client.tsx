@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { User, Mail, Phone, MapPin, Building, Save, Camera, Lock, Key, Calendar, Eye, EyeOff, Settings2, Shield, Bell } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { clearAppCache } from "@/lib/cache-manager"
+import { RequestLeaveButton } from "@/components/leave/request-leave-button"
 import { PersonalAttendanceHistory } from "@/components/attendance/personal-attendance-history"
 import { SecureInput } from "@/components/ui/secure-input"
 import { validatePassword } from "@/lib/security"
@@ -812,9 +813,12 @@ export function ProfileClient({ initialUser, initialProfile }: ProfileClientProp
                   <Label className="text-sm font-medium">Notification Center</Label>
                   <p className="text-xs text-muted-foreground">View and manage your leave notifications</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => window.location.href = '/dashboard/leave-notifications'}>
-                  Manage
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => window.location.href = '/dashboard/leave-notifications'}>
+                    Manage
+                  </Button>
+                  <RequestLeaveButton />
+                </div>
               </div>
 
               <div className="flex items-center justify-between">

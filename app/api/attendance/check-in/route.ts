@@ -89,20 +89,33 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id)
       .maybeSingle()
 
-    // Check if user is on leave
+    // Check if user is on leave (per-day leave_status table)
     const { data: leaveStatus } = await supabase
       .from("leave_status")
-      .select("*")
+      .select("date, leave_request_id")
       .eq("user_id", user.id)
+      .eq("date", today)
       .eq("status", "on_leave")
-      .gte("end_date", today)
-      .lte("start_date", today)
       .maybeSingle()
 
     if (leaveStatus) {
+      let startDate: string | null = null
+      let endDate: string | null = null
+      if (leaveStatus.leave_request_id) {
+        const { data: lr } = await supabase
+          .from("leave_requests")
+          .select("start_date, end_date")
+          .eq("id", leaveStatus.leave_request_id)
+          .maybeSingle()
+        if (lr) {
+          startDate = lr.start_date
+          endDate = lr.end_date
+        }
+      }
+
       return NextResponse.json(
         {
-          error: `You are currently on approved leave from ${new Date(leaveStatus.start_date).toLocaleDateString()} to ${new Date(leaveStatus.end_date).toLocaleDateString()}. You cannot check in during this period. Please contact your manager if you believe this is incorrect.`,
+          error: `You are currently on approved leave${startDate && endDate ? ` from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` : ""}. You cannot check in during this period. Please contact your manager if you believe this is incorrect.`,
           onLeave: true,
         },
         { status: 403 }

@@ -44,7 +44,17 @@ export async function POST(request: NextRequest) {
       document_url = uploadData.path
     }
 
-    // Create leave request
+    // Determine creator role to decide auto-approval
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle()
+
+    const autoApproveRoles = ["admin", "regional_manager", "department_head"]
+    const shouldAutoApprove = profile && autoApproveRoles.includes(profile.role)
+
+    // Create leave request (status depends on role)
     const { data: leaveRequest, error: requestError } = await supabase
       .from("leave_requests")
       .insert({
@@ -53,7 +63,9 @@ export async function POST(request: NextRequest) {
         end_date,
         reason,
         leave_type,
-        status: "pending",
+        status: shouldAutoApprove ? "approved" : "pending",
+        approved_by: shouldAutoApprove ? user.id : null,
+        approved_at: shouldAutoApprove ? new Date().toISOString() : null,
         document_url,
       })
       .select()
@@ -69,12 +81,39 @@ export async function POST(request: NextRequest) {
       .insert({
         leave_request_id: leaveRequest.id,
         user_id: user.id,
-        notification_type: "leave_request",
-        status: "pending",
+        notification_type: shouldAutoApprove ? "leave_approved" : "leave_request",
+        status: shouldAutoApprove ? "approved" : "pending",
       })
 
     if (notificationError) {
-      return NextResponse.json({ error: notificationError.message }, { status: 400 })
+      console.warn("Failed to create leave notification:", notificationError.message)
+    }
+
+    // If auto-approved, also populate per-day leave_status rows (trigger only handles updates)
+    if (shouldAutoApprove) {
+      try {
+        const start = new Date(start_date)
+        const end = new Date(end_date)
+        const dates: string[] = []
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          dates.push(new Date(d).toISOString().split("T")[0])
+        }
+
+        const rows = dates.map((dt) => ({
+          user_id: user.id,
+          date: dt,
+          status: "on_leave",
+          leave_request_id: leaveRequest.id,
+        }))
+
+        // Upsert to avoid conflicts
+        const { error: leaveStatusError } = await supabase.from("leave_status").upsert(rows)
+        if (leaveStatusError) {
+          console.error("Failed to populate leave_status for auto-approved request:", leaveStatusError)
+        }
+      } catch (e) {
+        console.error("Error populating leave_status for auto-approved request:", e)
+      }
     }
 
     return NextResponse.json(

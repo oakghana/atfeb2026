@@ -56,28 +56,89 @@ export function LeaveNotificationsClient() {
   })
   const supabase = createClient()
 
+  const allowedRequestRoles = ["staff", "nsp", "intern", "it-admin", "regional_manager"]
+
+  const submitNewLeave = async () => {
+    if (!formData.start_date || !formData.end_date || !formData.reason) {
+      alert("Please fill in all required fields")
+      return
+    }
+    if (new Date(formData.start_date) >= new Date(formData.end_date)) {
+      alert("End date must be after start date")
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const m = new FormData()
+      m.append('start_date', formData.start_date)
+      m.append('end_date', formData.end_date)
+      m.append('reason', formData.reason)
+      m.append('leave_type', formData.leave_type)
+      if (uploadedFile) m.append('document', uploadedFile)
+
+      const resp = await fetch('/api/leave/request-leave', { method: 'POST', body: m })
+      if (resp.ok) {
+        setFormData({ start_date: '', end_date: '', leave_type: 'annual', reason: '' })
+        setUploadedFile(null)
+        setNewLeaveOpen(false)
+        await fetchNotifications()
+      } else {
+        const err = await resp.json()
+        alert(err.error || 'Failed to submit leave request')
+      }
+    } catch (e) {
+      console.error('Error submitting leave:', e)
+      alert('Failed to submit leave request')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   useEffect(() => {
     fetchNotifications()
   }, [])
 
-  const fetchNotifications = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+  const canRequestLeave = (role: string | null) => {
+    const allowed = ["staff", "nsp", "intern", "it-admin", "regional_manager"]
+    return role ? allowed.includes(role) : false
+  }
 
-      if (!user) return
+  const fetchNotifications = async () => {
+    const serialize = (v: any) => {
+      try {
+        return JSON.stringify(v)
+      } catch {
+        return String(v)
+      }
+    }
+
+    try {
+      setLoading(true)
+
+      const userRes = await supabase.auth.getUser()
+      const user = userRes?.data?.user
+      if (userRes?.error) console.warn("supabase.auth.getUser error:", serialize(userRes.error))
+
+      if (!user) {
+        console.warn("No authenticated user returned from supabase.auth.getUser")
+        setUserRole(null)
+        setNotifications([])
+        return
+      }
 
       // Get user profile to determine role
-      const { data: profile } = await supabase
+      const profileRes = await supabase
         .from("user_profiles")
         .select("role")
         .eq("id", user.id)
         .single()
 
+      if (profileRes?.error) console.warn("profile fetch error:", serialize(profileRes.error))
+      const profile = profileRes?.data
       setUserRole(profile?.role || null)
 
-      // Fetch leave notifications based on role
+      // Build query for leave requests
       let query = supabase
         .from("leave_requests")
         .select(`
@@ -101,25 +162,38 @@ export function LeaveNotificationsClient() {
         query = query.eq("user_id", user.id)
       } else if (profile?.role === "department_head") {
         // Department heads see requests from their department
-        const { data: deptProfile } = await supabase
+        const deptRes = await supabase
           .from("user_profiles")
           .select("department_id")
           .eq("id", user.id)
           .single()
 
+        if (deptRes?.error) console.warn("deptProfile fetch error:", serialize(deptRes.error))
+        const deptProfile = deptRes?.data
+
         if (deptProfile?.department_id) {
           query = query.eq("user.user_profiles.department_id", deptProfile.department_id)
         }
       }
-      // Regional managers and admins see all
 
       const { data, error } = await query
-
-      if (error) throw error
+      if (error) {
+        console.error("Supabase leave_requests query error:", serialize(error))
+        throw error
+      }
 
       setNotifications(data || [])
-    } catch (error) {
-      console.error("Error fetching notifications:", error)
+    } catch (err) {
+      // provide richer console output for debugging
+      if (err instanceof Error) {
+        console.error("Error fetching notifications:", err.message, err.stack)
+      } else {
+        try {
+          console.error("Error fetching notifications (non-Error):", JSON.stringify(err))
+        } catch {
+          console.error("Error fetching notifications (non-Error):", String(err))
+        }
+      }
     } finally {
       setLoading(false)
     }
@@ -187,7 +261,7 @@ export function LeaveNotificationsClient() {
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
-        {userRole === "staff" && (
+        {canRequestLeave(userRole) && (
           <div className="flex items-center justify-end mt-2">
             <Dialog open={newLeaveOpen} onOpenChange={setNewLeaveOpen}>
               <DialogTrigger asChild>
@@ -309,7 +383,7 @@ export function LeaveNotificationsClient() {
   }
 
   return (
-    <div className="space-y-8">
+      <div className="space-y-8">
       <div className="space-y-2">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-primary/10 rounded-lg">
@@ -323,6 +397,100 @@ export function LeaveNotificationsClient() {
               Manage leave requests and notifications
             </p>
           </div>
+              {allowedRequestRoles.includes(userRole || "") && (
+                <div className="ml-auto">
+                  <Dialog open={newLeaveOpen} onOpenChange={setNewLeaveOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Request Leave
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Request Leave</DialogTitle>
+                        <DialogDescription>Submit a new leave request for approval by your manager</DialogDescription>
+                      </DialogHeader>
+
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="leave_type">Leave Type</Label>
+                          <Select value={formData.leave_type} onValueChange={(value) => setFormData({ ...formData, leave_type: value })}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="annual">Annual Leave</SelectItem>
+                              <SelectItem value="sick">Sick Leave</SelectItem>
+                              <SelectItem value="maternity">Maternity Leave</SelectItem>
+                              <SelectItem value="paternity">Paternity Leave</SelectItem>
+                              <SelectItem value="unpaid">Unpaid Leave</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="start_date">Start Date</Label>
+                          <Input id="start_date" type="date" value={formData.start_date} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="end_date">End Date</Label>
+                          <Input id="end_date" type="date" value={formData.end_date} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="reason">Reason</Label>
+                          <Textarea id="reason" placeholder="Provide a reason for your leave request..." value={formData.reason} onChange={(e) => setFormData({ ...formData, reason: e.target.value })} rows={4} />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="document">Attachment (Optional)</Label>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Input id="document" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(e) => {
+                                const file = e.target.files?.[0]
+                                if (file) {
+                                  if (file.size > 5 * 1024 * 1024) {
+                                    alert("File size must be less than 5MB")
+                                    return
+                                  }
+                                  setUploadedFile(file)
+                                }
+                              }} className="hidden" />
+                              <Button type="button" variant="outline" onClick={() => document.getElementById("document")?.click()} className="w-full gap-2">Upload Document</Button>
+                            </div>
+                            {uploadedFile && (
+                              <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                                <span className="text-sm text-muted-foreground flex-1 truncate">{uploadedFile.name}</span>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => setUploadedFile(null)} className="h-6 w-6 p-0">X</Button>
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground">Upload supporting documents (Max 5MB)</p>
+                          </div>
+                        </div>
+
+                        <Button onClick={submitNewLeave} disabled={submitting} className="w-full gap-2">
+                          {submitting ? (<Loader2 className="h-4 w-4 animate-spin" />) : 'Submit Request'}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              )}
+            {canRequestLeave(userRole) && (
+              <div className="ml-auto">
+                <Dialog open={newLeaveOpen} onOpenChange={setNewLeaveOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Request Leave
+                    </Button>
+                  </DialogTrigger>
+                </Dialog>
+              </div>
+            )}
         </div>
       </div>
 

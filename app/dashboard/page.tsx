@@ -23,12 +23,7 @@ import {
   Star
 } from "lucide-react"
 import Link from "next/link"
-import dynamic from "next/dynamic"
-
-const RequestLeaveButtonWrapper = dynamic(
-  () => import("@/components/leave/request-leave-button").then((mod) => mod.RequestLeaveButton),
-  { ssr: false }
-)
+import RequestLeaveButtonWrapper from "@/components/leave/request-leave-button-client"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 
