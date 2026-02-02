@@ -61,6 +61,8 @@ interface SidebarProps {
       code: string
     }
   } | null
+  isCollapsed: boolean
+  setIsCollapsed: (value: boolean) => void
 }
 
 const navigationItems = [
@@ -223,7 +225,7 @@ const navigationItems = [
   },
 ]
 
-export function Sidebar({ user, profile }: SidebarProps) {
+export function Sidebar({ user, profile, isCollapsed, setIsCollapsed }: SidebarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isClearingCache, setIsClearingCache] = useState(false)
   const pathname = usePathname()
@@ -322,27 +324,47 @@ export function Sidebar({ user, profile }: SidebarProps) {
 
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 bg-gradient-to-b from-sidebar to-sidebar/95 backdrop-blur-xl border-r border-sidebar-border/50 shadow-2xl transform transition-all duration-300 ease-out lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 bg-gradient-to-b from-sidebar to-sidebar/95 backdrop-blur-xl border-r border-sidebar-border/50 shadow-2xl transform transition-all duration-300 ease-out lg:translate-x-0",
+          isCollapsed ? "lg:w-20 w-64" : "w-64",
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="flex flex-col h-full">
-          <div className="flex items-center gap-3 p-6 border-b border-sidebar-border/50 bg-gradient-to-r from-primary/5 to-accent/5">
-            <div className="relative p-2 bg-gradient-to-br from-primary/10 to-accent/10 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105">
-              <Image src="/images/qcc-logo.png" alt="QCC Logo" width={36} height={36} className="rounded-lg" />
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent rounded-xl opacity-0 hover:opacity-100 transition-opacity duration-300" />
-            </div>
-            <div>
-              <h2 className="font-bold text-sidebar-foreground text-lg tracking-tight">QCC Attendance</h2>
-              <p className="text-xs text-muted-foreground font-medium">Electronic System</p>
-            </div>
+          <div className="flex items-center gap-3 p-6 border-b border-sidebar-border/50 bg-gradient-to-r from-primary/5 to-accent/5 relative">
+            {!isCollapsed && (
+              <>
+                <div className="relative p-2 bg-gradient-to-br from-primary/10 to-accent/10 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105">
+                  <Image src="/images/qcc-logo.png" alt="QCC Logo" width={36} height={36} className="rounded-lg" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent rounded-xl opacity-0 hover:opacity-100 transition-opacity duration-300" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="font-bold text-sidebar-foreground text-lg tracking-tight">QCC Attendance</h2>
+                  <p className="text-xs text-muted-foreground font-medium">Electronic System</p>
+                </div>
+              </>
+            )}
+            {isCollapsed && (
+              <div className="relative p-2 bg-gradient-to-br from-primary/10 to-accent/10 rounded-xl shadow-sm mx-auto">
+                <Image src="/images/qcc-logo.png" alt="QCC Logo" width={32} height={32} className="rounded-lg" />
+              </div>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-background border border-border shadow-lg hover:bg-muted hover:scale-110 transition-all duration-200 z-50"
+            >
+              <ChevronRight className={cn("h-4 w-4 transition-transform duration-300", isCollapsed ? "" : "rotate-180")} />
+            </Button>
           </div>
 
           <nav className="flex-1 p-4 space-y-8 overflow-y-auto">
             <div className="space-y-2">
-              <div className="px-3 mb-3">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Main</h3>
-              </div>
+              {!isCollapsed && (
+                <div className="px-3 mb-3">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Main</h3>
+                </div>
+              )}
               {mainItems.map((item) => {
                 const Icon = item.icon
                 const isActive = pathname === item.href
@@ -350,8 +372,10 @@ export function Sidebar({ user, profile }: SidebarProps) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    title={isCollapsed ? item.title : undefined}
                     className={cn(
-                      "group flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px]",
+                      "group flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px]",
+                      isCollapsed ? "gap-0 px-0 py-4 justify-center" : "gap-3 px-4 py-4",
                       isActive
                         ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/25 scale-[1.02]"
                         : "text-sidebar-foreground hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 hover:text-foreground hover:shadow-md hover:scale-[1.01]",
@@ -366,8 +390,12 @@ export function Sidebar({ user, profile }: SidebarProps) {
                         isActive ? "scale-110" : "group-hover:scale-105",
                       )}
                     />
-                    <span className="flex-1">{item.title}</span>
-                    {isActive && <ChevronRight className="h-4 w-4 opacity-70" />}
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1">{item.title}</span>
+                        {isActive && <ChevronRight className="h-4 w-4 opacity-70" />}
+                      </>
+                    )}
                     {isActive && (
                       <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50" />
                     )}
@@ -378,17 +406,19 @@ export function Sidebar({ user, profile }: SidebarProps) {
 
             {adminItems.length > 0 && (
               <div className="space-y-2">
-                <div className="px-3 mb-3 flex items-center justify-between">
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Administration
-                  </h3>
-                  <Badge
-                    variant="secondary"
-                    className="text-xs px-2 py-0.5 bg-primary/10 text-primary border-primary/20"
-                  >
-                    Admin
-                  </Badge>
-                </div>
+                {!isCollapsed && (
+                  <div className="px-3 mb-3 flex items-center justify-between">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Administration
+                    </h3>
+                    <Badge
+                      variant="secondary"
+                      className="text-xs px-2 py-0.5 bg-primary/10 text-primary border-primary/20"
+                    >
+                      Admin
+                    </Badge>
+                  </div>
+                )}
                 {adminItems.map((item) => {
                   const Icon = item.icon
                   const isActive = pathname === item.href || item.subItems?.some((subItem) => pathname === subItem.href)
@@ -399,14 +429,20 @@ export function Sidebar({ user, profile }: SidebarProps) {
                       <DropdownMenu key={item.href}>
                         <DropdownMenuTrigger asChild>
                           <button
+                            title={isCollapsed ? item.title : undefined}
                             className={cn(
-                              "w-full group flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium transition-all duration-300 touch-manipulation min-h-[48px]",
+                              "w-full group flex items-center rounded-xl text-sm font-medium transition-all duration-300 touch-manipulation min-h-[48px]",
+                              isCollapsed ? "gap-0 px-0 py-4 justify-center" : "gap-3 px-4 py-4",
                               isActive ? "bg-primary text-primary-foreground hover:bg-primary/90" : "hover:bg-muted/50",
                             )}
                           >
                             <Icon className="h-5 w-5 flex-shrink-0" />
-                            <span className="flex-1 font-medium text-left">{item.title}</span>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1" />
+                            {!isCollapsed && (
+                              <>
+                                <span className="flex-1 font-medium text-left">{item.title}</span>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1" />
+                              </>
+                            )}
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
@@ -434,8 +470,10 @@ export function Sidebar({ user, profile }: SidebarProps) {
                     <Link
                       key={item.href}
                       href={item.href}
+                      title={isCollapsed ? item.title : undefined}
                       className={cn(
-                        "group flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px]",
+                        "group flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px]",
+                        isCollapsed ? "gap-0 px-0 py-4 justify-center" : "gap-3 px-4 py-4",
                         isActive
                           ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                           : "hover:bg-muted/50 text-foreground",
@@ -447,8 +485,12 @@ export function Sidebar({ user, profile }: SidebarProps) {
                           isActive ? "scale-110" : "group-hover:scale-105",
                         )}
                       />
-                      <span className="flex-1">{item.title}</span>
-                      {isActive && <ChevronRight className="h-4 w-4 opacity-70" />}
+                      {!isCollapsed && (
+                        <>
+                          <span className="flex-1">{item.title}</span>
+                          {isActive && <ChevronRight className="h-4 w-4 opacity-70" />}
+                        </>
+                      )}
                       {isActive && (
                         <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50" />
                       )}
@@ -459,9 +501,11 @@ export function Sidebar({ user, profile }: SidebarProps) {
             )}
 
             <div className="space-y-2">
-              <div className="px-3 mb-3">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Settings</h3>
-              </div>
+              {!isCollapsed && (
+                <div className="px-3 mb-3">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Settings</h3>
+                </div>
+              )}
               {settingsItems.map((item) => {
                 const Icon = item.icon
                 const isActive = pathname === item.href
@@ -469,8 +513,10 @@ export function Sidebar({ user, profile }: SidebarProps) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    title={isCollapsed ? item.title : undefined}
                     className={cn(
-                      "group flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px]",
+                      "group flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px]",
+                      isCollapsed ? "gap-0 px-0 py-4 justify-center" : "gap-3 px-4 py-4",
                       isActive
                         ? "bg-gradient-to-r from-accent to-accent/90 text-accent-foreground shadow-lg shadow-accent/25 scale-[1.02]"
                         : "text-sidebar-foreground hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 hover:text-foreground hover:shadow-md hover:scale-[1.01]",
@@ -485,8 +531,12 @@ export function Sidebar({ user, profile }: SidebarProps) {
                         isActive ? "scale-110" : "group-hover:scale-105",
                       )}
                     />
-                    <span className="flex-1">{item.title}</span>
-                    {isActive && <ChevronRight className="h-4 w-4 opacity-70" />}
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1">{item.title}</span>
+                        {isActive && <ChevronRight className="h-4 w-4 opacity-70" />}
+                      </>
+                    )}
                     {isActive && (
                       <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50" />
                     )}
@@ -496,7 +546,11 @@ export function Sidebar({ user, profile }: SidebarProps) {
               <button
                 onClick={handleClearCache}
                 disabled={isClearingCache}
-                className="group flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px] w-full text-sidebar-foreground hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 hover:text-foreground hover:shadow-md hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed"
+                title={isCollapsed ? "Clear Cache" : undefined}
+                className={cn(
+                  "group flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px] w-full text-sidebar-foreground hover:bg-gradient-to-r hover:from-muted hover:to-muted/50 hover:text-foreground hover:shadow-md hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed",
+                  isCollapsed ? "gap-0 px-0 py-4 justify-center" : "gap-3 px-4 py-4"
+                )}
               >
                 <RefreshCw
                   className={cn(
@@ -504,20 +558,83 @@ export function Sidebar({ user, profile }: SidebarProps) {
                     isClearingCache && "animate-spin",
                   )}
                 />
-                <span className="flex-1 text-left">{isClearingCache ? "Clearing..." : "Clear Cache"}</span>
+                {!isCollapsed && <span className="flex-1 text-left">{isClearingCache ? "Clearing..." : "Clear Cache"}</span>}
               </button>
               <button
                 onClick={handleSignOut}
-                className="group flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px] w-full text-destructive hover:bg-gradient-to-r hover:from-destructive/10 hover:to-destructive/5 hover:text-destructive hover:shadow-md hover:scale-[1.01]"
+                title={isCollapsed ? "Sign Out" : undefined}
+                className={cn(
+                  "group flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden touch-manipulation min-h-[48px] w-full text-destructive hover:bg-gradient-to-r hover:from-destructive/10 hover:to-destructive/5 hover:text-destructive hover:shadow-md hover:scale-[1.01]",
+                  isCollapsed ? "gap-0 px-0 py-4 justify-center" : "gap-3 px-4 py-4"
+                )}
               >
                 <LogOut className="h-5 w-5 flex-shrink-0 transition-transform duration-300 group-hover:scale-105" />
-                <span className="flex-1 text-left">Sign Out</span>
+                {!isCollapsed && <span className="flex-1 text-left">Sign Out</span>}
               </button>
             </div>
           </nav>
 
           <div className="p-4 border-t border-sidebar-border/50 bg-gradient-to-r from-muted/20 to-transparent">
-            <DropdownMenu>
+            {isCollapsed ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="w-full h-12 hover:bg-muted/50 rounded-xl transition-all duration-200 touch-manipulation"
+                  >
+                    <div className="relative">
+                      <Avatar className="h-8 w-8 ring-2 ring-primary/20 transition-all duration-300 hover:ring-primary/40">
+                        <AvatarImage src={profile?.profile_image_url || "/placeholder.svg"} />
+                        <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-xs font-bold">
+                          {userInitials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-sidebar shadow-sm" />
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-64 shadow-xl border-border/50 bg-background/95 backdrop-blur-xl"
+                >
+                  <DropdownMenuLabel className="font-semibold">
+                    {profile ? `${profile.first_name} ${profile.last_name}` : "Loading..."}
+                    <p className="text-xs text-muted-foreground font-normal mt-1">
+                      {profile?.departments?.name || "No department"}
+                    </p>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-border/50" />
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href="/dashboard/profile"
+                      className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-muted/50 rounded-lg transition-all duration-200 touch-manipulation min-h-[44px]"
+                    >
+                      <User className="h-4 w-4" />
+                      <span className="font-medium">Profile Settings</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href="/dashboard/settings"
+                      className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-muted/50 rounded-lg transition-all duration-200 touch-manipulation min-h-[44px]"
+                    >
+                      <Settings className="h-4 w-4" />
+                      <span className="font-medium">Preferences</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-border/50" />
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="text-destructive focus:text-destructive focus:bg-destructive/10 flex items-center gap-3 px-3 py-3 cursor-pointer rounded-lg transition-all duration-200 touch-manipulation min-h-[44px]"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span className="font-medium">Sign Out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
