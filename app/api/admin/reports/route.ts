@@ -28,6 +28,14 @@ export async function GET(request: NextRequest) {
     const locationId = searchParams.get("location_id")
     const departmentId = searchParams.get("department_id")
 
+    // Pagination params (optional)
+    const pageParam = searchParams.get("page")
+    const pageSizeParam = searchParams.get("page_size")
+    const page = pageParam ? Math.max(1, parseInt(pageParam, 10) || 1) : 1
+    const pageSize = pageSizeParam ? Math.max(1, parseInt(pageSizeParam, 10) || 50) : 50
+    const startIndex = (page - 1) * pageSize
+    const endIndex = startIndex + pageSize - 1
+
     // Build attendance query
     let attendanceQuery = supabase.from("attendance_records").select(`
         *,
@@ -48,11 +56,21 @@ export async function GET(request: NextRequest) {
     if (endDate) {
       attendanceQuery = attendanceQuery.lte("check_in_time", endDate)
     }
-    if (locationId) {
-      attendanceQuery = attendanceQuery.eq("location_id", locationId)
+
+    // sanitize incoming params
+    const safeLocationId = locationId && locationId !== "undefined" ? locationId : null
+    const safeDepartmentId = departmentId && departmentId !== "undefined" ? departmentId : null
+
+    if (safeLocationId) {
+      attendanceQuery = attendanceQuery.eq("location_id", safeLocationId)
+    }
+    if (safeDepartmentId) {
+      // department filtering will be applied after joining if necessary; attempt server-side where possible
+      attendanceQuery = attendanceQuery.eq("department_id", safeDepartmentId)
     }
 
-    const { data: attendanceData, error: attendanceError } = await attendanceQuery
+    // Apply ordering and pagination
+    const { data: attendanceData, error: attendanceError } = await attendanceQuery.order("check_in_time", { ascending: false }).range(startIndex, endIndex)
 
     if (attendanceError) {
       console.error("Error fetching attendance data:", attendanceError)
@@ -67,8 +85,27 @@ export async function GET(request: NextRequest) {
       .select("id", { count: "exact", head: true })
       .eq("is_active", true)
 
+    // total matching records (without pagination)
+    let totalRecords = 0
+    try {
+      const countQuery = supabase.from("attendance_records").select("id", { count: "exact", head: true })
+      if (startDate) countQuery.gte("check_in_time", startDate)
+      if (endDate) countQuery.lte("check_in_time", endDate)
+      if (safeLocationId) countQuery.eq("location_id", safeLocationId)
+      if (safeDepartmentId) countQuery.eq("department_id", safeDepartmentId)
+
+      const { count: countResult, error: countError } = await countQuery
+      if (countError) {
+        console.error("Reports count query error:", countError)
+      } else {
+        totalRecords = countResult || 0
+      }
+    } catch (err) {
+      console.error("Reports count exception:", err)
+    }
+
     // Calculate attendance statistics
-    const totalRecords = attendanceData?.length || 0
+    const totalRecordsOnPage = attendanceData?.length || 0
     const uniqueUsers = new Set(attendanceData?.map((record) => record.user_id)).size
     const avgCheckInTime =
       attendanceData?.length > 0
@@ -84,7 +121,10 @@ export async function GET(request: NextRequest) {
         totalUsers: totalUsers?.length || 0,
         activeUsers: activeUsers?.length || 0,
         totalRecords,
+        totalRecordsOnPage,
         uniqueUsers,
+        page,
+        pageSize,
         avgCheckInTime:
           Math.floor(avgCheckInTime / 60) + ":" + String(Math.floor(avgCheckInTime % 60)).padStart(2, "0"),
       },

@@ -149,3 +149,47 @@ class EmailService {
 
 export const emailService = new EmailService()
 export { EmailService }
+
+export async function sendEmergencyCheckoutNotification(payload: {
+  userName: string
+  employeeId: string
+  department: string
+  checkInTime: string
+  checkOutTime: string
+  workHours: string | number
+  emergencyReason: string
+  location: string
+}) {
+  try {
+    const recipientsEnv = process.env.EMERGENCY_NOTIFICATION_EMAILS || process.env.SMTP_USER || ""
+    const recipients = recipientsEnv.split(",").map((s) => s.trim()).filter(Boolean)
+
+    if (recipients.length === 0) {
+      console.warn("[EmailService] No emergency notification recipients configured")
+      return { success: false, error: "No recipients configured" }
+    }
+
+    const subject = `Emergency Check-out: ${payload.userName} (${payload.employeeId})`
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626">Emergency Check-out Notification</h2>
+        <p><strong>Employee:</strong> ${payload.userName} (${payload.employeeId})</p>
+        <p><strong>Department:</strong> ${payload.department}</p>
+        <p><strong>Location:</strong> ${payload.location}</p>
+        <p><strong>Check-in Time:</strong> ${payload.checkInTime}</p>
+        <p><strong>Check-out Time:</strong> ${payload.checkOutTime}</p>
+        <p><strong>Work Hours:</strong> ${payload.workHours}</p>
+        <p><strong>Reason:</strong> ${payload.emergencyReason}</p>
+        <hr>
+        <p style="color:#666; font-size:12px">This is an automated notification from QCC Attendance System.</p>
+      </div>
+    `
+
+    const text = `Emergency Check-out by ${payload.userName} (${payload.employeeId})\nDepartment: ${payload.department}\nLocation: ${payload.location}\nCheck-in: ${payload.checkInTime}\nCheck-out: ${payload.checkOutTime}\nWork Hours: ${payload.workHours}\nReason: ${payload.emergencyReason}`
+
+    return await emailService.sendEmail(recipients.join(","), { subject, html, text })
+  } catch (error) {
+    console.error("[EmailService] sendEmergencyCheckoutNotification error:", error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}

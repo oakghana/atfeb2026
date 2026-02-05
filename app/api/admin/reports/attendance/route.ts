@@ -75,11 +75,24 @@ export async function GET(request: NextRequest) {
       query = query.eq("user_id", userId)
     }
 
-    if (locationId) {
-      query = query.eq("check_in_location_id", locationId)
+    // Validate incoming UUID-like params to avoid invalid input to Postgres
+    const safeLocationId = locationId && locationId !== "undefined" ? locationId : null
+    const safeDistrictId = districtId && districtId !== "undefined" ? districtId : null
+    const safeDepartmentId = departmentId && departmentId !== "undefined" ? departmentId : null
+
+    if (safeLocationId) {
+      query = query.eq("check_in_location_id", safeLocationId)
     }
 
-    const { data: attendanceRecords, error } = await query.order("check_in_time", { ascending: false })
+    // Apply ordering and pagination
+    const pageParam = searchParams.get("page")
+    const pageSizeParam = searchParams.get("page_size")
+    const page = pageParam ? Math.max(1, parseInt(pageParam, 10) || 1) : 1
+    const pageSize = pageSizeParam ? Math.max(1, parseInt(pageSizeParam, 10) || 50) : 50
+    const startIndex = (page - 1) * pageSize
+    const endIndex = startIndex + pageSize - 1
+
+    const { data: attendanceRecords, error } = await query.order("check_in_time", { ascending: false }).range(startIndex, endIndex)
 
     if (error) {
       console.error("[v0] Reports API - Attendance query error:", error)
@@ -140,14 +153,12 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    if (districtId) {
+    if (safeDistrictId) {
       filteredRecords = filteredRecords.filter((record) => {
         const user = userMap.get(record.user_id)
-        // Check if user's assigned location is in the selected district
         return (
-          user?.assigned_location?.district_id === districtId ||
-          // Or if the check-in location is in the selected district
-          record.check_in_location?.district_id === districtId
+          user?.assigned_location?.district_id === safeDistrictId ||
+          record.check_in_location?.district_id === safeDistrictId
         )
       })
     }
@@ -177,18 +188,32 @@ export async function GET(request: NextRequest) {
     })
 
     // Calculate summary statistics
-    const { count: totalRecords, error: countError } = await supabase
-      .from("attendance_records")
-      .select("id", { count: "exact" })
-      .gte("check_in_time", `${startDate}T00:00:00`)
-      .lte("check_in_time", `${endDate}T23:59:59`)
+    // Calculate total matching records (without pagination)
+    let totalRecords = 0
+    try {
+      const countQuery = supabase
+        .from("attendance_records")
+        .select("id", { count: "exact", head: true })
+        .gte("check_in_time", `${startDate}T00:00:00`)
+        .lte("check_in_time", `${endDate}T23:59:59`)
 
-    if (countError) {
-      console.error("[v0] Reports API - Count query error:", countError)
-      return NextResponse.json({ error: "Failed to fetch attendance count" }, { status: 500 })
+      if (profile.role === "staff") {
+        countQuery.eq("user_id", user.id)
+      } else if (userId) {
+        countQuery.eq("user_id", userId)
+      }
+      if (safeLocationId) countQuery.eq("check_in_location_id", safeLocationId)
+
+      const { count: countResult, error: countError } = await countQuery
+      if (countError) {
+        console.error("[v0] Reports API - Count query error:", countError)
+      } else {
+        totalRecords = countResult || 0
+        console.log("[v0] Reports API - Total records:", totalRecords)
+      }
+    } catch (err) {
+      console.error("[v0] Reports API - Count exception:", err)
     }
-
-    console.log("[v0] Reports API - Total records:", totalRecords)
 
     const totalWorkHours = enrichedRecords.reduce((sum, record) => sum + (record.work_hours || 0), 0)
     const averageWorkHours = totalRecords > 0 ? totalWorkHours / totalRecords : 0

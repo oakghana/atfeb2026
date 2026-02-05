@@ -55,6 +55,7 @@ interface AttendanceRecord {
   is_check_in_outside_location?: boolean
   is_check_out_outside_location?: boolean
   early_checkout_reason?: string
+  lateness_reason?: string
   notes?: string
   user_profiles: {
     first_name: string
@@ -117,6 +118,17 @@ export function AttendanceReports() {
   const [sortKey, setSortKey] = useState<string>("check_in_time")
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
+  const [page, setPage] = useState<number>(1)
+  const [pageSize, setPageSize] = useState<number>(50)
+  const [totalRecords, setTotalRecords] = useState<number>(0)
+  const [reasonsPage, setReasonsPage] = useState<number>(1)
+  const reasonsPageSize = 20
+  const [earlyPage, setEarlyPage] = useState<number>(1)
+  const earlyPageSize = 20
+  const [activeTab, setActiveTab] = useState<string>("details")
+  const [reasonsRecords, setReasonsRecords] = useState<AttendanceRecord[]>([])
+  const [reasonsLoading, setReasonsLoading] = useState<boolean>(false)
+
   const visibleColumnCount = 9
 
   const [exporting, setExporting] = useState(false)
@@ -137,7 +149,43 @@ export function AttendanceReports() {
     fetchDepartments()
     fetchLocations()
     fetchDistricts()
-  }, [startDate, endDate, selectedDepartment, selectedLocation, selectedDistrict, selectedStatus])
+  }, [startDate, endDate, selectedDepartment, selectedLocation, selectedDistrict, selectedStatus, page, pageSize])
+
+  useEffect(() => {
+    // When the Reasons tab is opened, fetch a larger set that contains all reason entries
+    if (activeTab === "reasons") {
+      fetchReasons()
+    }
+  }, [activeTab, startDate, endDate, selectedLocation, selectedDepartment, selectedDistrict])
+
+  const fetchReasons = async () => {
+    setReasonsLoading(true)
+    try {
+      const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate,
+        page: "1",
+        page_size: String(1000), // large page to capture many reason entries; adjust if dataset larger
+      })
+
+      if (selectedDepartment !== "all") params.append("department_id", selectedDepartment)
+      if (selectedLocation !== "all") params.append("location_id", selectedLocation)
+      if (selectedDistrict !== "all") params.append("district_id", selectedDistrict)
+
+      const res = await fetch(`/api/admin/reports/attendance?${params}`)
+      const json = await res.json()
+      if (json.success) {
+        // use the server-provided records (unpaged large set)
+        setReasonsRecords(json.data.records || [])
+      } else {
+        console.error("Failed to fetch reasons:", json.error)
+      }
+    } catch (err) {
+      console.error("Failed to fetch reasons:", err)
+    } finally {
+      setReasonsLoading(false)
+    }
+  }
 
   const fetchReport = async () => {
     setLoading(true)
@@ -154,6 +202,9 @@ export function AttendanceReports() {
       if (selectedLocation !== "all") params.append("location_id", selectedLocation)
       if (selectedDistrict !== "all") params.append("district_id", selectedDistrict)
       if (selectedStatus !== "all") params.append("status", selectedStatus)
+      // Pagination params
+      params.append("page", String(page))
+      params.append("page_size", String(pageSize))
 
       console.log("[v0] API call URL:", `/api/admin/reports/attendance?${params}`)
 
@@ -165,7 +216,8 @@ export function AttendanceReports() {
       if (result.success) {
         setRecords(result.data.records || [])
         setSummary(result.data.summary || null)
-        console.log("[v0] Successfully loaded", result.data.records?.length || 0, "records")
+        setTotalRecords(result.data.summary?.totalRecords || 0)
+        console.log("[v0] Successfully loaded", result.data.records?.length || 0, "records (page)")
       } else {
         console.error("[v0] API error:", result.error)
         setExportError(result.error || "Failed to fetch report data")
@@ -247,6 +299,7 @@ export function AttendanceReports() {
             "Check Out Location",
             "Check Out Status",
             "Early Checkout Reason",
+            "Lateness Reason",
             "Work Hours",
             "Status",
             "Location Status",
@@ -265,6 +318,7 @@ export function AttendanceReports() {
               `"${record.check_out_location?.name || record.check_out_location_name || "N/A"}"`,
               `"${record.is_check_out_outside_location ? "Outside Assigned Location" : "On-site"}"`,
               `"${record.early_checkout_reason || "-"}"`,
+              `"${record.lateness_reason || "-"}"`,
               record.work_hours?.toFixed(2) || "0",
               `"${record.status}"`,
               `"${record.is_check_in_outside_location || record.is_check_out_outside_location ? "Remote Work" : "On-site"}"`,
@@ -490,6 +544,15 @@ export function AttendanceReports() {
     })
     return arr
   }, [filteredRecords, sortKey, sortDir])
+
+  // Derived paged lists for Reasons tab (computed here to avoid inline IIFEs in JSX)
+  const latenessList = reasonsRecords.filter((r) => r.lateness_reason)
+  const latenessStart = (reasonsPage - 1) * reasonsPageSize
+  const latenessPageItems = latenessList.slice(latenessStart, latenessStart + reasonsPageSize)
+
+  const earlyList = reasonsRecords.filter((r) => r.early_checkout_reason)
+  const earlyStart = (earlyPage - 1) * earlyPageSize
+  const earlyPageItems = earlyList.slice(earlyStart, earlyStart + earlyPageSize)
 
   return (
     <div className="space-y-8">
@@ -822,9 +885,9 @@ export function AttendanceReports() {
 
       <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
         <div className="border-b border-gray-100">
-          <Tabs defaultValue="details" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="details" className="w-full">
             <div className="px-8 pt-6">
-              <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 rounded-2xl h-14">
+              <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-2xl h-14">
                 <TabsTrigger
                   value="details"
                   className="rounded-xl text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all duration-200"
@@ -842,6 +905,12 @@ export function AttendanceReports() {
                   className="rounded-xl text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all duration-200"
                 >
                   🏢 Departments
+                </TabsTrigger>
+                <TabsTrigger
+                  value="reasons"
+                  className="rounded-xl text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all duration-200"
+                >
+                  📝 Reasons
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -1036,59 +1105,59 @@ export function AttendanceReports() {
             </TabsContent>
 
             <TabsContent value="details" className="px-8 py-8">
-              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden dark:bg-slate-900 dark:border-slate-700">
                 <div className="p-6 border-b border-gray-200">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900">Detailed Records</h3>
-                      <p className="text-gray-600 mt-1">
-                        Showing {filteredRecords.length} of {records.length} records
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-slate-100">Detailed Records</h3>
+                      <p className="text-gray-600 dark:text-slate-300 mt-1">
+                        Showing {records.length} of {totalRecords.toLocaleString()} records
                       </p>
                     </div>
-                    <Badge variant="secondary" className="px-4 py-2">
-                      {filteredRecords.length} Records
+                      <Badge variant="secondary" className="px-4 py-2 dark:bg-slate-800 dark:text-slate-100">
+                      {records.length} Records (page)
                     </Badge>
                   </div>
                 </div>
 
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="min-w-full text-sm text-gray-800 dark:text-slate-200">
                     <TableHeader>
-                      <TableRow className="bg-gray-50 hover:bg-gray-50">
-                        <TableHead className="font-semibold text-gray-700 py-4 cursor-pointer" onClick={() => toggleSort('check_in_time')}>Date</TableHead>
-                        <TableHead className="font-semibold text-gray-700 py-4 cursor-pointer" onClick={() => toggleSort('last_name')}>Employee</TableHead>
-                        <TableHead className="font-semibold text-gray-700 py-4 cursor-pointer" onClick={() => toggleSort('department')}>Department</TableHead>
-                        <TableHead className="font-semibold text-gray-700 py-4 cursor-pointer" onClick={() => toggleSort('check_in_time')}>Check In</TableHead>
-                        <TableHead className="font-semibold text-gray-700 py-4">Check In Location</TableHead>
-                        <TableHead className="font-semibold text-gray-700 py-4 cursor-pointer" onClick={() => toggleSort('check_out_time')}>Check Out</TableHead>
-                        <TableHead className="font-semibold text-gray-700 py-4">Check Out Location</TableHead>
-                        <TableHead className="font-semibold text-gray-700 py-4 cursor-pointer" onClick={() => toggleSort('work_hours')}>Hours</TableHead>
-                        <TableHead className="font-semibold text-gray-700 py-4 cursor-pointer" onClick={() => toggleSort('status')}>Status</TableHead>
-                        <TableHead className="font-semibold text-gray-700 py-4">Comment</TableHead>
-                        <TableHead className="font-semibold text-gray-700 py-4">Reason</TableHead>
+                      <TableRow className="bg-gray-50 dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700">
+                        <TableHead className="font-semibold text-gray-700 dark:text-slate-200 py-4 cursor-pointer" onClick={() => toggleSort('check_in_time')}>Date</TableHead>
+                        <TableHead className="font-semibold text-gray-700 dark:text-slate-200 py-4 cursor-pointer" onClick={() => toggleSort('last_name')}>Employee</TableHead>
+                        <TableHead className="font-semibold text-gray-700 dark:text-slate-200 py-4 cursor-pointer" onClick={() => toggleSort('department')}>Department</TableHead>
+                        <TableHead className="font-semibold text-gray-700 dark:text-slate-200 py-4 cursor-pointer" onClick={() => toggleSort('check_in_time')}>Check In</TableHead>
+                        <TableHead className="font-semibold text-gray-700 dark:text-slate-200 py-4">Check In Location</TableHead>
+                        <TableHead className="font-semibold text-gray-700 dark:text-slate-200 py-4 cursor-pointer" onClick={() => toggleSort('check_out_time')}>Check Out</TableHead>
+                        <TableHead className="font-semibold text-gray-700 dark:text-slate-200 py-4">Check Out Location</TableHead>
+                        <TableHead className="font-semibold text-gray-700 dark:text-slate-200 py-4 cursor-pointer" onClick={() => toggleSort('work_hours')}>Hours</TableHead>
+                        <TableHead className="font-semibold text-gray-700 dark:text-slate-200 py-4 cursor-pointer" onClick={() => toggleSort('status')}>Status</TableHead>
+                        <TableHead className="font-semibold text-gray-700 dark:text-slate-200 py-4">Comment</TableHead>
+                        <TableHead className="font-semibold text-gray-700 dark:text-slate-200 py-4">Reason</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sortedRecords.slice(0, 100).map((record) => (
-                        <TableRow key={record.id} className="hover:bg-gray-50 transition-colors">
-                          <TableCell className="py-4">{new Date(record.check_in_time).toLocaleDateString()}</TableCell>
-                          <TableCell className="py-4">
+                      {sortedRecords.map((record) => (
+                        <TableRow key={record.id} className="bg-white dark:bg-slate-900 even:bg-gray-50 dark:even:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                          <TableCell className="py-4 text-gray-800 dark:text-slate-200">{new Date(record.check_in_time).toLocaleDateString()}</TableCell>
+                          <TableCell className="py-4 text-gray-800 dark:text-slate-200">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-xs font-medium">
+                              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
                                 {record.user_profiles.first_name[0]}{record.user_profiles.last_name[0]}
                               </div>
                               <div>
-                                <p className="font-medium text-gray-900">{record.user_profiles.first_name} {record.user_profiles.last_name}</p>
-                                <p className="text-sm text-gray-500">{record.user_profiles.employee_id}</p>
+                                <p className="font-medium text-gray-900 dark:text-slate-100">{record.user_profiles.first_name} {record.user_profiles.last_name}</p>
+                                <p className="text-sm text-gray-600 dark:text-slate-300">{record.user_profiles.employee_id}</p>
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="py-4"><Badge variant="outline" className="font-medium">{record.user_profiles.departments?.name || 'N/A'}</Badge></TableCell>
-                          <TableCell className="py-4">{new Date(record.check_in_time).toLocaleTimeString()}</TableCell>
-                          <TableCell className="py-4"><div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-gray-400" /><span className="text-sm">{record.check_in_location_name || 'N/A'}</span></div></TableCell>
-                          <TableCell className="py-4">{record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : <span className="text-gray-400">-</span>}</TableCell>
-                          <TableCell className="py-4"><div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-gray-400" /><span className="text-sm">{record.check_out_location_name || 'N/A'}</span></div></TableCell>
-                          <TableCell className="py-4"><span className="font-medium">{record.work_hours ? `${record.work_hours.toFixed(1)}h` : '-'}</span></TableCell>
+                          <TableCell className="py-4"><Badge variant="outline" className="font-medium text-gray-700 dark:text-slate-200">{record.user_profiles.departments?.name || 'N/A'}</Badge></TableCell>
+                          <TableCell className="py-4 text-gray-800 dark:text-slate-200">{new Date(record.check_in_time).toLocaleTimeString()}</TableCell>
+                          <TableCell className="py-4 text-gray-800 dark:text-slate-200"><div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-gray-500 dark:text-slate-400" /><span className="text-sm text-gray-700 dark:text-slate-300">{record.check_in_location_name || 'N/A'}</span></div></TableCell>
+                          <TableCell className="py-4 text-gray-800 dark:text-slate-200">{record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : <span className="text-gray-400 dark:text-slate-400">-</span>}</TableCell>
+                          <TableCell className="py-4 text-gray-800 dark:text-slate-200"><div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-gray-500 dark:text-slate-400" /><span className="text-sm text-gray-700 dark:text-slate-300">{record.check_out_location_name || 'N/A'}</span></div></TableCell>
+                          <TableCell className="py-4 text-gray-800 dark:text-slate-200"><span className="font-medium">{record.work_hours ? `${record.work_hours.toFixed(1)}h` : '-'}</span></TableCell>
                           <TableCell className="py-4"><Badge
                             variant={
                               record.status === 'present' ? 'default' :
@@ -1098,24 +1167,39 @@ export function AttendanceReports() {
                             className="font-medium"
                           >{record.status.charAt(0).toUpperCase() + record.status.slice(1).replace('_', ' ')}</Badge></TableCell>
                           <TableCell className="py-4">
-                            <span className="text-sm text-gray-600">
+                            <span className="text-sm text-gray-700 dark:text-slate-300">
                               {record.notes ? (
                                 <span className="max-w-xs truncate block" title={record.notes}>
                                   {record.notes}
                                 </span>
                               ) : (
-                                <span className="text-gray-400">-</span>
+                                <span className="text-gray-400 dark:text-slate-400">-</span>
                               )}
                             </span>
                           </TableCell>
                           <TableCell className="py-4">
-                            <span className="text-sm text-gray-600">
-                              {record.early_checkout_reason ? (
-                                <span className="max-w-xs truncate block" title={record.early_checkout_reason}>
-                                  {record.early_checkout_reason}
-                                </span>
+                            <span className="text-sm text-gray-700 dark:text-slate-300">
+                              {record.lateness_reason || record.early_checkout_reason ? (
+                                <div className="space-y-1">
+                                  {record.lateness_reason && (
+                                    <div className="text-orange-600">
+                                      <span className="font-medium">Late:</span>
+                                      <span className="max-w-xs truncate block ml-1" title={record.lateness_reason}>
+                                        {record.lateness_reason}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {record.early_checkout_reason && (
+                                    <div className="text-blue-600">
+                                      <span className="font-medium">Early:</span>
+                                      <span className="max-w-xs truncate block ml-1" title={record.early_checkout_reason}>
+                                        {record.early_checkout_reason}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
                               ) : (
-                                <span className="text-gray-400">-</span>
+                                <span className="text-gray-400 dark:text-slate-400">-</span>
                               )}
                             </span>
                           </TableCell>
@@ -1125,13 +1209,188 @@ export function AttendanceReports() {
                   </Table>
                 </div>
 
-                {filteredRecords.length > 100 && (
-                  <div className="p-6 border-t border-gray-200 bg-gray-50">
-                    <p className="text-sm text-gray-600 text-center">
-                      Showing first 100 records. Use filters to narrow down results or export for full data.
-                    </p>
+                {/* Pagination Controls */}
+                <div className="p-6 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setPage(1)} disabled={page === 1}>First</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
+                    <span className="text-sm text-gray-600">Page {page} of {Math.max(1, Math.ceil(totalRecords / pageSize))}</span>
+                    <Button variant="ghost" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= Math.max(1, Math.ceil(totalRecords / pageSize))}>Next</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setPage(Math.max(1, Math.ceil(totalRecords / pageSize)))} disabled={page >= Math.max(1, Math.ceil(totalRecords / pageSize))}>Last</Button>
                   </div>
-                )}
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Page size:</span>
+                    <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(parseInt(v, 10)); setPage(1); }}>
+                      <SelectTrigger className="w-24 h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="reasons" className="px-8 py-8">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900">Attendance Reasons</h3>
+                    <p className="text-gray-600 mt-1">Review lateness and early checkout explanations</p>
+                  </div>
+                  <Badge variant="secondary" className="px-4 py-2">
+                      {reasonsRecords.filter(r => r.lateness_reason || r.early_checkout_reason).length} Records with Reasons
+                  </Badge>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-orange-500" />
+                        Lateness Reasons
+                      </CardTitle>
+                      <CardDescription>Staff explanations for arriving after 9:00 AM</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {latenessPageItems.map((record) => (
+                            <div key={record.id} className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-900">
+                                    {record.user_profiles.first_name} {record.user_profiles.last_name}
+                                  </p>
+                                  <p className="text-sm text-gray-600">
+                                    {new Date(record.check_in_time).toLocaleDateString()} at {new Date(record.check_in_time).toLocaleTimeString()}
+                                  </p>
+                                  <p className="text-sm text-orange-700 mt-2 font-medium">
+                                    {record.lateness_reason}
+                                  </p>
+                                </div>
+                                <Badge variant="secondary" className="ml-2">
+                                  {record.user_profiles.departments?.name}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        {latenessList.length === 0 && (
+                          <p className="text-gray-500 text-center py-4">No lateness reasons recorded</p>
+                        )}
+
+                        {/* Lateness pagination controls */}
+                        {reasonsRecords.filter(r => r.lateness_reason).length > reasonsPageSize && (
+                          <div className="flex items-center justify-between mt-4">
+                            <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => setReasonsPage(1)} disabled={reasonsPage === 1}>First</Button>
+                              <Button variant="ghost" size="sm" onClick={() => setReasonsPage((p) => Math.max(1, p - 1))} disabled={reasonsPage === 1}>Prev</Button>
+                              <span className="text-sm text-gray-600">Page {reasonsPage} of {Math.max(1, Math.ceil(reasonsRecords.filter(r => r.lateness_reason).length / reasonsPageSize))}</span>
+                              <Button variant="ghost" size="sm" onClick={() => setReasonsPage((p) => p + 1)} disabled={reasonsPage >= Math.max(1, Math.ceil(reasonsRecords.filter(r => r.lateness_reason).length / reasonsPageSize))}>Next</Button>
+                              <Button variant="ghost" size="sm" onClick={() => setReasonsPage(Math.max(1, Math.ceil(reasonsRecords.filter(r => r.lateness_reason).length / reasonsPageSize)))} disabled={reasonsPage >= Math.max(1, Math.ceil(reasonsRecords.filter(r => r.lateness_reason).length / reasonsPageSize))}>Last</Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5 text-blue-500" />
+                        Early Checkout Reasons
+                      </CardTitle>
+                      <CardDescription>Staff explanations for leaving before standard hours</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {earlyPageItems.map((record) => (
+                            <div key={record.id} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-900">
+                                    {record.user_profiles.first_name} {record.user_profiles.last_name}
+                                  </p>
+                                  <p className="text-sm text-gray-600">
+                                    {new Date(record.check_out_time!).toLocaleDateString()} at {new Date(record.check_out_time!).toLocaleTimeString()}
+                                  </p>
+                                  <p className="text-sm text-blue-700 mt-2 font-medium">
+                                    {record.early_checkout_reason}
+                                  </p>
+                                </div>
+                                <Badge variant="secondary" className="ml-2">
+                                  {record.user_profiles.departments?.name}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        {earlyList.length === 0 && (
+                          <p className="text-gray-500 text-center py-4">No early checkout reasons recorded</p>
+                        )}
+
+                        {/* Early checkout pagination controls */}
+                        {reasonsRecords.filter(r => r.early_checkout_reason).length > earlyPageSize && (
+                          <div className="flex items-center justify-between mt-4">
+                            <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => setEarlyPage(1)} disabled={earlyPage === 1}>First</Button>
+                              <Button variant="ghost" size="sm" onClick={() => setEarlyPage((p) => Math.max(1, p - 1))} disabled={earlyPage === 1}>Prev</Button>
+                              <span className="text-sm text-gray-600">Page {earlyPage} of {Math.max(1, Math.ceil(reasonsRecords.filter(r => r.early_checkout_reason).length / earlyPageSize))}</span>
+                              <Button variant="ghost" size="sm" onClick={() => setEarlyPage((p) => p + 1)} disabled={earlyPage >= Math.max(1, Math.ceil(reasonsRecords.filter(r => r.early_checkout_reason).length / earlyPageSize))}>Next</Button>
+                              <Button variant="ghost" size="sm" onClick={() => setEarlyPage(Math.max(1, Math.ceil(reasonsRecords.filter(r => r.early_checkout_reason).length / earlyPageSize)))} disabled={earlyPage >= Math.max(1, Math.ceil(reasonsRecords.filter(r => r.early_checkout_reason).length / earlyPageSize))}>Last</Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Reason Summary by Location</CardTitle>
+                    <CardDescription>Overview of reasons provided across different locations</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                          {Object.entries(
+                            reasonsRecords
+                              .filter((r) => r.lateness_reason || r.early_checkout_reason)
+                              .reduce((acc, record) => {
+                                const location = record.check_in_location_name || 'Unknown'
+                                if (!acc[location]) {
+                                  acc[location] = { lateness: 0, earlyCheckout: 0 }
+                                }
+                                if (record.lateness_reason) acc[location].lateness++
+                                if (record.early_checkout_reason) acc[location].earlyCheckout++
+                                return acc
+                              }, {} as Record<string, { lateness: number; earlyCheckout: number }>)
+                          ).map(([location, counts]) => (
+                        <div key={location} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <MapPin className="h-5 w-5 text-gray-400" />
+                            <span className="font-medium">{location}</span>
+                          </div>
+                          <div className="flex gap-4">
+                            <div className="text-center">
+                              <p className="text-sm text-orange-600 font-medium">{counts.lateness}</p>
+                              <p className="text-xs text-gray-500">Lateness</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm text-blue-600 font-medium">{counts.earlyCheckout}</p>
+                              <p className="text-xs text-gray-500">Early Checkout</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
           </Tabs>

@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { latitude, longitude, location_id, device_info, qr_code_used, qr_timestamp } = body
+    const { latitude, longitude, location_id, device_info, qr_code_used, qr_timestamp, lateness_reason } = body
 
     if (device_info?.device_id) {
       const getValidIpAddress = () => {
@@ -426,6 +426,15 @@ export async function POST(request: NextRequest) {
     const checkInMinutes = checkInTime.getMinutes()
     const isLateArrival = checkInHour > 9 || (checkInHour === 9 && checkInMinutes > 0)
 
+    // Require lateness reason if arriving late
+    if (isLateArrival && (!lateness_reason || lateness_reason.trim().length === 0)) {
+      return NextResponse.json({
+        error: "Lateness reason is required when checking in after 9:00 AM",
+        requiresLatenessReason: true,
+        checkInTime: checkInTime.toLocaleTimeString(),
+      }, { status: 400 })
+    }
+
     const attendanceData = {
       user_id: user.id,
       check_in_time: checkInTime.toISOString(),
@@ -446,6 +455,11 @@ export async function POST(request: NextRequest) {
     // Add QR code timestamp if used
     if (qr_code_used && qr_timestamp) {
       attendanceData.qr_check_in_timestamp = qr_timestamp
+    }
+
+    // Add lateness reason if provided
+    if (lateness_reason) {
+      attendanceData.lateness_reason = lateness_reason.trim()
     }
 
     if (userProfile?.assigned_location_id && userProfile.assigned_location_id !== location_id) {

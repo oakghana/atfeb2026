@@ -177,6 +177,14 @@ export function AttendanceRecorder({
     location: LocationData | null
     nearestLocation: any
   } | null>(null)
+  const [showLatenessDialog, setShowLatenessDialog] = useState(false)
+  const [latenessReason, setLatenessReason] = useState("")
+  const [pendingCheckInData, setPendingCheckInData] = useState<{
+    location: LocationData | null
+    nearestLocation: any
+    qrCodeUsed: boolean
+    qrTimestamp: string | null
+  } | null>(null)
   const [showCodeEntry, setShowCodeEntry] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -775,6 +783,7 @@ export function AttendanceRecorder({
       setUserLocation(location)
 
       setLocationPermissionStatus({ granted: true, message: "Location access granted" })
+      setLocationPermissionStatusSimplified({ granted: true, message: "Location access granted" })
       return location
     } catch (error) {
       console.error("[v0] Failed to get location:", error)
@@ -782,6 +791,10 @@ export function AttendanceRecorder({
         error instanceof Error ? error.message : "Unable to access location. Please enable GPS or use QR code option."
       setError(errorMessage)
       setLocationPermissionStatus({
+        granted: false,
+        message: errorMessage,
+      })
+      setLocationPermissionStatusSimplified({
         granted: false,
         message: errorMessage,
       })
@@ -896,116 +909,39 @@ export function AttendanceRecorder({
         throw new Error("No valid locations found or location data is unavailable.")
       }
 
-      console.log("[v0] Sending check-in request to API...")
-      const response = await fetch("/api/attendance/check-in", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-        },
-        body: JSON.stringify(checkInData),
-      })
+      // Check if check-in is after 9:00 AM (late arrival)
+      const checkInTime = new Date()
+      const checkInHour = checkInTime.getHours()
+      const checkInMinutes = checkInTime.getMinutes()
+      const isLateArrival = checkInHour > 9 || (checkInHour === 9 && checkInMinutes > 0)
 
-      const result = await response.json()
-      console.log("[v0] Check-in API response:", result)
-
-      if (!response.ok) {
-        // Handle completed work for the day with friendly message
-        if (result.alreadyCompleted && result.details) {
-          console.log("[v0] User has already completed work for today")
-          
-          setFlashMessage({
-            message: `Work completed! You worked ${result.details.workHours} hours today.`,
-            type: "success",
-          })
-
-          await fetchTodayAttendance()
-
-          toast({
-            title: "✓ You're Done for Today!",
-            description: `You checked in at ${result.details.checkInTime} and checked out at ${result.details.checkOutTime}. You worked ${result.details.workHours} hours. Great job! See you tomorrow.`,
-            className: "bg-green-50 border-green-400 text-green-900 dark:bg-green-900/20 dark:border-green-700 dark:text-green-200",
-            duration: 10000,
-          })
-        } else if (result.error?.includes("DUPLICATE CHECK-IN BLOCKED") || result.error?.includes("already checked in")) {
-          console.log("[v0] Duplicate check-in prevented by server - still on duty")
-          setFlashMessage({
-            message: result.error,
-            type: "error",
-          })
-
-          await fetchTodayAttendance()
-
-          toast({
-            title: "Already Checked In",
-            description: result.error,
-            variant: "destructive",
-            duration: 8000,
-          })
-        } else {
-          throw new Error(result.error || "Failed to check in")
-        }
+      // If late, show dialog for reason instead of proceeding
+      if (isLateArrival) {
+        console.log("[v0] Late arrival detected - showing reason dialog")
+        setPendingCheckInData({
+          location: {
+            latitude: checkInData.latitude,
+            longitude: checkInData.longitude,
+            accuracy: 10,
+          },
+          nearestLocation: resolvedNearestLocation,
+          qrCodeUsed: false,
+          qrTimestamp: null,
+        })
+        setShowLatenessDialog(true)
+        setIsCheckingIn(false)
+        setIsCheckInProcessing(false)
+        setRecentCheckIn(false)
         return
       }
 
-      console.log("[v0] ✓ Check-in successful")
+      // Use extracted check-in API function
+      await performCheckInAPI(
+        { latitude: checkInData.latitude, longitude: checkInData.longitude, accuracy: 10 },
+        resolvedNearestLocation,
+        ""
+      )
 
-      if (result.data) {
-        // Add device sharing warning to the attendance data if present
-        const attendanceWithWarning = {
-          ...result.data,
-          device_sharing_warning: result.deviceSharingWarning?.message || null
-        }
-        setLocalTodayAttendance(attendanceWithWarning)
-      }
-
-      setFlashMessage({
-        message: result.message || "Successfully checked in!",
-        type: result.isLateArrival ? "warning" : "success",
-      })
-
-      // Refresh attendance data
-      await fetchTodayAttendance()
-
-      // Clear attendance cache
-      clearAttendanceCache()
-
-      // Show device sharing warning if applicable (highest priority)
-      if (result.deviceSharingWarning) {
-        toast({
-          title: "⚠️ Shared Device Detected",
-          description: result.deviceSharingWarning.message,
-          variant: "default",
-          className: "bg-yellow-50 border-yellow-400 text-yellow-900 dark:bg-yellow-900/20 dark:border-yellow-700 dark:text-yellow-200",
-          duration: 10000,
-        })
-      }
-      
-      // Show late arrival warning if applicable
-      if (result.isLateArrival) {
-        toast({
-          title: "Late Arrival Recorded",
-          description: `You checked in at ${result.lateArrivalTime} (after 9:00 AM). Your late arrival has been recorded and will be visible to your department head. Please provide a reason if prompted.`,
-          variant: "destructive",
-          duration: 8000,
-        })
-      } else if (!result.deviceSharingWarning) {
-        // Only show success toast if no other warnings
-        const positionText = result.checkInPosition 
-          ? `You are the ${result.checkInPosition}${getOrdinalSuffix(result.checkInPosition)} staff to check in at this location today.` 
-          : ""
-        
-        toast({
-          title: "Check-in Successful",
-          description: `${result.message || "You have successfully checked in."} ${positionText}`,
-          duration: 6000,
-        })
-      }
-
-      setTimeout(() => {
-        setRecentCheckIn(false)
-      }, 5000)
     } catch (error: any) {
       console.error("[v0] Check-in error:", error)
       setFlashMessage({
@@ -1208,6 +1144,120 @@ export function AttendanceRecorder({
     }
   }
 
+  // Extracted check-in API call for lateness dialog flow
+  const performCheckInAPI = async (locationData: any, nearestLocation: any, reason: string) => {
+    try {
+      const deviceInfo = getDeviceInfo()
+      const checkInData: any = {
+        device_info: deviceInfo,
+        latitude: locationData.latitude,
+        longitude: locationData.longitude,
+        location_id: nearestLocation?.id,
+        lateness_reason: reason || null,
+      }
+
+      const response = await fetch("/api/attendance/check-in", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
+        body: JSON.stringify(checkInData),
+      })
+
+      const result = await response.json()
+      console.log("[v0] Check-in API response:", result)
+
+      if (!response.ok) {
+        // Handle completed work for the day with friendly message
+        if (result.alreadyCompleted && result.details) {
+          console.log("[v0] User has already completed work for today")
+
+          setFlashMessage({
+            message: `Work completed! You worked ${result.details.workHours} hours today.`,
+            type: "success",
+          })
+
+          await fetchTodayAttendance()
+
+          toast({
+            title: "✓ You're Done for Today!",
+            description: `You checked in at ${result.details.checkInTime} and checked out at ${result.details.checkOutTime}. You worked ${result.details.workHours} hours. Great job! See you tomorrow.`,
+            className: "bg-green-50 border-green-400 text-green-900 dark:bg-green-900/20 dark:border-green-700 dark:text-green-200",
+            duration: 10000,
+          })
+        } else if (result.error?.includes("DUPLICATE CHECK-IN BLOCKED") || result.error?.includes("already checked in")) {
+          console.log("[v0] Duplicate check-in prevented by server - still on duty")
+          setFlashMessage({
+            message: result.error,
+            type: "error",
+          })
+
+          await fetchTodayAttendance()
+
+          toast({
+            title: "Already Checked In",
+            description: result.error,
+            variant: "destructive",
+            duration: 8000,
+          })
+        } else {
+          throw new Error(result.error || "Failed to check in")
+        }
+        return
+      }
+
+      console.log("[v0] ✓ Check-in successful")
+
+      if (result.data) {
+        // Add device sharing warning to the attendance data if present
+        const attendanceWithWarning = {
+          ...result.data,
+          device_sharing_warning: result.deviceSharingWarning?.message || null
+        }
+        setLocalTodayAttendance(attendanceWithWarning)
+      }
+
+      setFlashMessage({
+        message: result.message || "Successfully checked in!",
+        type: "success",
+      })
+
+      // Refresh attendance data
+      await fetchTodayAttendance()
+
+      // Clear attendance cache
+      clearAttendanceCache()
+
+      // Show device sharing warning if applicable (highest priority)
+      if (result.deviceSharingWarning) {
+        toast({
+          title: "⚠️ Shared Device Detected",
+          description: result.deviceSharingWarning.message,
+          variant: "default",
+          className: "bg-yellow-50 border-yellow-400 text-yellow-900 dark:bg-yellow-900/20 dark:border-yellow-700 dark:text-yellow-200",
+          duration: 10000,
+        })
+      }
+
+      setLatenessReason("")
+      setPendingCheckInData(null)
+
+      // Refetch to verify check-in was recorded
+      setTimeout(() => {
+        fetchTodayAttendance()
+      }, 500)
+    } catch (err) {
+      console.error("[v0] Check-in error:", err)
+      throw err
+    } finally {
+      setIsCheckingIn(false)
+      setIsCheckInProcessing(false)
+      setRecentCheckIn(false)
+    }
+  }
+
   const handleEarlyCheckoutConfirm = async () => {
     const trimmedReason = earlyCheckoutReason.trim()
     
@@ -1243,11 +1293,49 @@ export function AttendanceRecorder({
       })
     }
   }
-  const handleEarlyCheckoutCancel = () => {
-    setShowEarlyCheckoutDialog(false)
-    setEarlyCheckoutReason("")
-    setPendingCheckoutData(null)
-    setIsLoading(false)
+  const handleLatenessConfirm = async () => {
+    const trimmedReason = latenessReason.trim()
+    
+    if (!trimmedReason) {
+      setFlashMessage({
+        message: "Please provide a reason for your late arrival before proceeding.",
+        type: "error",
+      })
+      return
+    }
+    
+    if (trimmedReason.length < 10) {
+      setFlashMessage({
+        message: "Lateness reason must be at least 10 characters long. Please provide more details.",
+        type: "error",
+      })
+      return
+    }
+
+    setShowLatenessDialog(false)
+    setIsCheckingIn(true)
+
+    try {
+      const { location, nearestLocation } = pendingCheckInData
+
+      // Use optimized check-in function with reason
+      await performCheckInAPI(location, nearestLocation, latenessReason)
+    } catch (error) {
+      console.error("[v0] Late check-in error:", error)
+      setFlashMessage({
+        message: error instanceof Error ? error.message : "Failed to check in. Please try again.",
+        type: "error",
+      })
+    }
+  }
+
+  const handleLatenessCancel = () => {
+    setShowLatenessDialog(false)
+    setLatenessReason("")
+    setPendingCheckInData(null)
+    setIsCheckingIn(false)
+    setIsCheckInProcessing(false)
+    setRecentCheckIn(false)
   }
 
   const getFormattedCheckoutTime = () => {
@@ -1281,6 +1369,7 @@ export function AttendanceRecorder({
       }
 
       setLocationPermissionStatus({ granted: true, message: "Location access granted" })
+      setLocationPermissionStatusSimplified({ granted: true, message: "Location access granted" })
       console.log("[v0] Location refreshed successfully")
     } catch (error) {
       console.error("[v0] Failed to refresh location:", error)
@@ -1288,6 +1377,7 @@ export function AttendanceRecorder({
         error instanceof Error ? error.message : "Unable to access location. Please enable GPS or use QR code option."
       setError(errorMessage)
       setLocationPermissionStatus({ granted: false, message: errorMessage })
+      setLocationPermissionStatusSimplified({ granted: false, message: errorMessage })
       setShowLocationHelp(true)
     } finally {
       setIsLoading(false)
@@ -1426,6 +1516,44 @@ export function AttendanceRecorder({
             hours is required between check-in and check-out.
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Location Permission Section */}
+      {!locationPermissionStatusSimplified.granted && !isCompletedForDay && (
+        <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-500/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-yellow-800 dark:text-yellow-100">
+              <AlertTriangle className="h-5 w-5" />
+              GPS Location Required
+            </CardTitle>
+            <CardDescription className="text-yellow-700 dark:text-yellow-200">
+              {locationPermissionStatusSimplified.message}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={getCurrentLocationData}
+              disabled={isLoading || isCheckingIn}
+              className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
+              size="lg"
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                  Getting Location...
+                </>
+              ) : (
+                <>
+                  <MapPin className="mr-2 h-5 w-5" />
+                  Get Current Location
+                </>
+              )}
+            </Button>
+            <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-2 text-center">
+              Allow location access when prompted by your browser
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Actions Section */}
@@ -1667,6 +1795,71 @@ export function AttendanceRecorder({
                     </>
                   ) : (
                     "Confirm Check-Out"
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {showLatenessDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-600">
+                <Clock className="h-5 w-5" />
+                Late Arrival Notice
+              </CardTitle>
+            <CardDescription>
+              You are checking in after 9:00 AM. Please provide a reason for your late arrival.
+            </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="border-orange-200 bg-orange-50">
+                <Info className="h-4 w-4 text-orange-600" />
+                <AlertTitle className="text-orange-800">Important</AlertTitle>
+                <AlertDescription className="text-orange-700">
+                  Your reason will be visible to your department head, supervisor, and HR portal for review.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2">
+                <Label htmlFor="lateness-reason">Reason for Late Arrival *</Label>
+                <textarea
+                  id="lateness-reason"
+                  value={latenessReason}
+                  onChange={(e) => setLatenessReason(e.target.value)}
+                  placeholder="e.g., Traffic congestion, medical appointment, family emergency..."
+                  className="w-full min-h-[100px] p-3 border rounded-md resize-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  maxLength={500}
+                />
+                <p className={`text-xs ${latenessReason.length < 10 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                  {latenessReason.length}/500 characters (minimum 10 required)
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleLatenessCancel}
+                  variant="outline"
+                  className="flex-1 bg-transparent"
+                  disabled={isCheckingIn}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleLatenessConfirm}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700"
+                  disabled={isCheckingIn || latenessReason.trim().length < 10}
+                >
+                  {isCheckingIn ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Confirm Check-In"
                   )}
                 </Button>
               </div>

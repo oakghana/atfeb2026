@@ -25,6 +25,7 @@ import Link from "next/link"
 import RequestLeaveButtonWrapper from "@/components/leave/request-leave-button-client"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
+import { GPSStatusBanner } from "@/components/attendance/gps-status-banner"
 
 export const metadata = {
   title: "Dashboard | QCC Electronic Attendance",
@@ -174,6 +175,9 @@ export default async function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* GPS Status Banner */}
+          <GPSStatusBanner />
 
           {/* Admin Alert */}
           {profile?.role === "admin" && pendingApprovals > 0 && (

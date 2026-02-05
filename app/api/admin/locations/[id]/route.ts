@@ -52,11 +52,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Invalid coordinates provided" }, { status: 400 })
     }
 
-    const { data: currentLocation, error: fetchError } = await supabase
-      .from("geofence_locations")
-      .select("id, name, latitude, longitude")
-      .eq("id", params.id)
-      .single()
+      const { data: currentLocation, error: fetchError } = await supabase
+        .from("geofence_locations")
+        .select("id, name, latitude, longitude")
+        .eq("id", id)
+        .single()
 
     if (fetchError || !currentLocation) {
       console.error("[v0] Location not found:", fetchError)
@@ -72,7 +72,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       const { data: otherLocations, error: conflictError } = await supabase
         .from("geofence_locations")
         .select("id, name, latitude, longitude")
-        .neq("id", params.id)
+          .neq("id", id)
         .eq("is_active", true) // Only check active locations
 
       if (conflictError) {
@@ -110,7 +110,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         working_hours_description: body.working_hours_description || null,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", params.id)
+        .eq("id", id)
       .select()
       .single()
 
@@ -131,7 +131,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       user_id: user.id,
       action: "update_location",
       table_name: "geofence_locations",
-      record_id: params.id,
+        record_id: id,
       old_values: {
         name: currentLocation.name,
         latitude: currentLocation.latitude,
