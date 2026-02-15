@@ -380,6 +380,7 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+    }
 
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
@@ -643,5 +644,4 @@ export async function POST(request: NextRequest) {
   }
 
 
-}
 }
