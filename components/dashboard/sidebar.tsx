@@ -81,6 +81,13 @@ const navigationItems = [
     category: "main",
   },
   {
+    title: "Off-Premises Approvals",
+    href: "/offpremises-approvals",
+    icon: MapPin,
+    roles: ["admin", "regional_manager", "department_head"],
+    category: "main",
+  },
+  {
     title: "Excuse Duty",
     href: "/dashboard/excuse-duty",
     icon: FileText,
