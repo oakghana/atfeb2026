@@ -1746,53 +1746,58 @@ export function AttendanceRecorder({
             <div className="space-y-4">
               {!localTodayAttendance?.check_in_time && (
                 <>
-                  <Button
-                    onClick={handleCheckIn}
-                    disabled={
-                      !locationValidation?.canCheckIn || isCheckingIn || isProcessing || recentCheckIn || isLoading || !canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role)
-                    }
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
-                    size="lg"
-                    title={!canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role) ? `Check-in only allowed before ${getCheckInDeadline()}` : "Check in to your assigned location"}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <div className="relative z-10 flex items-center justify-center w-full">
-                      {isCheckingIn ? (
-                        <>
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          {checkingMessage || "Checking In..."}
-                        </>
-                  ) : (
-                    <>
-                      <LogIn className="mr-2 h-5 w-5" />
-                      Check In
-                    </>
-                  )}
-                    </div>
-                  </Button>
-                  
-                  {/* Check In Outside Premises Button - Show when outside check-in window or time window closed */}
-                  {!canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role) && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Regular Check In Button - Shows when inside geofence OR during check-in window */}
                     <Button
-                      onClick={handleCheckInOutsidePremises}
-                      disabled={isCheckingIn || isProcessing}
-                      variant="outline"
-                      className="w-full border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-400 dark:hover:bg-amber-950"
+                      onClick={handleCheckIn}
+                      disabled={
+                        !locationValidation?.canCheckIn || isCheckingIn || isProcessing || recentCheckIn || isLoading || !canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role)
+                      }
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
                       size="lg"
+                      title={!canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role) ? `Check-in only allowed before ${getCheckInDeadline()}` : "Check in to your assigned location"}
                     >
-                      {isCheckingIn ? (
-                        <>
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          Requesting Confirmation...
-                        </>
-                      ) : (
-                        <>
-                          <MapPin className="mr-2 h-5 w-5" />
-                          Check In Outside Premises
-                        </>
-                      )}
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <div className="relative z-10 flex items-center justify-center w-full">
+                        {isCheckingIn ? (
+                          <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            {checkingMessage || "Checking In..."}
+                          </>
+                    ) : (
+                      <>
+                        <LogIn className="mr-2 h-5 w-5" />
+                        Check In
+                      </>
+                    )}
+                      </div>
                     </Button>
-                  )}
+                    
+                    {/* Check In Outside Premises Button - Show when:
+                        1. User is NOT within any registered location geofence AND
+                        2. After regular check-in deadline (3 PM) */}
+                    {!locationValidation?.canCheckIn && !canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role) && (
+                      <Button
+                        onClick={handleCheckInOutsidePremises}
+                        disabled={isCheckingIn || isProcessing}
+                        variant="outline"
+                        className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-400 dark:hover:bg-amber-950"
+                        size="lg"
+                      >
+                        {isCheckingIn ? (
+                          <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            Requesting...
+                          </>
+                        ) : (
+                          <>
+                            <MapPin className="mr-2 h-5 w-5" />
+                            Check In Outside Premises
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 </>
               )}
 

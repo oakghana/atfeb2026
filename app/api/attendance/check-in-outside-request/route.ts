@@ -29,10 +29,10 @@ export async function POST(request: NextRequest) {
       coordinates: `${current_location.latitude}, ${current_location.longitude}`,
     })
 
-    // Get user's department head and regional manager
+    // Get user's direct manager (department head or regional manager they report to)
     const { data: userProfile } = await supabase
       .from("user_profiles")
-      .select("department_id, role, first_name, last_name")
+      .select("department_id, reports_to_id, role, first_name, last_name")
       .eq("id", user.id)
       .single()
 
@@ -43,14 +43,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get department heads and regional managers who need to approve
-    const { data: managers } = await supabase
-      .from("user_profiles")
-      .select("id, email, first_name, last_name, role")
-      .in("role", ["department_head", "regional_manager", "admin"])
-      .eq("department_id", userProfile.department_id)
+    // Get the specific manager(s) this user reports to
+    let managers = []
+    
+    if (userProfile.reports_to_id) {
+      // User has a direct manager assigned
+      const { data: directManager } = await supabase
+        .from("user_profiles")
+        .select("id, email, first_name, last_name, role")
+        .eq("id", userProfile.reports_to_id)
+        .single()
+      
+      if (directManager) {
+        managers.push(directManager)
+      }
+    }
+    
+    // If no direct manager, get all department heads and regional managers in the department
+    if (managers.length === 0) {
+      const { data: deptManagers } = await supabase
+        .from("user_profiles")
+        .select("id, email, first_name, last_name, role")
+        .in("role", ["department_head", "regional_manager"])
+        .eq("department_id", userProfile.department_id)
+      
+      if (deptManagers && deptManagers.length > 0) {
+        managers = deptManagers
+      }
+    }
 
-    if (!managers || managers.length === 0) {
+    if (managers.length === 0) {
       return NextResponse.json(
         {
           error: "No managers found to approve your request",
