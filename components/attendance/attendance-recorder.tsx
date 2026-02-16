@@ -1109,9 +1109,7 @@ export function AttendanceRecorder({
     }
   }
 
-  const handleCheckOut = async () {
-    console.log("[v0] Check-out initiated")
-
+  const handleCheckOut = async () => {
     if (!localTodayAttendance?.check_in_time || localTodayAttendance?.check_out_time) {
       setFlashMessage({
         message:
