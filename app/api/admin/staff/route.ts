@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
 function createJsonResponse(data: any, status = 200) {
   return new NextResponse(JSON.stringify(data), {
