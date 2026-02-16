@@ -39,98 +39,98 @@ export default async function DashboardPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) redirect("/auth/login")
 
-  // Get current date info
-  const today = new Date()
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-  const startOfYear = new Date(today.getFullYear(), 0, 1)
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
-  const currentDay = today.getDate()
+    // Get current date info
+    const today = new Date()
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+    const startOfYear = new Date(today.getFullYear(), 0, 1)
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+    const currentDay = today.getDate()
 
-  // Parallel fetch for better performance
-  const [
-    profileResult,
-    todayAttendanceResult,
-    monthlyAttendanceResult,
-    yearlyAttendanceResult,
-    leaveRequestsResult,
-    notificationsResult
-  ] = await Promise.all([
-    supabase
-      .from("user_profiles")
-      .select(`id, first_name, last_name, role, departments (name, code)`)
-      .eq("id", user.id)
-      .single(),
-    supabase
-      .from("attendance_records")
-      .select("id, check_in_time, check_out_time, work_hours, status")
-      .eq("user_id", user.id)
-      .gte("check_in_time", `${today.toISOString().split("T")[0]}T00:00:00`)
-      .lt("check_in_time", `${today.toISOString().split("T")[0]}T23:59:59`)
-      .maybeSingle(),
-    supabase
-      .from("attendance_records")
-      .select("work_hours, status, check_in_time")
-      .eq("user_id", user.id)
-      .gte("check_in_time", startOfMonth.toISOString()),
-    supabase
-      .from("attendance_records")
-      .select("work_hours, status, check_in_time")
-      .eq("user_id", user.id)
-      .gte("check_in_time", startOfYear.toISOString()),
-    supabase
-      .from("leave_requests")
-      .select("id, status, start_date, end_date")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(5),
-    supabase
-      .from("staff_notifications")
-      .select("id, title, message, is_read, created_at")
-      .eq("user_id", user.id)
-      .eq("is_read", false)
-      .order("created_at", { ascending: false })
-      .limit(3)
-  ])
+    // Parallel fetch for better performance
+    const [
+      profileResult,
+      todayAttendanceResult,
+      monthlyAttendanceResult,
+      yearlyAttendanceResult,
+      leaveRequestsResult,
+      notificationsResult
+    ] = await Promise.all([
+      supabase
+        .from("user_profiles")
+        .select(`id, first_name, last_name, role, departments (name, code)`)
+        .eq("id", user.id)
+        .single(),
+      supabase
+        .from("attendance_records")
+        .select("id, check_in_time, check_out_time, work_hours, status")
+        .eq("user_id", user.id)
+        .gte("check_in_time", `${today.toISOString().split("T")[0]}T00:00:00`)
+        .lt("check_in_time", `${today.toISOString().split("T")[0]}T23:59:59`)
+        .maybeSingle(),
+      supabase
+        .from("attendance_records")
+        .select("work_hours, status, check_in_time")
+        .eq("user_id", user.id)
+        .gte("check_in_time", startOfMonth.toISOString()),
+      supabase
+        .from("attendance_records")
+        .select("work_hours, status, check_in_time")
+        .eq("user_id", user.id)
+        .gte("check_in_time", startOfYear.toISOString()),
+      supabase
+        .from("leave_requests")
+        .select("id, status, start_date, end_date")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("staff_notifications")
+        .select("id, title, message, is_read, created_at")
+        .eq("user_id", user.id)
+        .eq("is_read", false)
+        .order("created_at", { ascending: false })
+        .limit(3)
+    ])
 
-  const profile = profileResult.data
-  const todayAttendance = todayAttendanceResult.data
-  const monthlyAttendance = monthlyAttendanceResult.data || []
-  const yearlyAttendance = yearlyAttendanceResult.data || []
-  const leaveRequests = leaveRequestsResult.data || []
-  const notifications = notificationsResult.data || []
+    const profile = profileResult.data
+    const todayAttendance = todayAttendanceResult.data
+    const monthlyAttendance = monthlyAttendanceResult.data || []
+    const yearlyAttendance = yearlyAttendanceResult.data || []
+    const leaveRequests = leaveRequestsResult.data || []
+    const notifications = notificationsResult.data || []
 
-  // Calculate comprehensive metrics
-  const monthlyStats = {
-    totalDays: monthlyAttendance.length,
-    presentDays: monthlyAttendance.filter(r => r.status === 'present').length,
-    lateDays: monthlyAttendance.filter(r => r.status === 'late').length,
-    totalHours: monthlyAttendance.reduce((sum, r) => sum + (r.work_hours || 0), 0),
-    avgHours: monthlyAttendance.length > 0 ? monthlyAttendance.reduce((sum, r) => sum + (r.work_hours || 0), 0) / monthlyAttendance.length : 0
-  }
+    // Calculate comprehensive metrics
+    const monthlyStats = {
+      totalDays: monthlyAttendance.length,
+      presentDays: monthlyAttendance.filter(r => r.status === 'present').length,
+      lateDays: monthlyAttendance.filter(r => r.status === 'late').length,
+      totalHours: monthlyAttendance.reduce((sum, r) => sum + (r.work_hours || 0), 0),
+      avgHours: monthlyAttendance.length > 0 ? monthlyAttendance.reduce((sum, r) => sum + (r.work_hours || 0), 0) / monthlyAttendance.length : 0
+    }
 
-  const yearlyStats = {
-    totalDays: yearlyAttendance.length,
-    presentDays: yearlyAttendance.filter(r => r.status === 'present').length,
-    totalHours: yearlyAttendance.reduce((sum, r) => sum + (r.work_hours || 0), 0),
-    avgHours: yearlyAttendance.length > 0 ? yearlyAttendance.reduce((sum, r) => sum + (r.work_hours || 0), 0) / yearlyAttendance.length : 0
-  }
+    const yearlyStats = {
+      totalDays: yearlyAttendance.length,
+      presentDays: yearlyAttendance.filter(r => r.status === 'present').length,
+      totalHours: yearlyAttendance.reduce((sum, r) => sum + (r.work_hours || 0), 0),
+      avgHours: yearlyAttendance.length > 0 ? yearlyAttendance.reduce((sum, r) => sum + (r.work_hours || 0), 0) / yearlyAttendance.length : 0
+    }
 
-  const attendanceRate = currentDay > 0 ? Math.round((monthlyStats.presentDays / currentDay) * 100) : 0
-  const monthlyTarget = Math.round((daysInMonth * 0.95)) // 95% attendance target
-  const progressToTarget = Math.min((monthlyStats.presentDays / monthlyTarget) * 100, 100)
+    const attendanceRate = currentDay > 0 ? Math.round((monthlyStats.presentDays / currentDay) * 100) : 0
+    const monthlyTarget = Math.round((daysInMonth * 0.95)) // 95% attendance target
+    const progressToTarget = Math.min((monthlyStats.presentDays / monthlyTarget) * 100, 100)
 
-  // Only fetch pending approvals for admins
-  let pendingApprovals = 0
-  if (profile?.role === "admin") {
-    const { count } = await supabase
-      .from("user_profiles")
-      .select("*", { count: "exact", head: true })
-      .eq("is_active", false)
-    pendingApprovals = count || 0
-  }
+    // Only fetch pending approvals for admins
+    let pendingApprovals = 0
+    if (profile?.role === "admin") {
+      const { count } = await supabase
+        .from("user_profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("is_active", false)
+      pendingApprovals = count || 0
+    }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
         <div className="space-y-8 p-6 lg:p-8">
           {/* Welcome Header */}
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-white/80 via-white/60 to-white/40 dark:from-slate-900/80 dark:via-slate-800/60 dark:to-slate-700/40 backdrop-blur-xl border border-white/20 dark:border-slate-700/20 shadow-2xl">
