@@ -69,13 +69,16 @@ export function requiresEarlyCheckoutReason(date: Date = new Date(), locationReq
 }
 
 /**
- * Check if check-in time is allowed (before 1 PM / 13:00)
- * Operational and Security departments are exempt
+ * Check if check-in time is allowed
+ * - Admins, Regional Managers, Department Heads: can check in anytime
+ * - Regular staff: can only check in before 3 PM (15:00)
+ * - Operational and Security departments: can check in anytime
  */
 export function canCheckInAtTime(date: Date = new Date(), dept?: DeptInfo, role?: string | null): boolean {
+  // Exempt roles can check in anytime
   if (isExemptFromTimeRestrictions(dept, role)) return true
   const hours = date.getHours()
-  return hours < 13 // Allow check-in only before 1 PM
+  return hours < 15 // Allow check-in only before 3 PM for regular staff
 }
 
 /**
@@ -89,10 +92,10 @@ export function canCheckOutAtTime(date: Date = new Date(), dept?: DeptInfo, role
 }
 
 /**
- * Get check-in deadline time (1 PM)
+ * Get check-in deadline time (3 PM for regular staff, anytime for admins/managers)
  */
 export function getCheckInDeadline(): string {
-  return "1:00 PM"
+  return "3:00 PM"
 }
 
 /**

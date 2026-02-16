@@ -1026,9 +1026,90 @@ export function AttendanceRecorder({
     }
   }
 
-  const handleCheckOut = async () => {
-    console.log("[v0] Check-out initiated")
+  const handleCheckInOutsidePremises = async () => {
+    if (isCheckingIn || isProcessing) {
+      toast({
+        title: "Processing",
+        description: "Please wait while your request is being processed...",
+        variant: "default",
+      })
+      return
+    }
 
+    setIsCheckingIn(true)
+    setCheckingMessage("Getting your current location...")
+
+    try {
+      const currentLocation = await getCurrentLocationData()
+      if (!currentLocation) {
+        throw new Error("Could not retrieve current location. Please ensure GPS is enabled.")
+      }
+
+      let locationName = "Unknown Location"
+      try {
+        const geoResult = await reverseGeocode(currentLocation.latitude, currentLocation.longitude)
+        if (geoResult) {
+          locationName = geoResult.display_name || geoResult.address || "Unknown Location"
+        }
+      } catch (geoError) {
+        locationName = `${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}`
+      }
+
+      setCheckingMessage("Sending request to managers...")
+
+      const response = await fetch("/api/attendance/check-in-outside-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          current_location: {
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+            accuracy: currentLocation.accuracy,
+            name: locationName,
+          },
+          device_info: getDeviceInfo(),
+          assigned_location_id: userProfile?.assigned_location_id,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send confirmation request")
+      }
+
+      setFlashMessage({
+        message: `Confirmation request sent to your department head and regional manager for your location: ${locationName}. Awaiting approval...`,
+        type: "info",
+      })
+
+      toast({
+        title: "Request Sent",
+        description: "Your confirmation request has been sent to your managers.",
+        action: <ToastAction altText="OK">OK</ToastAction>,
+      })
+
+      setTimeout(() => {
+        handleRefreshStatus()
+      }, 2000)
+
+    } catch (error: any) {
+      setFlashMessage({
+        message: error.message || "Failed to send confirmation request. Please try again.",
+        type: "error",
+      })
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send confirmation request",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCheckingIn(false)
+      setCheckingMessage("")
+    }
+  }
+
+  const handleCheckOut = async () => {
     if (!localTodayAttendance?.check_in_time || localTodayAttendance?.check_out_time) {
       setFlashMessage({
         message:
@@ -1596,10 +1677,13 @@ export function AttendanceRecorder({
             {timeRestrictionWarning.type === 'checkin' ? 'Check-In Window Closed' : 'Check-Out Window Closed'}
           </AlertTitle>
           <AlertDescription className="text-red-700 dark:text-red-300">
-            {timeRestrictionWarning.message}
+            {timeRestrictionWarning.type === 'checkin' 
+              ? `Regular check-in is only allowed before ${getCheckInDeadline()}. If you are on official duty outside your registered location, click "Check In Outside Premises" to request manager confirmation.`
+              : `Check-out is only allowed before ${getCheckOutDeadline()}. If you need to check out after this time, contact your manager.`
+            }
             <br />
             <small className="text-red-600 dark:text-red-400 mt-2 block">
-              Only operational and security departments can check-in/out outside these windows.
+              Admins, Regional Managers, and Department Heads can check-in/out anytime. Operational and Security departments are also exempt.
             </small>
           </AlertDescription>
         </Alert>
@@ -1640,6 +1724,8 @@ export function AttendanceRecorder({
                   onCheckOut={handleCheckOut}
                   canCheckOut={locationValidation?.canCheckOut}
                   isCheckingOut={isLoading}
+                  userDepartment={userProfile?.departments}
+                  userRole={userProfile?.role}
                 />
               )
             })()}
@@ -1647,29 +1733,60 @@ export function AttendanceRecorder({
             {/* Check-in/Check-out Buttons */}
             <div className="space-y-4">
               {!localTodayAttendance?.check_in_time && (
-                <Button
-                  onClick={handleCheckIn}
-                  disabled={
-                    !locationValidation?.canCheckIn || isCheckingIn || isProcessing || recentCheckIn || isLoading
-                  }
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg relative overflow-hidden group"
-                  size="lg"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                  <div className="relative z-10 flex items-center justify-center w-full">
-                    {isCheckingIn ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Regular Check In Button - Shows when inside geofence OR during check-in window */}
+                    <Button
+                      onClick={handleCheckIn}
+                      disabled={
+                        !locationValidation?.canCheckIn || isCheckingIn || isProcessing || recentCheckIn || isLoading || !canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role)
+                      }
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+                      size="lg"
+                      title={!canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role) ? `Check-in only allowed before ${getCheckInDeadline()}` : "Check in to your assigned location"}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <div className="relative z-10 flex items-center justify-center w-full">
+                        {isCheckingIn ? (
+                          <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            {checkingMessage || "Checking In..."}
+                          </>
+                    ) : (
                       <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        {checkingMessage || "Checking In..."}
+                        <LogIn className="mr-2 h-5 w-5" />
+                        Check In
                       </>
-                ) : (
-                  <>
-                    <LogIn className="mr-2 h-5 w-5" />
-                    Check In
-                  </>
-                )}
+                    )}
+                      </div>
+                    </Button>
+                    
+                    {/* Check In Outside Premises Button - Show when:
+                        1. User is NOT within any registered location geofence AND
+                        2. After regular check-in deadline (3 PM) */}
+                    {!locationValidation?.canCheckIn && !canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role) && (
+                      <Button
+                        onClick={handleCheckInOutsidePremises}
+                        disabled={isCheckingIn || isProcessing}
+                        variant="outline"
+                        className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-400 dark:hover:bg-amber-950"
+                        size="lg"
+                      >
+                        {isCheckingIn ? (
+                          <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            Requesting...
+                          </>
+                        ) : (
+                          <>
+                            <MapPin className="mr-2 h-5 w-5" />
+                            Check In Outside Premises
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
-                </Button>
+                </>
               )}
 
               {/* Checkout button now integrated into Active Session Timer */}
