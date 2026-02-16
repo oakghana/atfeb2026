@@ -6,7 +6,7 @@ export async function updateSession(request: NextRequest) {
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseKey) {
-    console.error("[v0] Missing Supabase environment variables")
+    console.error("[v0] Missing Supabase environment variables - allowing request without auth")
     return NextResponse.next({ request })
   }
 
@@ -39,6 +39,7 @@ export async function updateSession(request: NextRequest) {
     })
 
     // Exclude static and PWA assets from auth redirects (service worker must be fetchable at /sw.js)
+    // Also exclude if credentials are missing (deployment without Supabase)
     if (
       request.nextUrl.pathname !== "/" &&
       request.nextUrl.pathname !== "/sw.js" &&
