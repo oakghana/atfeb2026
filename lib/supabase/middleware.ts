@@ -9,9 +9,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request })
   }
 
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
+  let supabaseResponse = NextResponse.next({ request })
 
   try {
     const supabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -20,11 +18,13 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value)
           })
-          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options)
+          })
         },
       },
       global: {
@@ -37,14 +37,11 @@ export async function updateSession(request: NextRequest) {
       },
     })
 
-    // Just refresh the session to update cookies, don't enforce auth here
-    // Let individual pages handle auth checks instead
+    // Refresh the session to update cookies
     await supabase.auth.getUser()
 
     return supabaseResponse
   } catch (error: any) {
-    return NextResponse.next({
-      request,
-    })
+    return supabaseResponse
   }
 }

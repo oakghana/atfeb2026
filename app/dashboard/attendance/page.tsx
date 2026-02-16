@@ -152,6 +152,7 @@ export default async function AttendancePage() {
     </div>
     )
   } catch (error) {
+    // Only redirect on actual auth errors, not data fetch errors
     redirect("/auth/login")
   }
 }
