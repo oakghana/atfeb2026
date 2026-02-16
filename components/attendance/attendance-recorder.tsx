@@ -37,6 +37,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { LocationCodeDialog } from "@/components/dialogs/location-code-dialog"
 import { QRScannerDialog } from "@/components/dialogs/qr-scanner-dialog"
+import { AssignmentRequestDialog } from "@/components/dialogs/assignment-request-dialog"
 import { FlashMessage } from "@/components/notifications/flash-message"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
@@ -226,6 +227,7 @@ export function AttendanceRecorder({
   const [lastCheckInAttempt, setLastCheckInAttempt] = useState<number>(0)
   const [deviceInfo, setDeviceInfo] = useState(() => getDeviceInfo())
   const [timeRestrictionWarning, setTimeRestrictionWarning] = useState<{ type: 'checkin' | 'checkout'; message: string } | null>(null)
+  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false)
 
   // Check time restrictions and show warnings
   useEffect(() => {
@@ -1649,30 +1651,45 @@ export function AttendanceRecorder({
             {/* Check-in/Check-out Buttons */}
             <div className="space-y-4">
               {!localTodayAttendance?.check_in_time && (
-                <Button
-                  onClick={handleCheckIn}
-                  disabled={
-                    !locationValidation?.canCheckIn || isCheckingIn || isProcessing || recentCheckIn || isLoading || !canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role)
-                  }
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
-                  size="lg"
-                  title={!canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role) ? `Check-in only allowed before ${getCheckInDeadline()}` : "Check in to your assigned location"}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                  <div className="relative z-10 flex items-center justify-center w-full">
-                    {isCheckingIn ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        {checkingMessage || "Checking In..."}
-                      </>
-                ) : (
-                  <>
-                    <LogIn className="mr-2 h-5 w-5" />
-                    Check In
-                  </>
-                )}
-                  </div>
-                </Button>
+                <>
+                  <Button
+                    onClick={handleCheckIn}
+                    disabled={
+                      !locationValidation?.canCheckIn || isCheckingIn || isProcessing || recentCheckIn || isLoading || !canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role)
+                    }
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+                    size="lg"
+                    title={!canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role) ? `Check-in only allowed before ${getCheckInDeadline()}` : "Check in to your assigned location"}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="relative z-10 flex items-center justify-center w-full">
+                      {isCheckingIn ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          {checkingMessage || "Checking In..."}
+                        </>
+                  ) : (
+                    <>
+                      <LogIn className="mr-2 h-5 w-5" />
+                      Check In
+                    </>
+                  )}
+                    </div>
+                  </Button>
+                  
+                  {/* Assignment Request Button - Show when outside check-in window */}
+                  {!canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role) && (
+                    <Button
+                      onClick={() => setAssignmentDialogOpen(true)}
+                      variant="outline"
+                      className="w-full border-amber-300 text-amber-700 hover:bg-amber-50"
+                      size="lg"
+                    >
+                      <MapPin className="mr-2 h-5 w-5" />
+                      Request Off-Location Assignment
+                    </Button>
+                  )}
+                </>
               )}
 
               {/* Checkout button now integrated into Active Session Timer */}
