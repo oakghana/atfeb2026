@@ -37,7 +37,6 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { LocationCodeDialog } from "@/components/dialogs/location-code-dialog"
 import { QRScannerDialog } from "@/components/dialogs/qr-scanner-dialog"
-import { AssignmentRequestDialog } from "@/components/dialogs/assignment-request-dialog"
 import { FlashMessage } from "@/components/notifications/flash-message"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
@@ -227,7 +226,6 @@ export function AttendanceRecorder({
   const [lastCheckInAttempt, setLastCheckInAttempt] = useState<number>(0)
   const [deviceInfo, setDeviceInfo] = useState(() => getDeviceInfo())
   const [timeRestrictionWarning, setTimeRestrictionWarning] = useState<{ type: 'checkin' | 'checkout'; message: string } | null>(null)
-  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false)
 
   // Check time restrictions and show warnings
   useEffect(() => {
@@ -1028,7 +1026,100 @@ export function AttendanceRecorder({
     }
   }
 
-  const handleCheckOut = async () => {
+  const handleCheckInOutsidePremises = async () => {
+    console.log("[v0] Check-in outside premises initiated")
+
+    if (isCheckingIn || isProcessing) {
+      toast({
+        title: "Processing",
+        description: "Please wait while your request is being processed...",
+        variant: "default",
+      })
+      return
+    }
+
+    setIsCheckingIn(true)
+    setCheckingMessage("Getting your current location...")
+
+    try {
+      // Get current location
+      const currentLocation = await getCurrentLocationData()
+      if (!currentLocation) {
+        throw new Error("Could not retrieve current location. Please ensure GPS is enabled.")
+      }
+
+      console.log("[v0] Current location:", currentLocation)
+
+      // Reverse geocode to get location name/address
+      let locationName = "Unknown Location"
+      try {
+        const geoResult = await reverseGeocode(currentLocation.latitude, currentLocation.longitude)
+        if (geoResult) {
+          locationName = geoResult.display_name || geoResult.address || "Unknown Location"
+        }
+      } catch (geoError) {
+        console.log("[v0] Reverse geocoding failed, using coordinates:", geoError)
+        locationName = `${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}`
+      }
+
+      setCheckingMessage("Sending request to managers...")
+
+      // Send confirmation request to department heads and regional managers
+      const response = await fetch("/api/attendance/check-in-outside-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          current_location: {
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+            accuracy: currentLocation.accuracy,
+            name: locationName,
+          },
+          device_info: getDeviceInfo(),
+          assigned_location_id: userProfile?.assigned_location_id,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send confirmation request")
+      }
+
+      setFlashMessage({
+        message: `Confirmation request sent to your department head and regional manager for your location: ${locationName}. Awaiting approval...`,
+        type: "info",
+      })
+
+      toast({
+        title: "Request Sent",
+        description: "Your confirmation request has been sent to your managers.",
+        action: <ToastAction altText="OK">OK</ToastAction>,
+      })
+
+      // Refresh attendance status to check for confirmation
+      setTimeout(() => {
+        handleRefreshStatus()
+      }, 2000)
+
+    } catch (error: any) {
+      console.error("[v0] Check-in outside premises error:", error)
+      setFlashMessage({
+        message: error.message || "Failed to send confirmation request. Please try again.",
+        type: "error",
+      })
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send confirmation request",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCheckingIn(false)
+      setCheckingMessage("")
+    }
+  }
+
+  const handleCheckOut = async () {
     console.log("[v0] Check-out initiated")
 
     if (!localTodayAttendance?.check_in_time || localTodayAttendance?.check_out_time) {
@@ -1598,10 +1689,13 @@ export function AttendanceRecorder({
             {timeRestrictionWarning.type === 'checkin' ? 'Check-In Window Closed' : 'Check-Out Window Closed'}
           </AlertTitle>
           <AlertDescription className="text-red-700 dark:text-red-300">
-            {timeRestrictionWarning.message}
+            {timeRestrictionWarning.type === 'checkin' 
+              ? `Regular check-in is only allowed before ${getCheckInDeadline()}. If you are on official duty outside your registered location, click "Check In Outside Premises" to request manager confirmation.`
+              : `Check-out is only allowed before ${getCheckOutDeadline()}. If you need to check out after this time, contact your manager.`
+            }
             <br />
             <small className="text-red-600 dark:text-red-400 mt-2 block">
-              Only operational and security departments can check-in/out outside these windows.
+              Admins, Regional Managers, and Department Heads can check-in/out anytime. Operational and Security departments are also exempt.
             </small>
           </AlertDescription>
         </Alert>
@@ -1677,16 +1771,26 @@ export function AttendanceRecorder({
                     </div>
                   </Button>
                   
-                  {/* Assignment Request Button - Show when outside check-in window */}
+                  {/* Check In Outside Premises Button - Show when outside check-in window or time window closed */}
                   {!canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role) && (
                     <Button
-                      onClick={() => setAssignmentDialogOpen(true)}
+                      onClick={handleCheckInOutsidePremises}
+                      disabled={isCheckingIn || isProcessing}
                       variant="outline"
-                      className="w-full border-amber-300 text-amber-700 hover:bg-amber-50"
+                      className="w-full border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-400 dark:hover:bg-amber-950"
                       size="lg"
                     >
-                      <MapPin className="mr-2 h-5 w-5" />
-                      Request Off-Location Assignment
+                      {isCheckingIn ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Requesting Confirmation...
+                        </>
+                      ) : (
+                        <>
+                          <MapPin className="mr-2 h-5 w-5" />
+                          Check In Outside Premises
+                        </>
+                      )}
                     </Button>
                   )}
                 </>
