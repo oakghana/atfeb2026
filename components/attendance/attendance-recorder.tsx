@@ -1079,13 +1079,13 @@ export function AttendanceRecorder({
       }
 
       setFlashMessage({
-        message: `Confirmation request sent to your department head and regional manager for your location: ${locationName}. Awaiting approval...`,
+        message: `Your location request has been sent to your department head and regional manager for confirmation. You are currently at: ${locationName}. Once they confirm that you have been sent on official duties to this location, you will be automatically checked in to your allocated QCC location and marked as working outside premises. Please wait for their approval.`,
         type: "info",
       })
 
       toast({
-        title: "Request Sent",
-        description: "Your confirmation request has been sent to your managers.",
+        title: "Request Submitted",
+        description: "Awaiting manager confirmation to check in outside your allocated location.",
         action: <ToastAction altText="OK">OK</ToastAction>,
       })
 
