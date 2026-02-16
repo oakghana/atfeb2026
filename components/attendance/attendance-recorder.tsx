@@ -1640,6 +1640,8 @@ export function AttendanceRecorder({
                   onCheckOut={handleCheckOut}
                   canCheckOut={locationValidation?.canCheckOut}
                   isCheckingOut={isLoading}
+                  userDepartment={userProfile?.departments}
+                  userRole={userProfile?.role}
                 />
               )
             })()}
@@ -1650,10 +1652,11 @@ export function AttendanceRecorder({
                 <Button
                   onClick={handleCheckIn}
                   disabled={
-                    !locationValidation?.canCheckIn || isCheckingIn || isProcessing || recentCheckIn || isLoading
+                    !locationValidation?.canCheckIn || isCheckingIn || isProcessing || recentCheckIn || isLoading || !canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role)
                   }
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg relative overflow-hidden group"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
                   size="lg"
+                  title={!canCheckInAtTime(new Date(), userProfile?.departments, userProfile?.role) ? `Check-in only allowed before ${getCheckInDeadline()}` : "Check in to your assigned location"}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   <div className="relative z-10 flex items-center justify-center w-full">

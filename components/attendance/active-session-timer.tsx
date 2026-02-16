@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Clock, MapPin, Timer, Calendar, LogOut, Loader2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { formatDistanceToNow } from "date-fns"
+import { canCheckOutAtTime, getCheckOutDeadline } from "@/lib/attendance-utils"
 
 interface ActiveSessionTimerProps {
   checkInTime: string
@@ -17,6 +18,8 @@ interface ActiveSessionTimerProps {
   onCheckOut?: () => void
   canCheckOut?: boolean
   isCheckingOut?: boolean
+  userDepartment?: { code?: string | null; name?: string | null } | undefined | null
+  userRole?: string | null
 }
 
 export function ActiveSessionTimer({
@@ -29,6 +32,8 @@ export function ActiveSessionTimer({
   onCheckOut,
   canCheckOut = true,
   isCheckingOut = false,
+  userDepartment,
+  userRole,
 }: ActiveSessionTimerProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [timeUntilCheckout, setTimeUntilCheckout] = useState<{
@@ -135,10 +140,11 @@ export function ActiveSessionTimer({
         {timeUntilCheckout.canCheckout && onCheckOut && (
           <Button
             onClick={onCheckOut}
-            disabled={!canCheckOut || isCheckingOut}
+            disabled={!canCheckOut || isCheckingOut || !canCheckOutAtTime(new Date(), userDepartment, userRole)}
             variant="destructive"
-            className="w-full transition-all duration-300 bg-red-600 hover:bg-red-700 text-white shadow-lg"
+            className="w-full transition-all duration-300 bg-red-600 hover:bg-red-700 text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
             size="lg"
+            title={!canCheckOutAtTime(new Date(), userDepartment, userRole) ? `Check-out only allowed before ${getCheckOutDeadline()}` : "Check out from your location"}
           >
             {isCheckingOut ? (
               <>
