@@ -23,10 +23,7 @@ export default async function AttendancePage() {
       data: { user },
     } = await supabase.auth.getUser()
     
-    console.log("[v0] AttendancePage: User auth check", { userId: user?.id, userEmail: user?.email })
-    
     if (!user) {
-      console.log("[v0] AttendancePage: No user found, redirecting to login")
       redirect("/auth/login")
     }
 
@@ -48,7 +45,7 @@ export default async function AttendancePage() {
       .maybeSingle()
 
     if (attendanceError) {
-      console.log("[v0] AttendancePage: Attendance fetch error", attendanceError)
+      // Silently handle error - use empty state
     }
 
     const enhancedAttendance = todayAttendance
@@ -155,7 +152,6 @@ export default async function AttendancePage() {
     </div>
   )
   } catch (error) {
-    console.error("[v0] AttendancePage error:", error)
     redirect("/auth/login")
   }
 }

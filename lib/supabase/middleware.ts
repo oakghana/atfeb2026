@@ -6,7 +6,6 @@ export async function updateSession(request: NextRequest) {
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseKey) {
-    console.error("[v0] Missing Supabase environment variables - allowing request without auth")
     return NextResponse.next({ request })
   }
 
@@ -44,9 +43,6 @@ export async function updateSession(request: NextRequest) {
 
     return supabaseResponse
   } catch (error: any) {
-    if (error.name !== "AbortError" && process.env.NODE_ENV === "development") {
-      console.error("[v0] Middleware error:", error)
-    }
     return NextResponse.next({
       request,
     })

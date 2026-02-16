@@ -1,0 +1,173 @@
+/* Smooth transitions and animations for professional UI */
+
+@layer components {
+  /* Fade in animations */
+  .fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  .fade-in-delayed {
+    animation: fadeIn 0.5s ease-in-out 0.2s both;
+  }
+
+  /* Smooth scale animations */
+  .scale-in {
+    animation: scaleIn 0.3s ease-out;
+  }
+
+  /* Slide animations */
+  .slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  .slide-down {
+    animation: slideDown 0.4s ease-out;
+  }
+
+  /* Loading pulse */
+  .pulse-smooth {
+    animation: smoothPulse 2s ease-in-out infinite;
+  }
+
+  /* Input focus enhancement */
+  .focus-enhanced {
+    transition: all 0.2s ease-out;
+  }
+
+  .focus-enhanced:focus {
+    box-shadow: 0 0 0 3px rgb(var(--color-primary) / 0.1);
+  }
+
+  /* Button smooth states */
+  .btn-smooth {
+    transition: all 0.2s ease-out;
+  }
+
+  .btn-smooth:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .btn-smooth:active {
+    transform: translateY(0);
+  }
+
+  /* Smooth shadow transition */
+  .shadow-smooth {
+    transition: box-shadow 0.3s ease-out;
+  }
+
+  /* Staggered list animation */
+  .stagger-children > * {
+    animation: slideUp 0.4s ease-out both;
+  }
+
+  .stagger-children > *:nth-child(1) { animation-delay: 0s; }
+  .stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
+  .stagger-children > *:nth-child(3) { animation-delay: 0.2s; }
+  .stagger-children > *:nth-child(4) { animation-delay: 0.3s; }
+  .stagger-children > *:nth-child(5) { animation-delay: 0.4s; }
+  .stagger-children > *:nth-child(6) { animation-delay: 0.5s; }
+
+  /* Glass morphism effect */
+  .glass-effect {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .glass-effect.dark {
+    background: rgba(15, 23, 42, 0.7);
+  }
+
+  /* Card smooth transitions */
+  .card-smooth {
+    transition: all 0.3s ease-out;
+  }
+
+  .card-smooth:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes smoothPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Optimized animations for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .stagger-children > * {
+    animation: slideUp 0.3s ease-out both;
+  }
+
+  .card-smooth:hover {
+    transform: none;
+  }
+
+  .btn-smooth:hover {
+    transform: none;
+  }
+}

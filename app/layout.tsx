@@ -1,8 +1,8 @@
 import type React from "react"
 import { Inter, JetBrains_Mono } from "next/font/google"
-import dynamic from "next/dynamic"
 import "./globals.css"
 import { metadata, viewport } from "./metadata"
+import RootLayoutClient from "./root-layout-client"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -21,10 +21,6 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export { metadata, viewport }
-
-const RootLayoutClient = dynamic(() => import("./root-layout-client"), {
-  ssr: true,
-})
 
 export default function RootLayout({
   children,

@@ -67,12 +67,9 @@ export async function createClientAndGetUser() {
       error,
     } = await supabase.auth.getUser()
 
-    console.log("[v0] getUser result:", { userId: user?.id, userEmail: user?.email, hasError: !!error, errorMessage: error?.message })
-
     if (error) {
       const msg = (error as any)?.message || ""
       if (/refresh token not found|invalid refresh token/i.test(msg)) {
-        console.log("[v0] Refresh token issue detected, clearing Supabase cookies")
         // Clear Supabase-related cookies (names containing 'sb' or 'supabase')
         const cookieStore = await cookies()
         const all = cookieStore.getAll()
@@ -90,7 +87,6 @@ export async function createClientAndGetUser() {
 
     return { supabase, user: (user as any) || null, authError: error || null }
   } catch (e) {
-    console.error("[v0] Error in getUser:", e)
     return { supabase, user: null, authError: e }
   }
 }

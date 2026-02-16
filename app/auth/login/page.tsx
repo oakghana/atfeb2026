@@ -85,9 +85,8 @@ export default function LoginPage() {
         name: `${data.first_name} ${data.last_name}`,
         error: data.is_active ? null : "Your account is pending admin approval. Please wait for activation.",
       }
-    } catch (error) {
-      console.error("Exception checking user approval:", error)
-      return { approved: false, error: "Failed to verify account status" }
+      } catch (error) {
+        return { approved: false, error: "Failed to verify account status" }
     }
   }
 
@@ -130,7 +129,6 @@ export default function LoginPage() {
       } catch (authError: any) {
         // Handle AbortError silently - request was cancelled but may have succeeded
         if (authError.name === "AbortError") {
-          console.log("[v0] Auth request aborted, will verify session")
           // Check if we have a valid session despite the abort
           const { data: sessionData } = await supabase.auth.getSession().catch(() => ({ data: null }))
           if (sessionData?.session) {
@@ -211,10 +209,10 @@ export default function LoginPage() {
 
       showSuccess("Login successful! Redirecting...", "Welcome Back")
 
-      // Wait for Supabase to fully set cookies, then redirect to home which will check auth and redirect to attendance
+      // Direct redirect to attendance page with minimal delay for cookie setting
       setTimeout(() => {
-        window.location.href = "/"
-      }, 500)
+        window.location.href = "/dashboard/attendance"
+      }, 300)
     } catch (error: unknown) {
       showError(error instanceof Error ? error.message : "An error occurred during login", "Login Error")
     } finally {
@@ -241,8 +239,6 @@ export default function LoginPage() {
       }
 
       console.log("[v0] Attempting to validate email:", otpEmail)
-
-      let emailValidated = false
       let validationError: string | null = null
 
       try {
@@ -363,8 +359,6 @@ export default function LoginPage() {
       }
 
       console.log("[v0] Verifying OTP:", otp.substring(0, 2) + "****") // Log first 2 digits only for security
-
-      let data, error
       try {
         const result = await supabase.auth.verifyOtp({
           email: otpEmail,
@@ -376,7 +370,6 @@ export default function LoginPage() {
       } catch (authError: any) {
         // Handle AbortError silently
         if (authError.name === "AbortError") {
-          console.log("[v0] OTP verification aborted, will check session")
           const { data: sessionData } = await supabase.auth.getSession().catch(() => ({ data: null }))
           if (sessionData?.session) {
             data = { user: sessionData.session.user, session: sessionData.session }
@@ -390,7 +383,6 @@ export default function LoginPage() {
       }
 
       if (error) {
-        console.error("[v0] OTP verification error:", error.message)
         if (data?.user?.id) {
           await logLoginActivity(data.user.id, "otp_login_failed", false, "otp")
         }
@@ -424,12 +416,11 @@ export default function LoginPage() {
       console.log("[v0] OTP verification successful")
       showSuccess("OTP verified successfully! Redirecting to dashboard...", "Login Successful")
 
-      // Wait for Supabase to fully set cookies, then redirect to home which will check auth and redirect to attendance
+      // Direct redirect to attendance page with minimal delay
       setTimeout(() => {
-        window.location.href = "/"
-      }, 500)
+        window.location.href = "/dashboard/attendance"
+      }, 300)
     } catch (error: unknown) {
-      console.error("[v0] OTP verification exception:", error)
       showFieldError("OTP Code", error instanceof Error ? error.message : "Invalid OTP code")
     } finally {
       setIsLoading(false)
@@ -437,62 +428,66 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-background p-3 sm:p-4 fade-in">
+      <div className="w-full max-w-md scale-in">
         <Card className="glass-effect shadow-2xl border-border/50">
-          <CardHeader className="text-center space-y-6 pb-8">
+          <CardHeader className="text-center space-y-5 pb-6 sm:pb-8 px-4 sm:px-8 pt-6 sm:pt-8">
             <div className="flex justify-center">
-              <div className="w-24 h-24 rounded-full bg-card border-2 border-primary/20 flex items-center justify-center shadow-lg">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-card border-2 border-primary/20 flex items-center justify-center shadow-lg scale-in">
                 <Image
                   src="/images/qcc-logo.png"
                   alt="QCC Logo - Quality Control Company Limited"
                   width={80}
                   height={80}
                   className="rounded-full object-contain"
+                  priority
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <CardTitle className="text-2xl font-bold text-primary tracking-wide">QCC ELECTRONIC ATTENDANCE</CardTitle>
-              <CardDescription className="text-muted-foreground text-sm">
+            <div className="space-y-2 slide-up">
+              <CardTitle className="text-xl sm:text-2xl font-bold text-primary tracking-wide">QCC ATTENDANCE</CardTitle>
+              <CardDescription className="text-xs sm:text-sm text-muted-foreground">
                 Sign in with your Staff Number, Email or use OTP
               </CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="px-8 pb-8">
+          <CardContent className="px-4 sm:px-8 pb-6 sm:pb-8">
             <Tabs defaultValue="password" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-muted/50 p-1 rounded-lg">
+              <TabsList className="grid w-full grid-cols-2 bg-muted/50 p-1 rounded-lg h-11 sm:h-12 transition-all">
                 <TabsTrigger
                   value="password"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                  className="text-sm sm:text-base transition-all duration-200 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
                 >
                   Staff Login
                 </TabsTrigger>
                 <TabsTrigger
                   value="otp"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                  className="text-sm sm:text-base transition-all duration-200 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
                 >
                   OTP Login
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="password" className="space-y-6 mt-6">
-                <form onSubmit={handleLogin} className="space-y-6">
+              <TabsContent value="password" className="space-y-5 mt-6 sm:space-y-6 fade-in">
+                <form onSubmit={handleLogin} className="space-y-5 sm:space-y-6 stagger-children">
                   <div className="space-y-2">
                     <Label htmlFor="identifier" className="text-sm font-medium text-foreground">
-                      Staff Number or Email Address
+                      Staff Number or Email
                     </Label>
                     <Input
                       id="identifier"
                       type="text"
-                      placeholder="Enter your corporate email"
+                      placeholder="Enter your email"
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
                       required
-                      className="h-12 border-border focus:border-primary focus:ring-primary bg-input focus-enhanced"
+                      className="h-12 sm:h-12 border-border focus:border-primary focus:ring-primary bg-input focus-enhanced text-base"
+                      disabled={isLoading}
+                      autoComplete="email"
+                      inputMode="email"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Enter your 7-digit staff number (e.g., 1234567) or corporate email address
+                    <p className="text-xs text-muted-foreground mt-1">
+                      7-digit staff number or email address
                     </p>
                   </div>
                   <div className="space-y-2">
