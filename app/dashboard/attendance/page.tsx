@@ -1,3 +1,8 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { AttendanceRecorder } from "@/components/attendance/attendance-recorder"
 import { PersonalAttendanceHistory } from "@/components/attendance/personal-attendance-history"
 import { LocationPreviewCard } from "@/components/attendance/location-preview-card"
@@ -5,81 +10,122 @@ import { LeaveStatusCard } from "@/components/leave/leave-status-card"
 import { StaffStatusBadge } from "@/components/attendance/staff-status-badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { createClient } from "@/lib/supabase/server"
 import { Clock, History, ArrowLeft, Home } from "lucide-react"
-import { redirect } from "next/navigation"
 import Link from "next/link"
 
-export const metadata = {
-  title: "Attendance | QCC Electronic Attendance",
-  description: "Record your daily attendance and view your history at QCC locations",
-}
+export default function AttendancePage() {
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
+  const [todayAttendance, setTodayAttendance] = useState<any>(null)
+  const [userProfile, setUserProfile] = useState<any>(null)
+  const [locations, setLocations] = useState<any[]>([])
 
-export default async function AttendancePage() {
-  try {
-    const supabase = await createClient()
+  useEffect(() => {
+    let isMounted = true
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    
-    if (!user) {
-      redirect("/auth/login")
-    }
+    const loadAttendanceData = async () => {
+      try {
+        const supabase = createClient()
 
-    const today = new Date().toISOString().split("T")[0]
-    const { data: todayAttendance, error: attendanceError } = await supabase
-      .from("attendance_records")
-      .select(`
-        *,
-        geofence_locations!check_in_location_id (
-          name
-        ),
-        checkout_location:geofence_locations!check_out_location_id (
-          name
-        )
-      `)
-      .eq("user_id", user.id)
-      .gte("check_in_time", `${today}T00:00:00`)
-      .lt("check_in_time", `${today}T23:59:59`)
-      .maybeSingle()
+        // Check authentication
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
 
-    if (attendanceError) {
-      // Silently handle error - use empty state
-    }
+        if (!isMounted) return
 
-    const enhancedAttendance = todayAttendance
-      ? {
-          ...todayAttendance,
-          check_in_location_name: todayAttendance.geofence_locations?.name || todayAttendance.check_in_location_name,
-          check_out_location_name: todayAttendance.checkout_location?.name || todayAttendance.check_out_location_name,
+        if (authError || !authUser) {
+          router.push('/auth/login')
+          return
         }
-      : null
 
-  // Fetch user profile with leave status
-  const { data: userProfile } = await supabase
-    .from("user_profiles")
-    .select("assigned_location_id, leave_status, leave_start_date, leave_end_date, leave_reason, first_name, last_name")
-    .eq("id", user.id)
-    .single()
+        setUser(authUser)
 
-  // Fetch all locations and assigned location details
-  const { data: locations } = await supabase
-    .from("geofence_locations")
-    .select("*")
-    .eq("is_active", true)
-    .order("name")
+        // Fetch today's attendance
+        const today = new Date().toISOString().split("T")[0]
+        const { data: attendance } = await supabase
+          .from("attendance_records")
+          .select(`
+            *,
+            geofence_locations!check_in_location_id (
+              name
+            ),
+            checkout_location:geofence_locations!check_out_location_id (
+              name
+            )
+          `)
+          .eq("user_id", authUser.id)
+          .gte("check_in_time", `${today}T00:00:00`)
+          .lt("check_in_time", `${today}T23:59:59`)
+          .maybeSingle()
 
-  const assignedLocation = locations?.find((loc) => loc.id === userProfile?.assigned_location_id) || null
+        if (isMounted && attendance) {
+          setTodayAttendance({
+            ...attendance,
+            check_in_location_name: attendance.geofence_locations?.name || attendance.check_in_location_name,
+            check_out_location_name: attendance.checkout_location?.name || attendance.check_out_location_name,
+          })
+        }
 
-  // Determine if staff is currently on leave
-  // 'active' means at post/working, 'on_leave' or 'sick_leave' means on leave
+        // Fetch user profile
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("assigned_location_id, leave_status, leave_start_date, leave_end_date, leave_reason, first_name, last_name")
+          .eq("id", authUser.id)
+          .single()
+
+        if (isMounted) {
+          setUserProfile(profile)
+        }
+
+        // Fetch all locations
+        const { data: allLocations } = await supabase
+          .from("geofence_locations")
+          .select("*")
+          .eq("is_active", true)
+          .order("name")
+
+        if (isMounted) {
+          setLocations(allLocations || [])
+        }
+      } catch (error) {
+        if (isMounted) {
+          router.push('/auth/login')
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    loadAttendanceData()
+
+    return () => {
+      isMounted = false
+    }
+  }, [router])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="text-center space-y-4">
+          <div className="animate-spin h-12 w-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+          <h1 className="text-2xl font-bold text-slate-900">Loading dashboard...</h1>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
+
+  const assignedLocation = locations.find((loc) => loc.id === userProfile?.assigned_location_id) || null
   const isOnLeave = userProfile?.leave_status === "on_leave" || userProfile?.leave_status === "sick_leave"
-  const isCheckedIn = !!enhancedAttendance && !enhancedAttendance.check_out_time
+  const isCheckedIn = !!todayAttendance && !todayAttendance.check_out_time
 
   return (
     <div className="space-y-8">
-      {/* Back to Dashboard Button - Always visible */}
       <div className="flex items-center gap-2">
         <Button variant="outline" size="sm" asChild className="gap-2 hover:bg-primary/5">
           <Link href="/dashboard">
@@ -92,32 +138,31 @@ export default async function AttendancePage() {
 
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Clock className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-3xl sm:text-4xl font-heading font-bold text-foreground tracking-tight">Attendance</h1>
-                <p className="text-base sm:text-lg text-muted-foreground font-medium mt-1">
-                  Record your daily attendance and view your history at QCC locations
-                </p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Clock className="h-6 w-6 text-primary" />
             </div>
-            <StaffStatusBadge
-              isCheckedIn={isCheckedIn}
-              isOnLeave={isOnLeave}
-              leaveStatus={userProfile?.leave_status as "active" | "pending" | "approved" | "rejected" | "on_leave" | "sick_leave" | null}
-            />
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-heading font-bold text-foreground tracking-tight">Attendance</h1>
+              <p className="text-base sm:text-lg text-muted-foreground font-medium mt-1">
+                Record your daily attendance and view your history at QCC locations
+              </p>
+            </div>
           </div>
+          <StaffStatusBadge
+            isCheckedIn={isCheckedIn}
+            isOnLeave={isOnLeave}
+            leaveStatus={userProfile?.leave_status as "active" | "pending" | "approved" | "rejected" | "on_leave" | "sick_leave" | null}
+          />
+        </div>
 
-        {/* Leave Status Card - Shows if user is on leave (not when status is 'active' which means at post) */}
         {userProfile?.leave_status && userProfile.leave_status !== "active" && (
           <LeaveStatusCard
             leaveStatus={userProfile.leave_status as "active" | "pending" | "approved" | "rejected" | "on_leave" | "sick_leave" | null}
             leaveStartDate={userProfile.leave_start_date}
             leaveEndDate={userProfile.leave_end_date}
             leaveReason={userProfile.leave_reason}
-            onRequestLeave={() => {}} // This will be handled in the client component
+            onRequestLeave={() => {}}
           />
         )}
 
@@ -140,8 +185,8 @@ export default async function AttendancePage() {
           </TabsList>
 
           <TabsContent value="today" className="space-y-6 mt-8">
-            <LocationPreviewCard assignedLocation={assignedLocation} locations={locations || []} />
-            <AttendanceRecorder todayAttendance={enhancedAttendance} userLeaveStatus={userProfile?.leave_status} />
+            <LocationPreviewCard assignedLocation={assignedLocation} locations={locations} />
+            <AttendanceRecorder todayAttendance={todayAttendance} userLeaveStatus={userProfile?.leave_status} />
           </TabsContent>
 
           <TabsContent value="history" className="space-y-6 mt-8">
@@ -150,9 +195,5 @@ export default async function AttendancePage() {
         </Tabs>
       </div>
     </div>
-    )
-  } catch (error) {
-    // Only redirect on actual auth errors, not data fetch errors
-    redirect("/auth/login")
-  }
+  )
 }
