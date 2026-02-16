@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     // Verify the approver is a department head, regional manager, or admin
     const { data: approverProfile } = await supabase
       .from("user_profiles")
-      .select("role")
+      .select("role, department_id, geofence_locations")
       .eq("id", user.id)
       .single()
 
@@ -37,10 +37,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get the pending check-in request
+    // Get the pending check-in request with staff details
     const { data: pendingRequest } = await supabase
       .from("pending_offpremises_checkins")
-      .select("*")
+      .select(`
+        *,
+        user_profiles!pending_offpremises_checkins_user_id_fkey (
+          id,
+          department_id,
+          geofence_locations
+        )
+      `)
       .eq("id", request_id)
       .single()
 
@@ -51,10 +58,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Permission validation based on role
+    if (approverProfile.role === "admin") {
+      // Admins can approve all requests
+    } else if (approverProfile.role === "regional_manager") {
+      // Regional managers can only approve requests from staff in their location
+      const staffLocations = pendingRequest.user_profiles?.geofence_locations || []
+      const managerLocations = approverProfile.geofence_locations || []
+      const hasPermission = staffLocations.some((loc: string) => managerLocations.includes(loc))
+      
+      if (!hasPermission) {
+        return NextResponse.json(
+          { error: "You can only approve requests from staff in your assigned location" },
+          { status: 403 }
+        )
+      }
+    } else if (approverProfile.role === "department_head") {
+      // Department heads can only approve requests from staff in their department
+      if (pendingRequest.user_profiles?.department_id !== approverProfile.department_id) {
+        return NextResponse.json(
+          { error: "You can only approve requests from staff in your department" },
+          { status: 403 }
+        )
+      }
+    }
+
     if (approved) {
       // Approve and create automatic check-in
-      console.log("[v0] Approving off-premises check-in request:", request_id)
-
       // Create attendance record for the user's assigned location
       const { data: attendanceRecord, error: attendanceError } = await supabase
         .from("attendance_records")
