@@ -28,12 +28,9 @@ export default function OffPremisesApprovalPage() {
         if (!isMounted) return
 
         if (authError || !authUser) {
-          console.log("[v0] Not authenticated, redirecting to login")
           router.push('/auth/login')
           return
         }
-
-        console.log("[v0] Fetching user profile for:", authUser.id)
 
         // Fetch user profile
         const { data: profile, error: profileError } = await supabase
@@ -45,22 +42,17 @@ export default function OffPremisesApprovalPage() {
         if (!isMounted) return
 
         if (profileError) {
-          console.error("[v0] Profile error:", profileError)
           setError('Failed to load user profile')
           return
         }
 
         if (!profile) {
-          console.error("[v0] No profile found for user:", authUser.id)
           setError('User profile not found')
           return
         }
 
-        console.log("[v0] User profile loaded:", profile.role)
-
         // Check if user has permission to view this page
         if (!['admin', 'department_head', 'regional_manager'].includes(profile.role)) {
-          console.log("[v0] User role not authorized:", profile.role)
           setError('You do not have permission to view this page')
           return
         }
@@ -68,7 +60,6 @@ export default function OffPremisesApprovalPage() {
         setUserProfile(profile)
       } catch (err: any) {
         if (isMounted) {
-          console.error("[v0] Error loading profile:", err)
           setError(err.message || 'Failed to load dashboard')
         }
       } finally {

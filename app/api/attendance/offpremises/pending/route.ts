@@ -14,13 +14,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify the user is a department head, regional manager, or admin
-    const { data: managerProfile } = await supabase
+    const { data: managerProfile, error: profileError } = await supabase
       .from("user_profiles")
       .select("id, role, department_id, geofence_locations")
       .eq("id", user.id)
-      .single()
+      .maybeSingle()
 
-    if (!managerProfile || !["department_head", "regional_manager", "admin"].includes(managerProfile.role)) {
+    if (profileError || !managerProfile || !["department_head", "regional_manager", "admin"].includes(managerProfile.role)) {
       return NextResponse.json(
         { error: "Only managers can view pending off-premises requests" },
         { status: 403 }
