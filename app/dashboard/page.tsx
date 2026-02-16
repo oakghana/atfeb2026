@@ -33,10 +33,11 @@ export const metadata = {
 }
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) redirect("/auth/login")
 
   // Get current date info
   const today = new Date()
@@ -445,5 +446,10 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
-  )
+    )
+  } catch (error) {
+    console.error("[v0] Dashboard error:", error)
+    redirect("/auth/login")
+  }
+}
 }
