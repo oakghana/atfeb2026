@@ -3,12 +3,15 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("[v0] Off-premises check-in API called")
+    
     const body = await request.json()
+    console.log("[v0] Request body received:", { user_id: body.user_id, location: body.current_location?.name })
+    
     const { current_location, device_info, user_id } = body
 
-    console.log("[v0] Off-premises check-in request:", { user_id, location: current_location?.name })
-
     if (!current_location) {
+      console.error("[v0] Missing current_location")
       return NextResponse.json(
         { error: "Current location is required" },
         { status: 400 }
@@ -16,13 +19,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user_id) {
+      console.error("[v0] Missing user_id")
       return NextResponse.json(
         { error: "User ID is required" },
         { status: 400 }
       )
     }
 
+    console.log("[v0] Creating admin client...")
     const supabase = await createAdminClient()
+    console.log("[v0] Admin client created")
 
     // Get user's direct manager (department head or regional manager they report to)
     const { data: userProfile } = await supabase
@@ -128,7 +134,7 @@ export async function POST(request: NextRequest) {
       message: `${userProfile.first_name} ${userProfile.last_name} is requesting to check-in from outside their assigned location: ${current_location.name}. Please approve or deny.`,
       data: {
         request_id: requestRecord.id,
-        staff_user_id: user.id,
+        staff_user_id: user_id,
         staff_name: `${userProfile.first_name} ${userProfile.last_name}`,
         location_name: current_location.name,
         coordinates: `${current_location.latitude}, ${current_location.longitude}`,
