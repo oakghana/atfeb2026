@@ -32,13 +32,23 @@ interface PendingOffPremisesRequestsProps {
   // Component will fetch requests directly from API
 }
 
-const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((res) => {
+const fetcher = async (url: string) => {
+  const res = await fetch(url, { 
+    credentials: 'include',
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+  
   if (!res.ok) {
-    console.log("[v0] Fetch error:", { status: res.status, url })
-    throw new Error(`API error: ${res.status}`)
+    const errorData = await res.json().catch(() => ({}))
+    console.error("[v0] API error:", { status: res.status, url, error: errorData })
+    throw new Error(errorData.error || `API error: ${res.status}`)
   }
+  
   return res.json()
-})
+}
 
 export function PendingOffPremisesRequests() {
   const [selectedRequest, setSelectedRequest] = useState<PendingRequest | null>(null)
