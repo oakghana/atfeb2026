@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import useSWR from 'swr'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -25,42 +25,122 @@ interface PendingRequest {
     last_name: string
     email: string
     department_id: string
+    geofence_locations?: string[]
   }
-}
-
-interface PendingOffPremisesRequestsProps {
-  // Component will fetch requests directly from API
-}
-
-const fetcher = async (url: string) => {
-  const res = await fetch(url, { 
-    credentials: 'include',
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  })
-  
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}))
-    console.error("[v0] API error:", { status: res.status, url, error: errorData })
-    throw new Error(errorData.error || `API error: ${res.status}`)
-  }
-  
-  return res.json()
 }
 
 export function PendingOffPremisesRequests() {
   const [selectedRequest, setSelectedRequest] = useState<PendingRequest | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const { data, error, isLoading, mutate } = useSWR(
-    '/api/attendance/offpremises/pending',
-    fetcher,
-    { refreshInterval: 30000 } // Refresh every 30 seconds
-  )
+  const [requests, setRequests] = useState<PendingRequest[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [managerProfile, setManagerProfile] = useState<any>(null)
 
-  const requests: PendingRequest[] = data?.requests || []
-  const totalCount = data?.count || 0
+  // Load pending requests
+  const loadPendingRequests = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const supabase = createClient()
+
+      // Get current user
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+
+      if (authError || !authUser) {
+        setError('Unable to authenticate')
+        return
+      }
+
+      // Get user profile for filtering
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('id, role, department_id, geofence_locations')
+        .eq('id', authUser.id)
+        .maybeSingle()
+
+      if (profileError || !profile) {
+        setError('Failed to fetch user profile')
+        return
+      }
+
+      setManagerProfile(profile)
+
+      // Build query based on role
+      let query = supabase
+        .from('pending_offpremises_checkins')
+        .select(`
+          id,
+          user_id,
+          current_location_name,
+          latitude,
+          longitude,
+          accuracy,
+          device_info,
+          created_at,
+          status,
+          user_profiles!pending_offpremises_checkins_user_id_fkey (
+            id,
+            first_name,
+            last_name,
+            email,
+            department_id,
+            geofence_locations
+          )
+        `)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+
+      // Apply role-based filtering
+      if (profile.role === 'admin') {
+        // Admins see all requests
+      } else if (profile.role === 'regional_manager') {
+        // Regional managers see requests from their location staff
+        const { data: locationStaff, error: staffError } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .contains('geofence_locations', profile.geofence_locations || [])
+
+        if (!staffError && locationStaff && locationStaff.length > 0) {
+          const staffIds = locationStaff.map(s => s.id)
+          query = query.in('user_id', staffIds)
+        } else {
+          setRequests([])
+          setIsLoading(false)
+          return
+        }
+      } else if (profile.role === 'department_head') {
+        // Department heads see requests from their department
+        query = query.eq('user_profiles.department_id', profile.department_id)
+      }
+
+      const { data: pendingRequests, error: queryError } = await query
+
+      if (queryError) {
+        console.error('[v0] Query error:', queryError)
+        setError('Failed to fetch pending requests')
+        return
+      }
+
+      setRequests(pendingRequests || [])
+    } catch (err: any) {
+      console.error('[v0] Error loading pending requests:', err)
+      setError(err.message || 'An error occurred while loading requests')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Load requests on mount and set up polling
+  useEffect(() => {
+    loadPendingRequests()
+
+    // Poll every 30 seconds
+    const interval = setInterval(loadPendingRequests, 30000)
+
+    return () => clearInterval(interval)
+  }, [])
 
   const handleRequestClick = (request: PendingRequest) => {
     setSelectedRequest(request)
@@ -70,7 +150,7 @@ export function PendingOffPremisesRequests() {
   const handleApprovalComplete = () => {
     setIsModalOpen(false)
     setSelectedRequest(null)
-    mutate() // Refresh the list
+    loadPendingRequests() // Refresh the list
   }
 
   const formatDate = (dateString: string) => {
@@ -98,7 +178,6 @@ export function PendingOffPremisesRequests() {
   }
 
   if (error) {
-    console.error("[v0] Error fetching pending requests:", error)
     return (
       <Card>
         <CardHeader>
@@ -109,9 +188,12 @@ export function PendingOffPremisesRequests() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Error Loading Requests</AlertTitle>
             <AlertDescription>
-              {error.message || 'Failed to load pending requests. Please try again later.'}
+              {error}
             </AlertDescription>
           </Alert>
+          <Button onClick={loadPendingRequests} className="mt-4">
+            Retry
+          </Button>
         </CardContent>
       </Card>
     )
@@ -129,7 +211,7 @@ export function PendingOffPremisesRequests() {
               </CardDescription>
             </div>
             <Badge variant="outline" className="text-lg">
-              {totalCount} Pending
+              {requests.length} Pending
             </Badge>
           </div>
         </CardHeader>
