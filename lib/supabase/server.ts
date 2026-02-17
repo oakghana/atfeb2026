@@ -42,14 +42,6 @@ export async function createClient() {
         }
       },
     },
-    global: {
-      fetch: (url, options) => {
-        return fetch(url, {
-          ...options,
-          signal: undefined, // Don't use AbortSignal to prevent AbortErrors
-        })
-      },
-    },
   })
 }
 
@@ -68,14 +60,6 @@ export async function createAdminClient() {
       },
       setAll() {
         // No-op for admin client
-      },
-    },
-    global: {
-      fetch: (url, options) => {
-        return fetch(url, {
-          ...options,
-          signal: undefined, // Don't use AbortSignal to prevent AbortErrors
-        })
       },
     },
   })
