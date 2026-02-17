@@ -42,16 +42,28 @@ export function PendingOffPremisesRequests() {
     try {
       setIsLoading(true)
       setError(null)
+      console.log('[v0] Starting loadPendingRequests')
 
       const supabase = createClient()
+      console.log('[v0] Supabase client created')
 
-      // Get current user
+      // Get current user with better error handling
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+      console.log('[v0] Auth result:', { hasUser: !!authUser, authError: authError?.message })
 
-      if (authError || !authUser) {
-        setError('Unable to authenticate')
+      if (authError) {
+        console.error('[v0] Auth error:', authError)
+        setError('Authentication error: ' + authError.message)
         return
       }
+
+      if (!authUser) {
+        console.log('[v0] No authenticated user found')
+        setError('Unable to authenticate - please log in again')
+        return
+      }
+
+      console.log('[v0] Authenticated user:', authUser.id)
 
       // Get user profile for filtering
       const { data: profile, error: profileError } = await supabase
@@ -60,11 +72,21 @@ export function PendingOffPremisesRequests() {
         .eq('id', authUser.id)
         .maybeSingle()
 
-      if (profileError || !profile) {
-        setError('Failed to fetch user profile')
+      console.log('[v0] Profile result:', { hasProfile: !!profile, profileError: profileError?.message })
+
+      if (profileError) {
+        console.error('[v0] Profile error:', profileError)
+        setError('Failed to fetch user profile: ' + profileError.message)
         return
       }
 
+      if (!profile) {
+        console.log('[v0] User profile not found')
+        setError('User profile not found')
+        return
+      }
+
+      console.log('[v0] User profile loaded:', profile.role)
       setManagerProfile(profile)
 
       // Build query based on role
@@ -117,15 +139,18 @@ export function PendingOffPremisesRequests() {
 
       const { data: pendingRequests, error: queryError } = await query
 
+      console.log('[v0] Query result:', { count: pendingRequests?.length || 0, queryError: queryError?.message })
+
       if (queryError) {
         console.error('[v0] Query error:', queryError)
-        setError('Failed to fetch pending requests')
+        setError('Failed to fetch pending requests: ' + queryError.message)
         return
       }
 
+      console.log('[v0] Requests loaded successfully:', pendingRequests?.length || 0)
       setRequests(pendingRequests || [])
     } catch (err: any) {
-      console.error('[v0] Error loading pending requests:', err)
+      console.error('[v0] Exception in loadPendingRequests:', err)
       setError(err.message || 'An error occurred while loading requests')
     } finally {
       setIsLoading(false)
