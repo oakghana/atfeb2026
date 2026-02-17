@@ -36,7 +36,10 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id)
       .single()
 
+    console.log("[v0] User profile:", { userProfile, user_id: user.id })
+
     if (!userProfile) {
+      console.error("[v0] User profile not found")
       return NextResponse.json(
         { error: "User profile not found" },
         { status: 404 }
@@ -48,12 +51,14 @@ export async function POST(request: NextRequest) {
     
     if (userProfile.reports_to_id) {
       // User has a direct manager assigned
+      console.log("[v0] Looking for direct manager:", userProfile.reports_to_id)
       const { data: directManager } = await supabase
         .from("user_profiles")
         .select("id, email, first_name, last_name, role")
         .eq("id", userProfile.reports_to_id)
         .single()
       
+      console.log("[v0] Direct manager result:", directManager)
       if (directManager) {
         managers.push(directManager)
       }
@@ -61,18 +66,23 @@ export async function POST(request: NextRequest) {
     
     // If no direct manager, get all department heads and regional managers in the department
     if (managers.length === 0) {
+      console.log("[v0] No direct manager, looking for department managers in:", userProfile.department_id)
       const { data: deptManagers } = await supabase
         .from("user_profiles")
         .select("id, email, first_name, last_name, role")
         .in("role", ["department_head", "regional_manager"])
         .eq("department_id", userProfile.department_id)
       
+      console.log("[v0] Department managers result:", { count: deptManagers?.length || 0, managers: deptManagers })
       if (deptManagers && deptManagers.length > 0) {
         managers = deptManagers
       }
     }
 
+    console.log("[v0] Final managers found:", { count: managers.length, managers })
+
     if (managers.length === 0) {
+      console.error("[v0] No managers found for user")
       return NextResponse.json(
         {
           error: "No managers found to approve your request",
@@ -83,6 +93,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Store the off-premises check-in request for manager approval
+    console.log("[v0] Inserting pending check-in:", {
+      user_id: user.id,
+      location_name: current_location.name,
+      status: "pending",
+    })
+
     const { data: requestRecord, error: insertError } = await supabase
       .from("pending_offpremises_checkins")
       .insert({
@@ -97,13 +113,17 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
+    console.log("[v0] Insert result:", { insertError, hasData: !!requestRecord })
+
     if (insertError) {
       console.error("[v0] Failed to store pending check-in:", insertError)
       return NextResponse.json(
-        { error: "Failed to process request" },
+        { error: "Failed to process request: " + insertError.message },
         { status: 500 }
       )
     }
+
+    console.log("[v0] Request stored successfully:", requestRecord.id)
 
     // Send notifications to managers
     const managerNotifications = managers.map((manager: any) => ({
