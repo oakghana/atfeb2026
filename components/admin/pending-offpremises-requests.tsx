@@ -32,7 +32,13 @@ interface PendingOffPremisesRequestsProps {
   // Component will fetch requests directly from API
 }
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((res) => {
+  if (!res.ok) {
+    console.log("[v0] Fetch error:", { status: res.status, url })
+    throw new Error(`API error: ${res.status}`)
+  }
+  return res.json()
+})
 
 export function PendingOffPremisesRequests() {
   const [selectedRequest, setSelectedRequest] = useState<PendingRequest | null>(null)
@@ -82,6 +88,7 @@ export function PendingOffPremisesRequests() {
   }
 
   if (error) {
+    console.error("[v0] Error fetching pending requests:", error)
     return (
       <Card>
         <CardHeader>
@@ -92,7 +99,7 @@ export function PendingOffPremisesRequests() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Error Loading Requests</AlertTitle>
             <AlertDescription>
-              Failed to load pending requests. Please try again later.
+              {error.message || 'Failed to load pending requests. Please try again later.'}
             </AlertDescription>
           </Alert>
         </CardContent>
