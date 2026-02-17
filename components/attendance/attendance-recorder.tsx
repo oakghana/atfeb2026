@@ -1787,11 +1787,47 @@ export function AttendanceRecorder({
                 </>
               )}
 
-              {/* Checkout button now integrated into Active Session Timer */}
-              {localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time && checkoutTimeReached && !locationValidation?.canCheckOut && (
-                <p className="text-xs text-red-500 mt-2 text-center">
-                  You are outside the approved location range. Please move closer to a QCC location to check out.
-                </p>
+              {/* Checkout button - Always visible when checked in */}
+              {localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time && (
+                <>
+                  <Button
+                    onClick={handleCheckOut}
+                    disabled={
+                      isCheckingIn || isProcessing || isLoading || !checkoutTimeReached || !locationValidation?.canCheckOut
+                    }
+                    className="w-full bg-red-600 hover:bg-red-700 text-white shadow-lg relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
+                    size="lg"
+                    title={!checkoutTimeReached ? "Minimum 2 hours required between check-in and check-out" : !locationValidation?.canCheckOut ? "You must be at your assigned location to check out" : "Check out from your shift"}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="relative z-10 flex items-center justify-center w-full">
+                      {isCheckingIn ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          {checkingMessage || "Checking Out..."}
+                        </>
+                      ) : (
+                        <>
+                          <LogOut className="mr-2 h-5 w-5" />
+                          Check Out
+                        </>
+                      )}
+                    </div>
+                  </Button>
+
+                  {/* Warning messages for checkout */}
+                  {!checkoutTimeReached && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
+                      Minimum 2 hours required between check-in and check-out. {minutesUntilCheckout} minutes remaining.
+                    </p>
+                  )}
+                  
+                  {checkoutTimeReached && !locationValidation?.canCheckOut && (
+                    <p className="text-xs text-red-500 mt-2 text-center">
+                      You are outside the approved location range. Please move closer to a QCC location to check out.
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
