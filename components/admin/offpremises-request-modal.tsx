@@ -147,29 +147,33 @@ export function OffPremisesRequestModal({
           </div>
 
           {/* Current Location Information */}
-          <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20">
+          <div className="border-2 border-blue-300 rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20">
             <h3 className="font-semibold mb-3 text-sm text-blue-900 dark:text-blue-300">
               Current Location
             </h3>
-            <div className="space-y-2">
-              <div className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <MapPin className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="font-medium text-blue-900 dark:text-blue-100">
+                  <p className="text-lg font-bold text-blue-950 dark:text-blue-50 mb-2">
                     {request.current_location_name}
                   </p>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
-                    Latitude: {request.latitude.toFixed(6)}
-                    <br />
-                    Longitude: {request.longitude.toFixed(6)}
-                    <br />
-                    GPS Accuracy: ±{request.accuracy.toFixed(0)}m
-                  </p>
+                  <div className="bg-white dark:bg-gray-800 rounded p-3 space-y-1 text-sm">
+                    <p className="text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold">Latitude:</span> {request.latitude.toFixed(6)}
+                    </p>
+                    <p className="text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold">Longitude:</span> {request.longitude.toFixed(6)}
+                    </p>
+                    <p className="text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold">GPS Accuracy:</span> ±{request.accuracy.toFixed(0)}m
+                    </p>
+                  </div>
                   <a
                     href={mapUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:underline dark:text-blue-400 mt-2 inline-block"
+                    className="text-sm text-blue-600 hover:underline dark:text-blue-400 mt-3 inline-flex items-center gap-1"
                   >
                     View on Google Maps →
                   </a>
