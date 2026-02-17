@@ -37,6 +37,8 @@ export function PendingOffPremisesRequests() {
   const [error, setError] = useState<string | null>(null)
   const [managerProfile, setManagerProfile] = useState<any>(null)
 
+  console.log('[v0] PendingOffPremisesRequests component mounted')
+
   // Load pending requests
   const loadPendingRequests = async () => {
     try {
