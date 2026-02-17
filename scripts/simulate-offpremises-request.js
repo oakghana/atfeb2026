@@ -13,10 +13,11 @@ async function simulateOffPremisesRequest() {
 
   try {
     // Step 1: Get staff members to use as test data
-    console.log("\n📋 Step 1: Fetching staff members...");
+    console.log("\n📋 Step 1: Fetching staff members from user_profiles...");
     const { data: staffMembers, error: staffError } = await supabase
-      .from("staff_members")
-      .select("id, name, email, department, supervisor_id")
+      .from("user_profiles")
+      .select("id, first_name, last_name, email, department_id, role")
+      .neq("role", "admin")
       .limit(3);
 
     if (staffError) {
@@ -25,88 +26,44 @@ async function simulateOffPremisesRequest() {
     }
 
     if (!staffMembers || staffMembers.length === 0) {
-      console.log("ℹ️  No staff members found. Creating test staff data first...");
-
-      // Create test staff
-      const testStaff = [
-        {
-          name: "John Kwaku",
-          email: "john.kwaku@qcc.org.gh",
-          department: "IT",
-          position: "Software Developer",
-          supervisor_id: null,
-        },
-        {
-          name: "Ama Serwaa",
-          email: "ama.serwaa@qcc.org.gh",
-          department: "HR",
-          position: "HR Manager",
-          supervisor_id: null,
-        },
-        {
-          name: "Kofi Mensah",
-          email: "kofi.mensah@qcc.org.gh",
-          department: "Finance",
-          position: "Finance Officer",
-          supervisor_id: null,
-        },
-      ];
-
-      const { data: createdStaff, error: createError } = await supabase
-        .from("staff_members")
-        .insert(testStaff)
-        .select();
-
-      if (createError) {
-        console.error("❌ Error creating test staff:", createError.message);
-        return;
-      }
-
-      console.log(
-        `✅ Created ${createdStaff.length} test staff members`,
-        createdStaff
-      );
-
-      // Now create off-premises requests for these staff
-      await createOffPremisesRequests(createdStaff);
-    } else {
-      console.log(`✅ Found ${staffMembers.length} staff members`);
-      staffMembers.forEach((staff, idx) => {
-        console.log(
-          `   ${idx + 1}. ${staff.name} (${staff.email}) - ${staff.department}`
-        );
-      });
-
-      // Create off-premises requests for existing staff
-      await createOffPremisesRequests(staffMembers);
+      console.log("⚠️  No staff members found in database");
+      return;
     }
+
+    console.log(`✅ Found ${staffMembers.length} staff members`);
+    staffMembers.forEach((staff, idx) => {
+      console.log(
+        `   ${idx + 1}. ${staff.first_name} ${staff.last_name} (${staff.email})`
+      );
+    });
+
+    // Create off-premises requests for existing staff
+    await createOffPremisesRequests(staffMembers);
   } catch (error) {
     console.error("❌ Simulation error:", error);
   }
 }
 
 async function createOffPremisesRequests(staffMembers) {
-  console.log("\n📋 Step 2: Creating off-premises check-in requests...");
+  console.log("\n📝 Step 2: Creating off-premises check-in requests...");
 
   const requests = staffMembers.map((staff) => ({
     user_id: staff.id,
-    staff_id: staff.id,
-    staff_name: staff.name,
-    staff_email: staff.email,
-    department: staff.department,
-    requested_date: new Date().toISOString().split("T")[0],
-    reason: "Business meeting with client outside office",
-    location: "Accra Central Business District",
-    expected_checkin_time: new Date(
-      Date.now() + 2 * 60 * 60 * 1000
-    ).toISOString(),
+    current_location_name: `Client Meeting - Off-Site Location ${Math.floor(Math.random() * 100)}`,
+    latitude: 5.5500 + (Math.random() - 0.5) * 0.2,
+    longitude: -0.2167 + (Math.random() - 0.5) * 0.2,
+    accuracy: 15 + Math.random() * 20,
+    device_info: JSON.stringify({
+      device_type: "mobile",
+      os: "Android",
+      browser: "Chrome",
+      timestamp: new Date().toISOString(),
+    }),
     status: "pending",
-    supervisor_id: staff.supervisor_id,
-    created_at: new Date().toISOString(),
   }));
 
   const { data: createdRequests, error: requestError } = await supabase
-    .from("offpremises_checkin_requests")
+    .from("pending_offpremises_checkins")
     .insert(requests)
     .select();
 
@@ -117,31 +74,37 @@ async function createOffPremisesRequests(staffMembers) {
 
   console.log(`✅ Created ${createdRequests.length} off-premises requests:`);
   createdRequests.forEach((req, idx) => {
+    const staff = staffMembers[idx];
     console.log(`\n   Request ${idx + 1}:`);
-    console.log(`   - Staff: ${req.staff_name} (${req.staff_email})`);
-    console.log(`   - Department: ${req.department}`);
-    console.log(`   - Reason: ${req.reason}`);
-    console.log(`   - Location: ${req.location}`);
+    console.log(`   - Staff: ${staff.first_name} ${staff.last_name}`);
+    console.log(`   - Email: ${staff.email}`);
+    console.log(`   - Location: ${req.current_location_name}`);
+    console.log(`   - Coordinates: ${req.latitude.toFixed(4)}, ${req.longitude.toFixed(4)}`);
     console.log(`   - Status: ${req.status}`);
-    console.log(`   - Expected Check-in: ${req.expected_checkin_time}`);
+    console.log(`   - Created: ${new Date(req.created_at).toLocaleString()}`);
   });
 
   // Step 3: Verify requests appear in pending list
   console.log("\n📋 Step 3: Fetching pending off-premises requests...");
   const { data: pendingRequests, error: pendingError } = await supabase
-    .from("offpremises_checkin_requests")
+    .from("pending_offpremises_checkins")
     .select(
       `
       id,
-      staff_name,
-      staff_email,
-      department,
-      reason,
-      location,
-      expected_checkin_time,
+      user_id,
+      current_location_name,
+      latitude,
+      longitude,
+      accuracy,
       status,
-      requested_date,
-      created_at
+      created_at,
+      user_profiles!pending_offpremises_checkins_user_id_fkey (
+        id,
+        first_name,
+        last_name,
+        email,
+        department_id
+      )
     `
     )
     .eq("status", "pending")
@@ -156,35 +119,34 @@ async function createOffPremisesRequests(staffMembers) {
     `\n✅ Found ${pendingRequests.length} pending requests in the system:`
   );
   pendingRequests.forEach((req, idx) => {
-    console.log(`\n   [${idx + 1}] ${req.staff_name}`);
-    console.log(`       Email: ${req.staff_email}`);
-    console.log(`       Department: ${req.department}`);
-    console.log(`       Reason: ${req.reason}`);
-    console.log(`       Location: ${req.location}`);
-    console.log(`       Expected Check-in: ${req.expected_checkin_time}`);
+    console.log(`\n   [${idx + 1}] ${req.user_profiles.first_name} ${req.user_profiles.last_name}`);
+    console.log(`       Email: ${req.user_profiles.email}`);
+    console.log(`       Location: ${req.current_location_name}`);
+    console.log(`       Coordinates: ${req.latitude.toFixed(4)}, ${req.longitude.toFixed(4)}`);
     console.log(`       Status: ${req.status}`);
+    console.log(`       Requested: ${new Date(req.created_at).toLocaleString()}`);
   });
 
   // Step 4: Show what supervisors should see
   console.log("\n📋 Step 4: Supervisor Dashboard View");
   console.log("   These requests should now appear in:");
-  console.log("   → /offpremises-approvals");
+  console.log("   → Off-Premises Approvals page");
   console.log(`   → "Pending Off-Premises Check-In Requests" section`);
-  console.log(`   → Count: ${pendingRequests.length} Pending\n`);
+  console.log(`   → Total Pending: ${pendingRequests.length}\n`);
 
-  console.log("=" * 60);
+  console.log("=".repeat(60));
   console.log("\n✨ SIMULATION COMPLETE!");
   console.log("\n📝 What happened:");
-  console.log("   1. Created sample staff members (if needed)");
-  console.log("   2. Created off-premises check-in requests");
-  console.log("   3. Verified requests are in 'pending' status");
+  console.log("   1. Retrieved staff members from user_profiles table");
+  console.log("   2. Created off-premises check-in requests in 'pending' status");
+  console.log("   3. Verified requests are visible in the system");
   console.log("   4. Requests should now appear in supervisor's approval page\n");
 
   console.log("🔍 Next Steps:");
-  console.log("   • Visit: https://qccqrcode.qccpf.com/offpremises-approvals");
+  console.log("   • Visit: /offpremises-approvals");
   console.log("   • You should see the pending requests with staff details");
-  console.log("   • Supervisors can approve/reject requests");
-  console.log("   • Once approved, staff can check-in from off-premises\n");
+  console.log("   • Supervisors can now approve/reject these requests");
+  console.log("   • Once approved, staff can check-in from off-premises locations\n");
 }
 
 // Run simulation
