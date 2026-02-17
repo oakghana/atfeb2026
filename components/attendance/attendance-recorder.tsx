@@ -1061,26 +1061,36 @@ export function AttendanceRecorder({
       const supabase = createClient()
       const { data: { user: currentUser } } = await supabase.auth.getUser()
 
+      console.log("[v0] User authenticated:", { user_id: currentUser?.id })
+
       if (!currentUser?.id) {
         throw new Error("User not authenticated")
       }
 
+      const payload = {
+        current_location: {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          accuracy: currentLocation.accuracy,
+          name: locationName,
+        },
+        device_info: getDeviceInfo(),
+        user_id: currentUser.id,
+      }
+      
+      console.log("[v0] Sending off-premises request:", payload)
+
       const response = await fetch("/api/attendance/check-in-outside-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          current_location: {
-            latitude: currentLocation.latitude,
-            longitude: currentLocation.longitude,
-            accuracy: currentLocation.accuracy,
-            name: locationName,
-          },
-          device_info: getDeviceInfo(),
-          user_id: currentUser.id,
-        }),
+        body: JSON.stringify(payload),
       })
 
+      console.log("[v0] API response status:", response.status)
+
       const result = await response.json()
+      
+      console.log("[v0] API response body:", result)
 
       if (!response.ok) {
         throw new Error(result.error || "Failed to send confirmation request")
