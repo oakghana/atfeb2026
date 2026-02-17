@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { AlertTriangle, ArrowLeft, MapPin } from 'lucide-react'
 import { PendingOffPremisesRequests } from '@/components/admin/pending-offpremises-requests'
@@ -12,13 +11,13 @@ import { PendingOffPremisesRequests } from '@/components/admin/pending-offpremis
 export default function OffPremisesApprovalPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
+  const [isAuthorized, setIsAuthorized] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [userProfile, setUserProfile] = useState<any>(null)
 
   useEffect(() => {
     let isMounted = true
 
-    const loadUserProfile = async () => {
+    const checkAuthorization = async () => {
       try {
         const supabase = createClient()
 
@@ -32,35 +31,31 @@ export default function OffPremisesApprovalPage() {
           return
         }
 
-        // Fetch user profile
+        // Fetch user profile to verify permissions
         const { data: profile, error: profileError } = await supabase
           .from('user_profiles')
-          .select('id, role, department_id, first_name, last_name, geofence_locations')
+          .select('role')
           .eq('id', authUser.id)
           .maybeSingle()
 
         if (!isMounted) return
 
-        if (profileError) {
-          setError('Failed to load user profile')
-          return
-        }
-
-        if (!profile) {
-          setError('User profile not found')
+        if (profileError || !profile) {
+          setError('Unable to verify user permissions. Please try again.')
           return
         }
 
         // Check if user has permission to view this page
-        if (!['admin', 'department_head', 'regional_manager'].includes(profile.role)) {
+        const hasPermission = ['admin', 'department_head', 'regional_manager'].includes(profile.role)
+        if (!hasPermission) {
           setError('You do not have permission to view this page')
           return
         }
 
-        setUserProfile(profile)
+        setIsAuthorized(true)
       } catch (err: any) {
         if (isMounted) {
-          setError(err.message || 'Failed to load dashboard')
+          setError(err.message || 'An unexpected error occurred')
         }
       } finally {
         if (isMounted) {
@@ -69,7 +64,7 @@ export default function OffPremisesApprovalPage() {
       }
     }
 
-    loadUserProfile()
+    checkAuthorization()
 
     return () => {
       isMounted = false
@@ -89,14 +84,29 @@ export default function OffPremisesApprovalPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto py-8 px-4">
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto py-8 px-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.back()}
+            className="mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        </div>
       </div>
     )
+  }
+
+  if (!isAuthorized) {
+    return null
   }
 
   return (
@@ -126,7 +136,7 @@ export default function OffPremisesApprovalPage() {
         </div>
 
         {/* Pending Requests Component */}
-        <PendingOffPremisesRequests managerProfile={userProfile} />
+        <PendingOffPremisesRequests />
       </div>
     </div>
   )

@@ -29,12 +29,12 @@ interface PendingRequest {
 }
 
 interface PendingOffPremisesRequestsProps {
-  managerProfile?: any
+  // Component will fetch requests directly from API
 }
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
-export function PendingOffPremisesRequests({ managerProfile }: PendingOffPremisesRequestsProps) {
+export function PendingOffPremisesRequests() {
   const [selectedRequest, setSelectedRequest] = useState<PendingRequest | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { data, error, isLoading, mutate } = useSWR(
