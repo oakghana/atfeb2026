@@ -193,6 +193,10 @@ export function PendingOffPremisesRequests() {
   }
 
   if (error) {
+    // Check if error is due to missing table
+    const isMissingTable = error.includes("Could not find the table 'public.pending_offpremises_checkins'") || 
+                           error.includes("pending_offpremises_checkins")
+    
     return (
       <Card>
         <CardHeader>
@@ -203,7 +207,36 @@ export function PendingOffPremisesRequests() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Error Loading Requests</AlertTitle>
             <AlertDescription>
-              {error}
+              {isMissingTable ? (
+                <div>
+                  <p>The database table for off-premises requests needs to be created.</p>
+                  <p className="mt-2 text-sm">Please run this SQL in your Supabase SQL Editor:</p>
+                  <pre className="mt-2 p-2 bg-gray-900 text-gray-100 text-xs overflow-auto rounded">
+{`CREATE TABLE IF NOT EXISTS public.pending_offpremises_checkins (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
+  current_location_name TEXT NOT NULL,
+  latitude FLOAT8 NOT NULL,
+  longitude FLOAT8 NOT NULL,
+  accuracy FLOAT8,
+  device_info TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  approved_by_id UUID REFERENCES public.user_profiles(id) ON DELETE SET NULL,
+  approved_at TIMESTAMP WITH TIME ZONE,
+  rejection_reason TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_offpremises_user_id ON public.pending_offpremises_checkins(user_id);
+CREATE INDEX IF NOT EXISTS idx_pending_offpremises_status ON public.pending_offpremises_checkins(status);
+CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_offpremises_checkins(created_at DESC);`}
+                  </pre>
+                  <p className="mt-2 text-sm">After creating the table, click Retry below.</p>
+                </div>
+              ) : (
+                error
+              )}
             </AlertDescription>
           </Alert>
           <Button onClick={loadPendingRequests} className="mt-4">
