@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest) {
   try {
+    console.log("[v0] Fetching pending off-premises requests")
     const supabase = await createClient()
 
     const {
@@ -10,8 +11,11 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
+      console.log("[v0] No authenticated user")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    console.log("[v0] Authenticated user:", user.id)
 
     // Verify the user is a department head, regional manager, or admin
     const { data: managerProfile, error: profileError } = await supabase
@@ -20,12 +24,19 @@ export async function GET(request: NextRequest) {
       .eq("id", user.id)
       .maybeSingle()
 
-    if (profileError || !managerProfile || !["department_head", "regional_manager", "admin"].includes(managerProfile.role)) {
+    if (profileError) {
+      console.error("[v0] Error fetching manager profile:", profileError)
+    }
+
+    if (!managerProfile || !["department_head", "regional_manager", "admin"].includes(managerProfile.role)) {
+      console.log("[v0] User not authorized:", { hasProfile: !!managerProfile, role: managerProfile?.role })
       return NextResponse.json(
         { error: "Only managers can view pending off-premises requests" },
         { status: 403 }
       )
     }
+
+    console.log("[v0] Manager authorized:", managerProfile.role)
 
     // Get pending off-premises check-in requests
     let query = supabase
@@ -90,6 +101,8 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    console.log("[v0] Pending requests found:", pendingRequests?.length || 0)
 
     return NextResponse.json({
       requests: pendingRequests || [],
