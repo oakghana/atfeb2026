@@ -83,7 +83,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Store the off-premises check-in request for manager approval
-    // This will be stored in a notifications or pending_checkins table
     const { data: requestRecord, error: insertError } = await supabase
       .from("pending_offpremises_checkins")
       .insert({
@@ -92,10 +91,8 @@ export async function POST(request: NextRequest) {
         latitude: current_location.latitude,
         longitude: current_location.longitude,
         accuracy: current_location.accuracy,
-        assigned_location_id,
         device_info: device_info,
         status: "pending",
-        requested_at: new Date().toISOString(),
       })
       .select()
       .single()
