@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
         longitude: current_location.longitude,
         accuracy: current_location.accuracy,
         device_info: device_info,
+        reason: reason || null,
         status: "pending",
       })
       .select()
