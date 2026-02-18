@@ -91,27 +91,75 @@ export function PendingOffPremisesRequests() {
       console.log('[v0] User profile loaded:', profile.role)
       setManagerProfile(profile)
 
-      // Call the API endpoint instead of querying directly
-      console.log('[v0] Fetching pending requests from API')
-      const response = await fetch('/api/attendance/offpremises/pending', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
+      // Determine which user IDs to filter by based on role
+      let userIdFilter: string[] | null = null
 
-      console.log('[v0] API response status:', response.status)
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('[v0] API error response:', errorData)
-        setError('Failed to fetch pending requests: ' + (errorData.error || response.statusText))
+      if (profile.role === 'admin') {
+        console.log('[v0] Admin - showing all requests')
+        // No filter needed - show all
+      } else if (profile.role === 'department_head') {
+        console.log('[v0] Department head - filtering by department:', profile.department_id)
+        const { data: deptStaff } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('department_id', profile.department_id)
+        userIdFilter = deptStaff?.map(s => s.id) || []
+      } else if (profile.role === 'regional_manager') {
+        console.log('[v0] Regional manager - showing all requests for now')
+        // Show all for regional managers
+      } else {
+        console.log('[v0] User role not authorized:', profile.role)
+        setError('You do not have permission to view pending requests')
         return
       }
 
-      const data = await response.json()
-      console.log('[v0] Requests loaded successfully:', data.requests?.length || 0)
-      setRequests(data.requests || [])
+      // Build query
+      let query = supabase
+        .from('pending_offpremises_checkins')
+        .select(`
+          id,
+          user_id,
+          current_location_name,
+          latitude,
+          longitude,
+          accuracy,
+          device_info,
+          created_at,
+          status,
+          user_profiles!pending_offpremises_checkins_user_id_fkey (
+            id,
+            first_name,
+            last_name,
+            email,
+            department_id,
+            geofence_locations
+          )
+        `)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+
+      // Apply user ID filter for department heads
+      if (userIdFilter !== null) {
+        if (userIdFilter.length === 0) {
+          console.log('[v0] No staff found for filter - returning empty')
+          setRequests([])
+          return
+        }
+        query = query.in('user_id', userIdFilter)
+      }
+
+      const { data: pendingRequests, error: queryError } = await query
+
+      console.log('[v0] Query result:', { count: pendingRequests?.length || 0, error: queryError?.message })
+
+      if (queryError) {
+        console.error('[v0] Query error:', queryError)
+        setError('Failed to fetch pending requests: ' + queryError.message)
+        return
+      }
+
+      console.log('[v0] Requests loaded successfully:', pendingRequests?.length || 0)
+      setRequests(pendingRequests || [])
     } catch (err: any) {
       console.error('[v0] Exception in loadPendingRequests:', err)
       setError(err.message || 'An error occurred while loading requests')
