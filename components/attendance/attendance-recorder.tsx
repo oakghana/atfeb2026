@@ -1131,6 +1131,11 @@ export function AttendanceRecorder({
       console.log("[v0] API response body:", result)
 
       if (!response.ok) {
+        // Check if it's a profile setup error
+        if (result.requiresProfileSetup) {
+          console.error("[v0] Profile not found. User needs profile created.")
+          throw new Error(`Your user profile hasn't been set up yet. Please contact your administrator. (${result.userEmail})`)
+        }
         throw new Error(result.error || "Failed to send confirmation request")
       }
 
