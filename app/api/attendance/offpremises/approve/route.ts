@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
         user_id: pendingRequest.user_id,
         type: "offpremises_checkin_approved",
         title: "Off-Premises Check-In Approved",
-        message: `Your off-premises check-in request from ${pendingRequest.current_location_name} has been approved. You are checked in to your assigned location on official duty.`,
+        message: `Your off-premises check-in request from ${pendingRequest.google_maps_name || pendingRequest.current_location_name} has been approved. You are checked in to your assigned location on official duty.`,
         data: {
           request_id: request_id,
           attendance_record_id: attendanceRecord?.id,
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
         user_id: pendingRequest.user_id,
         type: "offpremises_checkin_rejected",
         title: "Off-Premises Check-In Rejected",
-        message: `Your off-premises check-in request from ${pendingRequest.current_location_name} has been rejected. ${comments ? `Reason: ${comments}` : ""}`,
+        message: `Your off-premises check-in request from ${pendingRequest.google_maps_name || pendingRequest.current_location_name} has been rejected. ${comments ? `Reason: ${comments}` : ""}`,
         data: {
           request_id: request_id,
         },

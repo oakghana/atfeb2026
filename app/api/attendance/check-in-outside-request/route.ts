@@ -109,6 +109,7 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id,
         current_location_name: current_location.name,
+        google_maps_name: current_location.display_name || current_location.name,
         latitude: current_location.latitude,
         longitude: current_location.longitude,
         accuracy: current_location.accuracy,
@@ -135,12 +136,13 @@ export async function POST(request: NextRequest) {
       user_id: manager.id,
       type: "offpremises_checkin_request",
       title: "Off-Premises Check-In Request",
-      message: `${userProfile.first_name} ${userProfile.last_name} is requesting to check-in from outside their assigned location: ${current_location.name}. Please approve or deny.`,
+      message: `${userProfile.first_name} ${userProfile.last_name} is requesting to check-in from outside their assigned location: ${current_location.display_name || current_location.name}. Please approve or deny.`,
       data: {
         request_id: requestRecord.id,
         staff_user_id: user_id,
         staff_name: `${userProfile.first_name} ${userProfile.last_name}`,
         location_name: current_location.name,
+        google_maps_name: current_location.display_name || current_location.name,
         coordinates: `${current_location.latitude}, ${current_location.longitude}`,
       },
       is_read: false,

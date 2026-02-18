@@ -43,6 +43,7 @@ import {
   Calendar,
   Bell,
   AlertTriangle,
+  CheckCircle2,
 } from "lucide-react"
 import Image from "next/image"
 
@@ -84,6 +85,13 @@ const navigationItems = [
     title: "Off-Premises Approvals",
     href: "/offpremises-approvals",
     icon: MapPin,
+    roles: ["admin", "regional_manager", "department_head"],
+    category: "main",
+  },
+  {
+    title: "Off-Premises Review",
+    href: "/offpremises-review",
+    icon: CheckCircle2,
     roles: ["admin", "regional_manager", "department_head"],
     category: "main",
   },
