@@ -523,7 +523,9 @@ export function OffPremisesReviewLog() {
                         <TableCell className="text-sm text-gray-600">
                           {record.user_profiles?.email}
                         </TableCell>
-                        <TableCell className="text-sm">{record.user_profiles?.department_id || 'N/A'}</TableCell>
+                        <TableCell className="text-sm">
+                          {record.user_profiles?.departments?.name || record.user_profiles?.department_id || 'N/A'}
+                        </TableCell>
                         <TableCell className="max-w-md">
                           <div className="flex items-start gap-2">
                             <MapPin className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />

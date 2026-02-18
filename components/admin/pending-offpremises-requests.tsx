@@ -264,6 +264,12 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
                           <Clock className="h-4 w-4" />
                           <span>Requested: {formatDate(request.created_at)}</span>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-gray-500">Department:</span>
+                          <span className="font-medium text-gray-700 dark:text-gray-300">
+                            {request.user_profiles?.departments?.name || request.user_profiles?.department_id || 'N/A'}
+                          </span>
+                        </div>
                         <div className="flex items-start gap-2 md:col-span-2">
                           <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
                           <div className="flex-1">

@@ -73,7 +73,11 @@ export async function GET(request: NextRequest) {
           first_name,
           last_name,
           email,
-          department_id
+          department_id,
+          departments!user_profiles_department_id_fkey (
+            id,
+            name
+          )
         )
       `,
         { count: "exact" }
