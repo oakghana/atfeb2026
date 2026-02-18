@@ -132,7 +132,7 @@ export function OffPremisesReviewLog() {
 
       // Get user profile
       const { data: profile, error: profileError } = await supabase
-        .from('profiles')
+        .from('user_profiles')
         .select('id, role, department_id')
         .eq('id', authUser.id)
         .maybeSingle()
@@ -148,7 +148,19 @@ export function OffPremisesReviewLog() {
       setManagerProfile(profile)
       setDepartmentId(profile.department_id)
 
-      // Build query based on role - department heads see only their department, admins see all
+      // Determine which user IDs to filter by based on role
+      let userIdFilter: string[] | null = null
+
+      if (profile.role === 'department_head') {
+        console.log('[v0] Department head - filtering by department:', profile.department_id)
+        const { data: deptStaff } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('department_id', profile.department_id)
+        userIdFilter = deptStaff?.map((s: any) => s.id) || []
+      }
+
+      // Build query for approved records
       let query = supabase
         .from('pending_offpremises_checkins')
         .select(`
@@ -160,6 +172,7 @@ export function OffPremisesReviewLog() {
           longitude,
           created_at,
           approved_at,
+          approved_by_id,
           status,
           user_profiles!pending_offpremises_checkins_user_id_fkey (
             id,
@@ -167,11 +180,6 @@ export function OffPremisesReviewLog() {
             last_name,
             email,
             department_id
-          ),
-          approved_by:approved_by_id (
-            id,
-            first_name,
-            last_name
           )
         `,
           { count: 'exact' }
@@ -179,15 +187,19 @@ export function OffPremisesReviewLog() {
         .eq('status', 'approved')
         .order('approved_at', { ascending: false })
 
-      // Filter by department if department_head
-      if (profile.role === 'department_head') {
-        query = query.eq('user_profiles.department_id', profile.department_id)
+      // Apply user ID filter for department heads
+      if (userIdFilter !== null) {
+        if (userIdFilter.length === 0) {
+          setRecords([])
+          setTotalRecords(0)
+          return
+        }
+        query = query.in('user_id', userIdFilter)
       }
 
       // Add pagination
       const { data: requestRecords, error: fetchError, count } = await query
         .range(currentPage * pageSize, (currentPage + 1) * pageSize - 1)
-        .single()
 
       console.log('[v0] Fetch result:', { count, recordCount: requestRecords?.length || 0, error: fetchError?.message })
 
