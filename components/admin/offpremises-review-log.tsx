@@ -148,10 +148,15 @@ export function OffPremisesReviewLog() {
       setManagerProfile(profile)
       setDepartmentId(profile.department_id)
 
+      console.log('[v0] User role:', profile.role, 'Is Admin:', profile.role === 'admin')
+
       // Determine which user IDs to filter by based on role
       let userIdFilter: string[] | null = null
 
-      if (profile.role === 'department_head') {
+      // Admins see all records - no filtering
+      if (profile.role === 'admin') {
+        console.log('[v0] Admin - showing all approved records')
+      } else if (profile.role === 'department_head') {
         console.log('[v0] Department head - filtering by department:', profile.department_id)
         const { data: deptStaff } = await supabase
           .from('user_profiles')
@@ -202,11 +207,22 @@ export function OffPremisesReviewLog() {
         .range(currentPage * pageSize, (currentPage + 1) * pageSize - 1)
 
       console.log('[v0] Fetch result:', { count, recordCount: requestRecords?.length || 0, error: fetchError?.message })
+      console.log('[v0] Approved records data:', requestRecords)
 
       if (fetchError) {
         console.error('[v0] Fetch error:', fetchError)
         setError('Failed to fetch approved records')
         return
+      }
+
+      // Also check if there are ANY approved records in the database at all
+      if (!requestRecords || requestRecords.length === 0) {
+        console.log('[v0] No approved records found - checking if any exist in database')
+        const { count: totalApproved } = await supabase
+          .from('pending_offpremises_checkins')
+          .select('id', { count: 'exact' })
+          .eq('status', 'approved')
+        console.log('[v0] Total approved records in DB:', totalApproved)
       }
 
       setRecords(requestRecords || [])
@@ -380,6 +396,11 @@ export function OffPremisesReviewLog() {
                 View all approved off-premises check-ins and staff location records
               </p>
             </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-green-600">{totalRecords}</div>
+              <div className="text-sm text-gray-600">Total Approved</div>
+            </div>
+            </div>
             <Button
               onClick={handleExportCSV}
               disabled={records.length === 0}
@@ -398,6 +419,20 @@ export function OffPremisesReviewLog() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {!error && totalRecords === 0 && (
+          <Alert className="mb-6 bg-blue-50 border-blue-200">
+            <CheckCircle2 className="h-4 w-4 text-blue-600" />
+            <AlertTitle className="text-blue-800">No Approved Records Yet</AlertTitle>
+            <AlertDescription className="text-blue-700">
+              There are currently no approved off-premises check-in requests. Check the 
+              <a href="/admin/offpremises-approvals" className="font-semibold underline ml-1">
+                Off-Premises Check-In Approvals page
+              </a>
+              to review pending requests.
+            </AlertDescription>
           </Alert>
         )}
 
