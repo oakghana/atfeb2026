@@ -164,6 +164,12 @@ export async function POST(request: NextRequest) {
         message: "Your off-premises check-in request has been sent to your managers for approval",
         request_id: requestRecord.id,
         pending_approval: true,
+        managers: managers.map((m: any) => ({
+          id: m.id,
+          name: `${m.first_name} ${m.last_name}`,
+          role: m.role,
+          email: m.email,
+        })),
       },
       { status: 200 }
     )

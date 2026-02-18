@@ -1134,14 +1134,24 @@ export function AttendanceRecorder({
         throw new Error(result.error || "Failed to send confirmation request")
       }
 
+      // Build personalized success message with manager names
+      let managerMessage = "your manager"
+      if (result.managers && result.managers.length > 0) {
+        const managerNames = result.managers.map((m: any) => m.name).join(" and ")
+        const roleDescription = result.managers.find((m: any) => m.role === "regional_manager")
+          ? "regional manager"
+          : "department head"
+        managerMessage = `${managerNames} (${roleDescription})`
+      }
+
       setFlashMessage({
-        message: `Your off-premises request has been sent to your department head and regional manager for review. Location: ${locationName}. Reason: ${offPremisesReason}. Once approved, you will be automatically checked in and marked as working outside premises.`,
+        message: `Your off-premises request has been sent successfully to ${managerMessage} for review. Location: ${locationName}. Reason: ${offPremisesReason}. Once approved, you will be automatically checked in and marked as working outside premises.`,
         type: "info",
       })
 
       toast({
         title: "Request Submitted",
-        description: "Your off-premises request is awaiting manager approval.",
+        description: `Your off-premises request is awaiting ${managerMessage}'s approval.`,
         action: <ToastAction altText="OK">OK</ToastAction>,
       })
 
