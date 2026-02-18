@@ -376,14 +376,10 @@ export function OffPremisesReviewLog() {
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
           <p className="mt-4 text-gray-600">Loading approved records...</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
   }
 
   return (
