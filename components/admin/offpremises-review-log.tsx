@@ -376,9 +376,14 @@ export function OffPremisesReviewLog() {
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
           <p className="mt-4 text-gray-600">Loading approved records...</p>
-        </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    )
+    </div>
+  )
   }
 
   return (
@@ -400,7 +405,6 @@ export function OffPremisesReviewLog() {
               <div className="text-2xl font-bold text-green-600">{totalRecords}</div>
               <div className="text-sm text-gray-600">Total Approved</div>
             </div>
-            </div>
             <Button
               onClick={handleExportCSV}
               disabled={records.length === 0}
@@ -413,8 +417,9 @@ export function OffPremisesReviewLog() {
             </Button>
           </div>
         </div>
+      </div>
 
-        {error && (
+      {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
