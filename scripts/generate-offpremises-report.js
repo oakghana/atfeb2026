@@ -1,7 +1,15 @@
-import { createAdminClient } from "@/lib/supabase/server.js"
+import { createClient } from "@supabase/supabase-js";
 
 async function generateOffPremisesReport() {
-  const supabase = await createAdminClient()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("[v0] Missing Supabase environment variables");
+    process.exit(1);
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
   console.log(`
 ════════════════════════════════════════════════════════════════════════════
@@ -34,7 +42,7 @@ async function generateOffPremisesReport() {
 
   // Get staff profile
   const { data: staffProfile } = await supabase
-    .from("user_profiles")
+    .from("profiles")
     .select("id, first_name, last_name, email, department_id")
     .eq("id", request.user_id)
     .single()
@@ -48,7 +56,7 @@ async function generateOffPremisesReport() {
 
   // Get approver profile
   const { data: approverProfile } = await supabase
-    .from("user_profiles")
+    .from("profiles")
     .select("id, first_name, last_name, email, role")
     .eq("id", request.approved_by_id)
     .single()
@@ -62,31 +70,34 @@ async function generateOffPremisesReport() {
 
   // Check attendance records table columns
   console.log(`\n🗄️  DATABASE CHECK:\n`)
-  const { data: dbColumns, error: columnsError } = await supabase
-    .rpc("get_table_columns", { table_name: "attendance_records" })
-    .catch(() => {
-      console.log("⚠️  Could not verify all columns via RPC")
-      return { data: null, error: true }
-    })
+  
+  // Try to get a sample attendance record to see what columns exist
+  const { data: sampleRecord, error: sampleError } = await supabase
+    .from("attendance_records")
+    .select("*")
+    .limit(1)
+    .single()
 
-  if (dbColumns) {
-    const columnNames = dbColumns.map((col) => col.column_name)
+  if (!sampleError && sampleRecord) {
+    const columnNames = Object.keys(sampleRecord);
     const requiredColumns = [
       "actual_location_name",
       "actual_latitude",
       "actual_longitude",
       "on_official_duty_outside_premises",
       "check_in_type",
-    ]
+    ];
 
-    console.log(`Expected columns for off-premises tracking:`)
+    console.log(`Expected columns for off-premises tracking:`);
     requiredColumns.forEach((col) => {
       if (columnNames.includes(col)) {
-        console.log(`  ✓ ${col}`)
+        console.log(`  ✓ ${col}`);
       } else {
-        console.log(`  ✗ ${col} - MISSING!`)
+        console.log(`  ✗ ${col} - MISSING!`);
       }
-    })
+    });
+  } else {
+    console.log("⚠️  Could not verify database columns");
   }
 
   // Check if attendance record was created
