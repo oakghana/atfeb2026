@@ -12,23 +12,7 @@ async function checkOffPremisesReview() {
   // Get the latest pending off-premises requests that have been reviewed
   const { data: pendingRequests, error: pendingError } = await supabase
     .from("pending_offpremises_checkins")
-    .select(
-      `
-      id,
-      user_id,
-      current_location_name,
-      google_maps_name,
-      latitude,
-      longitude,
-      status,
-      created_at,
-      approved_at,
-      approved_by,
-      rejection_reason,
-      profiles:user_id (first_name, last_name, email),
-      approver:approved_by (first_name, last_name, email)
-    `,
-    )
+    .select("*")
     .order("created_at", { ascending: false })
     .limit(10);
 
@@ -43,22 +27,44 @@ async function checkOffPremisesReview() {
     for (const request of pendingRequests) {
       console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
       console.log(`Request ID: ${request.id}`);
-      console.log(
-        `Staff: ${(request.profiles as any)?.first_name || "N/A"} ${(request.profiles as any)?.last_name || ""}`,
-      );
-      console.log(`Email: ${(request.profiles as any)?.email || "N/A"}`);
+      console.log(`Staff User ID: ${request.user_id}`);
       console.log(`Status: ${request.status?.toUpperCase()}`);
       console.log(`Location Name: ${request.current_location_name}`);
       console.log(`Google Maps Name: ${request.google_maps_name || "Not available"}`);
       console.log(`Coordinates: ${request.latitude}, ${request.longitude}`);
       console.log(`Requested at: ${new Date(request.created_at).toLocaleString()}`);
 
+      // Get staff profile
+      const { data: staffProfile } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, email")
+        .eq("id", request.user_id)
+        .single();
+
+      if (staffProfile) {
+        console.log(`Staff: ${staffProfile.first_name || ""} ${staffProfile.last_name || ""}`);
+        console.log(`Email: ${staffProfile.email || "N/A"}`);
+      }
+
       if (request.status === "approved") {
         console.log(`✓ APPROVED`);
-        console.log(`Approved at: ${new Date(request.approved_at).toLocaleString()}`);
-        console.log(
-          `Approved by: ${(request.approver as any)?.first_name || "N/A"} ${(request.approver as any)?.last_name || ""}`,
-        );
+        console.log(`Approved at: ${request.approved_at ? new Date(request.approved_at).toLocaleString() : "N/A"}`);
+        console.log(`Approved by ID: ${request.approved_by || "N/A"}`);
+
+        // Get approver details
+        if (request.approved_by) {
+          const { data: approverProfile } = await supabase
+            .from("profiles")
+            .select("first_name, last_name, email")
+            .eq("id", request.approved_by)
+            .single();
+
+          if (approverProfile) {
+            console.log(
+              `Approved by: ${approverProfile.first_name || ""} ${approverProfile.last_name || ""}`,
+            );
+          }
+        }
 
         // Check if the staff member was auto-checked in
         const { data: attendanceRecord, error: attendanceError } = await supabase
