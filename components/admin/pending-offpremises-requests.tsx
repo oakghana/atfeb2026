@@ -25,7 +25,7 @@ interface PendingRequest {
     last_name: string
     email: string
     department_id: string
-    geofence_locations?: string[]
+
   }
 }
 
@@ -131,8 +131,7 @@ export function PendingOffPremisesRequests() {
             first_name,
             last_name,
             email,
-            department_id,
-            geofence_locations
+            department_id
           )
         `)
         .eq('status', 'pending')
