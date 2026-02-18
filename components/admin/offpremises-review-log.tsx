@@ -297,32 +297,31 @@ export function OffPremisesReviewLog() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        {/* Header with Role Information */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-start justify-between mb-4">
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <CheckCircle2 className="h-6 w-6 text-green-600" />
-                <h1 className="text-3xl font-bold">Off-Premises Review Log</h1>
+                <div>
+                  <h1 className="text-3xl font-bold">Off-Premises Review Log</h1>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {managerProfile?.role === 'admin' && 'View all approved off-premises requests across all departments and locations'}
+                    {managerProfile?.role === 'regional_manager' && 'View approved off-premises requests from your assigned location'}
+                    {managerProfile?.role === 'department_head' && `View approved off-premises requests from ${managerProfile?.department_id || 'your department'}`}
+                  </p>
+                </div>
               </div>
-              <p className="text-gray-600 ml-9">
-                View all approved off-premises check-ins and staff location records
-              </p>
             </div>
             <div className="text-right">
+              <Badge variant="outline" className="mb-2 block">
+                {managerProfile?.role === 'admin' && '👤 Admin - All Access'}
+                {managerProfile?.role === 'regional_manager' && '📍 Regional Manager'}
+                {managerProfile?.role === 'department_head' && '🏢 Department Head'}
+              </Badge>
               <div className="text-2xl font-bold text-green-600">{totalRecords}</div>
               <div className="text-sm text-gray-600">Total Approved</div>
             </div>
-            <Button
-              onClick={handleExportCSV}
-              disabled={records.length === 0}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <Download className="h-4 w-4" />
-              Export CSV
-            </Button>
           </div>
         </div>
 
@@ -339,11 +338,13 @@ export function OffPremisesReviewLog() {
             <CheckCircle2 className="h-4 w-4 text-blue-600" />
             <AlertTitle className="text-blue-800">No Approved Records Yet</AlertTitle>
             <AlertDescription className="text-blue-700">
-              There are currently no approved off-premises check-in requests. Check the 
-              <a href="/admin/offpremises-approvals" className="font-semibold underline ml-1">
-                Off-Premises Check-In Approvals page
+              {managerProfile?.role === 'admin' && 'No approved off-premises requests found. All requests across the organization will appear here once approved.'}
+              {managerProfile?.role === 'regional_manager' && 'No approved requests from your location yet. Staff requests will appear here once approved.'}
+              {managerProfile?.role === 'department_head' && 'No approved requests from your department yet. Staff requests will appear here once approved.'}
+              <br />
+              <a href="/admin/offpremises-approvals" className="font-semibold underline inline-block mt-2 text-blue-600 hover:text-blue-800">
+                Go to Pending Approvals →
               </a>
-              to review pending requests.
             </AlertDescription>
           </Alert>
         )}

@@ -36,8 +36,6 @@ export function PendingOffPremisesRequests() {
   const [error, setError] = useState<string | null>(null)
   const [managerProfile, setManagerProfile] = useState<any>(null)
 
-  console.log('[v0] PendingOffPremisesRequests component mounted')
-
   // Load pending requests
   const loadPendingRequests = async () => {
     try {
@@ -178,16 +176,25 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between">
             <div>
               <CardTitle>Pending Off-Premises Check-In Requests</CardTitle>
               <CardDescription>
-                Review and approve staff members requesting to check in from outside their registered QCC location
+                {managerProfile?.role === 'admin' && 'Review and approve staff off-premises check-ins from all locations and departments'}
+                {managerProfile?.role === 'regional_manager' && 'Review and approve staff off-premises check-ins from your assigned location'}
+                {managerProfile?.role === 'department_head' && `Review and approve staff off-premises check-ins from ${managerProfile?.department_id || 'your department'}`}
               </CardDescription>
             </div>
-            <Badge variant="outline" className="text-lg">
-              {requests.length} Pending
-            </Badge>
+            <div className="text-right">
+              <Badge variant="outline" className="mb-2 block">
+                {managerProfile?.role === 'admin' && '👤 Admin - All Access'}
+                {managerProfile?.role === 'regional_manager' && '📍 Regional Manager'}
+                {managerProfile?.role === 'department_head' && '🏢 Department Head'}
+              </Badge>
+              <Badge variant={requests.length > 0 ? 'default' : 'secondary'} className="text-lg">
+                {requests.length} Pending
+              </Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
