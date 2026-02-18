@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -44,121 +43,29 @@ export function PendingOffPremisesRequests() {
     try {
       setIsLoading(true)
       setError(null)
-      console.log('[v0] Starting loadPendingRequests')
+      console.log('[v0] Starting loadPendingRequests via API')
 
-      const supabase = createClient()
-      console.log('[v0] Supabase client created')
+      // Use the API endpoint instead of direct Supabase query
+      const response = await fetch('/api/attendance/offpremises/pending')
+      console.log('[v0] API response status:', response.status)
 
-      // Get current user with better error handling
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
-      console.log('[v0] Auth result:', { hasUser: !!authUser, authError: authError?.message })
-
-      if (authError) {
-        console.error('[v0] Auth error:', authError)
-        setError('Authentication error: ' + authError.message)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || `HTTP ${response.status}`
+        console.error('[v0] API error:', errorMessage)
+        setError('Error Loading Requests\n' + errorMessage)
         return
       }
 
-      if (!authUser) {
-        console.log('[v0] No authenticated user found')
-        setError('Unable to authenticate - please log in again')
-        return
+      const data = await response.json()
+      console.log('[v0] Requests loaded successfully:', data.requests?.length || 0)
+      console.log('[v0] Manager profile from API:', data.profile?.role)
+
+      if (data.profile) {
+        setManagerProfile(data.profile)
       }
 
-      console.log('[v0] Authenticated user:', authUser.id)
-
-      // Get user profile for filtering
-      const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('id, role, department_id')
-        .eq('id', authUser.id)
-        .maybeSingle()
-
-      console.log('[v0] Profile result:', { hasProfile: !!profile, profileError: profileError?.message })
-
-      if (profileError) {
-        console.error('[v0] Profile error:', profileError)
-        setError('Failed to fetch user profile: ' + profileError.message)
-        return
-      }
-
-      if (!profile) {
-        console.log('[v0] User profile not found')
-        setError('User profile not found')
-        return
-      }
-
-      console.log('[v0] User profile loaded:', profile.role)
-      setManagerProfile(profile)
-
-      // Determine which user IDs to filter by based on role
-      let userIdFilter: string[] | null = null
-
-      if (profile.role === 'admin') {
-        console.log('[v0] Admin - showing all requests')
-        // No filter needed - show all
-      } else if (profile.role === 'department_head') {
-        console.log('[v0] Department head - filtering by department:', profile.department_id)
-        const { data: deptStaff } = await supabase
-          .from('user_profiles')
-          .select('id')
-          .eq('department_id', profile.department_id)
-        userIdFilter = deptStaff?.map(s => s.id) || []
-      } else if (profile.role === 'regional_manager') {
-        console.log('[v0] Regional manager - showing all requests for now')
-        // Show all for regional managers
-      } else {
-        console.log('[v0] User role not authorized:', profile.role)
-        setError('You do not have permission to view pending requests')
-        return
-      }
-
-      // Build query
-      let query = supabase
-        .from('pending_offpremises_checkins')
-        .select(`
-          id,
-          user_id,
-          current_location_name,
-          latitude,
-          longitude,
-          accuracy,
-          device_info,
-          created_at,
-          status,
-          user_profiles!pending_offpremises_checkins_user_id_fkey (
-            id,
-            first_name,
-            last_name,
-            email,
-            department_id
-          )
-        `)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-
-      // Apply user ID filter for department heads
-      if (userIdFilter !== null) {
-        if (userIdFilter.length === 0) {
-          console.log('[v0] No staff found for filter - returning empty')
-          setRequests([])
-          return
-        }
-        query = query.in('user_id', userIdFilter)
-      }
-
-      const { data: pendingRequests, error: queryError } = await query
-
-      console.log('[v0] Query result:', { count: pendingRequests?.length || 0, error: queryError?.message })
-
-      if (queryError) {
-        console.error('[v0] Query error:', queryError)
-        setError('Failed to fetch pending requests: ' + queryError.message)
-        return
-      }
-
-      console.log('[v0] Requests loaded successfully:', pendingRequests?.length || 0)
-      setRequests(pendingRequests || [])
+      setRequests(data.requests || [])
     } catch (err: any) {
       console.error('[v0] Exception in loadPendingRequests:', err)
       setError(err.message || 'An error occurred while loading requests')

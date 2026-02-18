@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -116,117 +115,31 @@ export function OffPremisesReviewLog() {
     try {
       setIsLoading(true)
       setError(null)
-      console.log('[v0] Starting loadApprovedRecords')
+      console.log('[v0] Starting loadApprovedRecords via API')
 
-      const supabase = createClient()
+      // Use the API endpoint instead of direct Supabase query
+      const response = await fetch('/api/attendance/offpremises/approved')
+      console.log('[v0] API response status:', response.status)
 
-      // Get current user
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
-      console.log('[v0] Auth result:', { hasUser: !!authUser, authError: authError?.message })
-
-      if (authError || !authUser) {
-        console.error('[v0] Auth error:', authError)
-        setError('Authentication error - please log in again')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || `HTTP ${response.status}`
+        console.error('[v0] API error:', errorMessage)
+        setError(errorMessage)
         return
       }
 
-      // Get user profile
-      const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('id, role, department_id')
-        .eq('id', authUser.id)
-        .maybeSingle()
+      const data = await response.json()
+      console.log('[v0] Records loaded successfully:', data.records?.length || 0)
+      console.log('[v0] Manager profile from API:', data.profile?.role)
 
-      console.log('[v0] Profile result:', { hasProfile: !!profile, role: profile?.role })
-
-      if (profileError || !profile) {
-        console.error('[v0] Profile error:', profileError)
-        setError('Failed to fetch user profile')
-        return
+      if (data.profile) {
+        setManagerProfile(data.profile)
+        setDepartmentId(data.profile.department_id)
       }
 
-      setManagerProfile(profile)
-      setDepartmentId(profile.department_id)
-
-      console.log('[v0] User role:', profile.role, 'Is Admin:', profile.role === 'admin')
-
-      // Determine which user IDs to filter by based on role
-      let userIdFilter: string[] | null = null
-
-      // Admins see all records - no filtering
-      if (profile.role === 'admin') {
-        console.log('[v0] Admin - showing all approved records')
-      } else if (profile.role === 'department_head') {
-        console.log('[v0] Department head - filtering by department:', profile.department_id)
-        const { data: deptStaff } = await supabase
-          .from('user_profiles')
-          .select('id')
-          .eq('department_id', profile.department_id)
-        userIdFilter = deptStaff?.map((s: any) => s.id) || []
-      }
-
-      // Build query for approved records
-      let query = supabase
-        .from('pending_offpremises_checkins')
-        .select(`
-          id,
-          user_id,
-          current_location_name,
-          google_maps_name,
-          latitude,
-          longitude,
-          created_at,
-          approved_at,
-          approved_by_id,
-          status,
-          user_profiles!pending_offpremises_checkins_user_id_fkey (
-            id,
-            first_name,
-            last_name,
-            email,
-            department_id
-          )
-        `,
-          { count: 'exact' }
-        )
-        .eq('status', 'approved')
-        .order('approved_at', { ascending: false })
-
-      // Apply user ID filter for department heads
-      if (userIdFilter !== null) {
-        if (userIdFilter.length === 0) {
-          setRecords([])
-          setTotalRecords(0)
-          return
-        }
-        query = query.in('user_id', userIdFilter)
-      }
-
-      // Add pagination
-      const { data: requestRecords, error: fetchError, count } = await query
-        .range(currentPage * pageSize, (currentPage + 1) * pageSize - 1)
-
-      console.log('[v0] Fetch result:', { count, recordCount: requestRecords?.length || 0, error: fetchError?.message })
-      console.log('[v0] Approved records data:', requestRecords)
-
-      if (fetchError) {
-        console.error('[v0] Fetch error:', fetchError)
-        setError('Failed to fetch approved records')
-        return
-      }
-
-      // Also check if there are ANY approved records in the database at all
-      if (!requestRecords || requestRecords.length === 0) {
-        console.log('[v0] No approved records found - checking if any exist in database')
-        const { count: totalApproved } = await supabase
-          .from('pending_offpremises_checkins')
-          .select('id', { count: 'exact' })
-          .eq('status', 'approved')
-        console.log('[v0] Total approved records in DB:', totalApproved)
-      }
-
-      setRecords(requestRecords || [])
-      setTotalRecords(count || 0)
+      setRecords(data.records || [])
+      setTotalRecords(data.count || 0)
     } catch (err: any) {
       console.error('[v0] Unexpected error:', err)
       setError(err.message || 'An unexpected error occurred')
