@@ -126,6 +126,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       requests: pendingRequests || [],
+      profile: managerProfile,
       count,
     })
   } catch (error) {

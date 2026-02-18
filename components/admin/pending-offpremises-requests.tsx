@@ -41,23 +41,19 @@ export function PendingOffPremisesRequests() {
     try {
       setIsLoading(true)
       setError(null)
-      console.log('[v0] Starting loadPendingRequests via API')
 
       // Use the API endpoint instead of direct Supabase query
       const response = await fetch('/api/attendance/offpremises/pending')
-      console.log('[v0] API response status:', response.status)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.error || `HTTP ${response.status}`
+        const errorMessage = errorData.error || `Failed to load requests (${response.status})`
         console.error('[v0] API error:', errorMessage)
-        setError('Error Loading Requests\n' + errorMessage)
+        setError(errorMessage)
         return
       }
 
       const data = await response.json()
-      console.log('[v0] Requests loaded successfully:', data.requests?.length || 0)
-      console.log('[v0] Manager profile from API:', data.profile?.role)
 
       if (data.profile) {
         setManagerProfile(data.profile)
@@ -185,15 +181,36 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
                 {managerProfile?.role === 'department_head' && `Review and approve staff off-premises check-ins from ${managerProfile?.department_id || 'your department'}`}
               </CardDescription>
             </div>
-            <div className="text-right">
-              <Badge variant="outline" className="mb-2 block">
-                {managerProfile?.role === 'admin' && '👤 Admin - All Access'}
-                {managerProfile?.role === 'regional_manager' && '📍 Regional Manager'}
-                {managerProfile?.role === 'department_head' && '🏢 Department Head'}
-              </Badge>
-              <Badge variant={requests.length > 0 ? 'default' : 'secondary'} className="text-lg">
-                {requests.length} Pending
-              </Badge>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={loadPendingRequests}
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+                className="gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="h-4 w-4" />
+                    Refresh
+                  </>
+                )}
+              </Button>
+              <div className="text-right">
+                <Badge variant="outline" className="mb-2 block">
+                  {managerProfile?.role === 'admin' && '👤 Admin - All Access'}
+                  {managerProfile?.role === 'regional_manager' && '📍 Regional Manager'}
+                  {managerProfile?.role === 'department_head' && '🏢 Department Head'}
+                </Badge>
+                <Badge variant={requests.length > 0 ? 'default' : 'secondary'} className="text-lg">
+                  {requests.length} Pending
+                </Badge>
+              </div>
             </div>
           </div>
         </CardHeader>

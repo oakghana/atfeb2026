@@ -111,27 +111,28 @@ export function OffPremisesReviewLog() {
     </TableHead>
   )
 
+  // Load data on mount
+  useEffect(() => {
+    loadApprovedRecords()
+  }, [])
+
   const loadApprovedRecords = async () => {
     try {
       setIsLoading(true)
       setError(null)
-      console.log('[v0] Starting loadApprovedRecords via API')
 
       // Use the API endpoint instead of direct Supabase query
       const response = await fetch('/api/attendance/offpremises/approved')
-      console.log('[v0] API response status:', response.status)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.error || `HTTP ${response.status}`
+        const errorMessage = errorData.error || `Failed to load records (${response.status})`
         console.error('[v0] API error:', errorMessage)
         setError(errorMessage)
         return
       }
 
       const data = await response.json()
-      console.log('[v0] Records loaded successfully:', data.records?.length || 0)
-      console.log('[v0] Manager profile from API:', data.profile?.role)
 
       if (data.profile) {
         setManagerProfile(data.profile)
@@ -313,14 +314,35 @@ export function OffPremisesReviewLog() {
                 </div>
               </div>
             </div>
-            <div className="text-right">
-              <Badge variant="outline" className="mb-2 block">
-                {managerProfile?.role === 'admin' && '👤 Admin - All Access'}
-                {managerProfile?.role === 'regional_manager' && '📍 Regional Manager'}
-                {managerProfile?.role === 'department_head' && '🏢 Department Head'}
-              </Badge>
-              <div className="text-2xl font-bold text-green-600">{totalRecords}</div>
-              <div className="text-sm text-gray-600">Total Approved</div>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={loadApprovedRecords}
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+                className="gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="h-4 w-4" />
+                    Refresh
+                  </>
+                )}
+              </Button>
+              <div className="text-right">
+                <Badge variant="outline" className="mb-2 block">
+                  {managerProfile?.role === 'admin' && '👤 Admin - All Access'}
+                  {managerProfile?.role === 'regional_manager' && '📍 Regional Manager'}
+                  {managerProfile?.role === 'department_head' && '🏢 Department Head'}
+                </Badge>
+                <div className="text-2xl font-bold text-green-600">{totalRecords}</div>
+                <div className="text-sm text-gray-600">Total Approved</div>
+              </div>
             </div>
           </div>
         </div>
