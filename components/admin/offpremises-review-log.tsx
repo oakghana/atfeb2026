@@ -209,6 +209,65 @@ export function OffPremisesReviewLog() {
   }
 
   // Apply client-side filtering and sorting
+  const filteredAndSortedRecords = useMemo(() => {
+    let filtered = [...records]
+
+    // Search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      filtered = filtered.filter(
+        (r) =>
+          r.user_profiles?.first_name.toLowerCase().includes(term) ||
+          r.user_profiles?.last_name.toLowerCase().includes(term) ||
+          r.user_profiles?.email.toLowerCase().includes(term) ||
+          r.current_location_name?.toLowerCase().includes(term) ||
+          r.google_maps_name?.toLowerCase().includes(term)
+      )
+    }
+
+    // Department filter
+    if (departmentFilter) {
+      filtered = filtered.filter((r) => r.user_profiles?.department_id === departmentFilter)
+    }
+
+    // Date filters
+    if (dateFrom) {
+      const fromDate = new Date(dateFrom)
+      filtered = filtered.filter((r) => new Date(r.approved_at || r.created_at) >= fromDate)
+    }
+    if (dateTo) {
+      const toDate = new Date(dateTo)
+      toDate.setHours(23, 59, 59, 999)
+      filtered = filtered.filter((r) => new Date(r.approved_at || r.created_at) <= toDate)
+    }
+
+    // Sorting
+    filtered.sort((a, b) => {
+      let aVal: any
+      let bVal: any
+
+      if (sortField === 'staff_name') {
+        aVal = `${a.user_profiles?.first_name} ${a.user_profiles?.last_name}`
+        bVal = `${b.user_profiles?.first_name} ${b.user_profiles?.last_name}`
+      } else if (sortField === 'location') {
+        aVal = a.current_location_name
+        bVal = b.current_location_name
+      } else if (sortField === 'approval_time') {
+        aVal = new Date(a.approved_at || a.created_at)
+        bVal = new Date(b.approved_at || b.created_at)
+      } else if (sortField === 'department') {
+        aVal = a.user_profiles?.department_id
+        bVal = b.user_profiles?.department_id
+      }
+
+      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return filtered
+  }, [records, searchTerm, departmentFilter, dateFrom, dateTo, sortField, sortOrder])
+
   // Apply pagination to filtered and sorted records
   const paginatedRecords = useMemo(() => {
     const start = currentPage * pageSize

@@ -1960,11 +1960,11 @@ export function AttendanceRecorder({
         </div>
       )}
 
-              {/* Checkout button - Always visible when checked in */}
-              {localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time && (
-                <>
-                  <Button
-                    onClick={handleCheckOut}
+      {/* Checkout button - Always visible when checked in */}
+      {localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time && (
+        <>
+          <Button
+            onClick={handleCheckOut}
                     disabled={
                       isCheckingIn || isProcessing || isLoading || !checkoutTimeReached || !locationValidation?.canCheckOut
                     }
@@ -2004,19 +2004,21 @@ export function AttendanceRecorder({
               )}
             </div>
 
-            <Button
-              onClick={handleRefreshLocations}
-              variant="secondary"
-              size="lg"
-              className="w-full h-12 md:h-14"
-              disabled={isLoading || isCheckingIn}
-            >
-              <RefreshCw className={`h-5 w-5 md:h-6 md:w-6 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-              Refresh Attendance Status
-            </Button>
-            <p className="text-xs md:text-sm text-muted-foreground text-center">
-              Click to manually update your attendance status if the buttons don't change after check-in/check-out
-            </p>
+            <div className="space-y-4">
+              <Button
+                onClick={handleRefreshLocations}
+                variant="secondary"
+                size="lg"
+                className="w-full h-12 md:h-14"
+                disabled={isLoading || isCheckingIn}
+              >
+                <RefreshCw className={`h-5 w-5 md:h-6 md:w-6 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+                Refresh Attendance Status
+              </Button>
+              <p className="text-xs md:text-sm text-muted-foreground text-center">
+                Click to manually update your attendance status if the buttons don't change after check-in/check-out
+              </p>
+            </div>
           </CardContent>
         </Card>
       )}
