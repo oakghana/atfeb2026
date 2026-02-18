@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("[v0] Fetching pending off-premises requests")
+    console.log("[v0] Fetching approved off-premises records")
     const supabase = await createClient()
 
     // Get authenticated user
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     if (!["department_head", "regional_manager", "admin"].includes(managerProfile.role)) {
       console.log("[v0] User not authorized - role:", managerProfile.role)
       return NextResponse.json(
-        { error: "Only managers can view pending off-premises requests" },
+        { error: "Only managers can view approved off-premises records" },
         { status: 403 }
       )
     }
@@ -61,11 +61,12 @@ export async function GET(request: NextRequest) {
         id,
         user_id,
         current_location_name,
+        google_maps_name,
         latitude,
         longitude,
-        accuracy,
-        device_info,
         created_at,
+        approved_at,
+        approved_by_id,
         status,
         user_profiles!pending_offpremises_checkins_user_id_fkey (
           id,
@@ -78,20 +79,18 @@ export async function GET(request: NextRequest) {
             name
           )
         )
-      `
+      `,
+        { count: "exact" }
       )
-      .eq("status", "pending")
-      .order("created_at", { ascending: false })
+      .eq("status", "approved")
+      .order("approved_at", { ascending: false })
 
     // Apply role-based filtering
     if (managerProfile.role === "admin") {
-      // Admins see all requests
-      console.log("[v0] Admin - showing all requests")
+      console.log("[v0] Admin - showing all approved records")
     } else if (managerProfile.role === "regional_manager") {
-      // Regional managers see all requests (no location-based filtering available)
-      console.log("[v0] Regional manager - showing all requests")
+      console.log("[v0] Regional manager - showing all approved records")
     } else if (managerProfile.role === "department_head") {
-      // Department heads see requests from their department
       console.log("[v0] Department head - filtering by department:", managerProfile.department_id)
       // Get staff IDs for this department first
       const { data: deptStaff, error: staffError } = await supabase
@@ -109,34 +108,34 @@ export async function GET(request: NextRequest) {
       } else {
         console.log("[v0] No staff found for department")
         return NextResponse.json({
-          requests: [],
+          records: [],
+          profile: managerProfile,
           count: 0,
         })
       }
     }
 
-    const { data: pendingRequests, error } = await query
+    const { data: records, error: fetchError, count } = await query
 
-    if (error) {
-      console.error("[v0] Failed to fetch pending requests:", error)
+    console.log("[v0] Fetch result:", { count, recordCount: records?.length || 0, error: fetchError?.message })
+
+    if (fetchError) {
+      console.error("[v0] Fetch error:", fetchError)
       return NextResponse.json(
-        { error: "Failed to fetch pending requests", details: error.message },
+        { error: "Failed to fetch approved records" },
         { status: 500 }
       )
     }
 
-    const count = pendingRequests?.length || 0
-    console.log("[v0] Pending requests found:", count)
-
     return NextResponse.json({
-      requests: pendingRequests || [],
+      records: records || [],
       profile: managerProfile,
-      count,
+      count: count || 0,
     })
   } catch (error) {
-    console.error("[v0] Error in pending requests endpoint:", error)
+    console.error("[v0] Unexpected error:", error)
     return NextResponse.json(
-      { error: "Internal server error", details: error instanceof Error ? error.message : String(error) },
+      { error: "Internal server error" },
       { status: 500 }
     )
   }

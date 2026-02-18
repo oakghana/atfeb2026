@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -112,93 +111,36 @@ export function OffPremisesReviewLog() {
     </TableHead>
   )
 
+  // Load data on mount
+  useEffect(() => {
+    loadApprovedRecords()
+  }, [])
+
   const loadApprovedRecords = async () => {
     try {
       setIsLoading(true)
       setError(null)
-      console.log('[v0] Starting loadApprovedRecords')
 
-      const supabase = createClient()
+      // Use the API endpoint instead of direct Supabase query
+      const response = await fetch('/api/attendance/offpremises/approved')
 
-      // Get current user
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
-      console.log('[v0] Auth result:', { hasUser: !!authUser, authError: authError?.message })
-
-      if (authError || !authUser) {
-        console.error('[v0] Auth error:', authError)
-        setError('Authentication error - please log in again')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || `Failed to load records (${response.status})`
+        console.error('[v0] API error:', errorMessage)
+        setError(errorMessage)
         return
       }
 
-      // Get user profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, role, department_id')
-        .eq('id', authUser.id)
-        .maybeSingle()
+      const data = await response.json()
 
-      console.log('[v0] Profile result:', { hasProfile: !!profile, role: profile?.role })
-
-      if (profileError || !profile) {
-        console.error('[v0] Profile error:', profileError)
-        setError('Failed to fetch user profile')
-        return
+      if (data.profile) {
+        setManagerProfile(data.profile)
+        setDepartmentId(data.profile.department_id)
       }
 
-      setManagerProfile(profile)
-      setDepartmentId(profile.department_id)
-
-      // Build query based on role - department heads see only their department, admins see all
-      let query = supabase
-        .from('pending_offpremises_checkins')
-        .select(`
-          id,
-          user_id,
-          current_location_name,
-          google_maps_name,
-          latitude,
-          longitude,
-          created_at,
-          approved_at,
-          status,
-          user_profiles!pending_offpremises_checkins_user_id_fkey (
-            id,
-            first_name,
-            last_name,
-            email,
-            department_id
-          ),
-          approved_by:approved_by_id (
-            id,
-            first_name,
-            last_name
-          )
-        `,
-          { count: 'exact' }
-        )
-        .eq('status', 'approved')
-        .order('approved_at', { ascending: false })
-
-      // Filter by department if department_head
-      if (profile.role === 'department_head') {
-        query = query.eq('user_profiles.department_id', profile.department_id)
-      }
-
-      // Add pagination
-      const { data: requestRecords, error: fetchError, count } = await query
-        .range(currentPage * pageSize, (currentPage + 1) * pageSize - 1)
-        .single()
-
-      console.log('[v0] Fetch result:', { count, recordCount: requestRecords?.length || 0, error: fetchError?.message })
-
-      if (fetchError) {
-        console.error('[v0] Fetch error:', fetchError)
-        setError('Failed to fetch approved records')
-        return
-      }
-
-      setRecords(requestRecords || [])
-      setTotalRecords(count || 0)
+      setRecords(data.records || [])
+      setTotalRecords(data.count || 0)
     } catch (err: any) {
       console.error('[v0] Unexpected error:', err)
       setError(err.message || 'An unexpected error occurred')
@@ -356,28 +298,52 @@ export function OffPremisesReviewLog() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        {/* Header with Role Information */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-start justify-between mb-4">
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <CheckCircle2 className="h-6 w-6 text-green-600" />
-                <h1 className="text-3xl font-bold">Off-Premises Review Log</h1>
+                <div>
+                  <h1 className="text-3xl font-bold">Off-Premises Review Log</h1>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {managerProfile?.role === 'admin' && 'View all approved off-premises requests across all departments and locations'}
+                    {managerProfile?.role === 'regional_manager' && 'View approved off-premises requests from your assigned location'}
+                    {managerProfile?.role === 'department_head' && `View approved off-premises requests from ${managerProfile?.department_id || 'your department'}`}
+                  </p>
+                </div>
               </div>
-              <p className="text-gray-600 ml-9">
-                View all approved off-premises check-ins and staff location records
-              </p>
             </div>
-            <Button
-              onClick={handleExportCSV}
-              disabled={records.length === 0}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <Download className="h-4 w-4" />
-              Export CSV
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={loadApprovedRecords}
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+                className="gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="h-4 w-4" />
+                    Refresh
+                  </>
+                )}
+              </Button>
+              <div className="text-right">
+                <Badge variant="outline" className="mb-2 block">
+                  {managerProfile?.role === 'admin' && '👤 Admin - All Access'}
+                  {managerProfile?.role === 'regional_manager' && '📍 Regional Manager'}
+                  {managerProfile?.role === 'department_head' && '🏢 Department Head'}
+                </Badge>
+                <div className="text-2xl font-bold text-green-600">{totalRecords}</div>
+                <div className="text-sm text-gray-600">Total Approved</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -386,6 +352,22 @@ export function OffPremisesReviewLog() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {!error && totalRecords === 0 && (
+          <Alert className="mb-6 bg-blue-50 border-blue-200">
+            <CheckCircle2 className="h-4 w-4 text-blue-600" />
+            <AlertTitle className="text-blue-800">No Approved Records Yet</AlertTitle>
+            <AlertDescription className="text-blue-700">
+              {managerProfile?.role === 'admin' && 'No approved off-premises requests found. All requests across the organization will appear here once approved.'}
+              {managerProfile?.role === 'regional_manager' && 'No approved requests from your location yet. Staff requests will appear here once approved.'}
+              {managerProfile?.role === 'department_head' && 'No approved requests from your department yet. Staff requests will appear here once approved.'}
+              <br />
+              <a href="/admin/offpremises-approvals" className="font-semibold underline inline-block mt-2 text-blue-600 hover:text-blue-800">
+                Go to Pending Approvals →
+              </a>
+            </AlertDescription>
           </Alert>
         )}
 
@@ -541,15 +523,17 @@ export function OffPremisesReviewLog() {
                         <TableCell className="text-sm text-gray-600">
                           {record.user_profiles?.email}
                         </TableCell>
-                        <TableCell className="text-sm">{record.user_profiles?.department_id || 'N/A'}</TableCell>
-                        <TableCell className="max-w-xs">
+                        <TableCell className="text-sm">
+                          {record.user_profiles?.departments?.name || record.user_profiles?.department_id || 'N/A'}
+                        </TableCell>
+                        <TableCell className="max-w-md">
                           <div className="flex items-start gap-2">
                             <MapPin className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
                             <div className="text-sm">
-                              <p className="font-medium">{record.current_location_name}</p>
+                              <p className="font-medium text-gray-800">{record.current_location_name}</p>
                               {record.google_maps_name &&
                                 record.google_maps_name !== record.current_location_name && (
-                                  <p className="text-gray-500 text-xs">{record.google_maps_name}</p>
+                                  <p className="text-gray-500 text-xs mt-1">{record.google_maps_name}</p>
                                 )}
                             </div>
                           </div>

@@ -1131,17 +1131,32 @@ export function AttendanceRecorder({
       console.log("[v0] API response body:", result)
 
       if (!response.ok) {
+        // Check if it's a profile setup error
+        if (result.requiresProfileSetup) {
+          console.error("[v0] Profile not found. User needs profile created.")
+          throw new Error(`Your user profile hasn't been set up yet. Please contact your administrator. (${result.userEmail})`)
+        }
         throw new Error(result.error || "Failed to send confirmation request")
       }
 
+      // Build personalized success message with manager names
+      let managerMessage = "your manager"
+      if (result.managers && result.managers.length > 0) {
+        const managerNames = result.managers.map((m: any) => m.name).join(" and ")
+        const roleDescription = result.managers.find((m: any) => m.role === "regional_manager")
+          ? "regional manager"
+          : "department head"
+        managerMessage = `${managerNames} (${roleDescription})`
+      }
+
       setFlashMessage({
-        message: `Your off-premises request has been sent to your department head and regional manager for review. Location: ${locationName}. Reason: ${offPremisesReason}. Once approved, you will be automatically checked in and marked as working outside premises.`,
+        message: `Your off-premises request has been sent successfully to ${managerMessage} for review. Location: ${locationName}. Reason: ${offPremisesReason}. Once approved, you will be automatically checked in and marked as working outside premises.`,
         type: "info",
       })
 
       toast({
         title: "Request Submitted",
-        description: "Your off-premises request is awaiting manager approval.",
+        description: `Your off-premises request is awaiting ${managerMessage}'s approval.`,
         action: <ToastAction altText="OK">OK</ToastAction>,
       })
 
@@ -1615,16 +1630,35 @@ export function AttendanceRecorder({
   return (
     <div className={cn("space-y-6", className)}>
       {flashMessage && (
-        <Card className="mb-4 border-l-4 border-l-green-500 bg-green-50 dark:bg-green-900/60 dark:border-green-500/50">
+        <Card className={cn(
+          "mb-4 border-l-4",
+          flashMessage.type === "info" ? "border-l-blue-500 bg-blue-50 dark:bg-blue-900/60 dark:border-blue-500/50" : "border-l-green-500 bg-green-50 dark:bg-green-900/60 dark:border-green-500/50"
+        )}>
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 bg-green-100 dark:bg-green-800/60 rounded-full p-2">
-                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-300" />
+              <div className={cn(
+                "flex-shrink-0 rounded-full p-2",
+                flashMessage.type === "info" ? "bg-blue-100 dark:bg-blue-800/60" : "bg-green-100 dark:bg-green-800/60"
+              )}>
+                <CheckCircle2 className={cn(
+                  "h-5 w-5",
+                  flashMessage.type === "info" ? "text-blue-600 dark:text-blue-300" : "text-green-600 dark:text-green-300"
+                )} />
               </div>
               <div className="flex-1">
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-green-900 dark:text-green-100">Success</p>
-                  <p className="text-xs text-green-800 dark:text-green-100">{successMessage}</p>
+                  <p className={cn(
+                    "text-sm font-medium",
+                    flashMessage.type === "info" ? "text-blue-900 dark:text-blue-100" : "text-green-900 dark:text-green-100"
+                  )}>
+                    {flashMessage.type === "info" ? "Request Submitted" : "Success"}
+                  </p>
+                  <p className={cn(
+                    "text-sm",
+                    flashMessage.type === "info" ? "text-blue-800 dark:text-blue-100" : "text-green-800 dark:text-green-100"
+                  )}>
+                    {flashMessage.message}
+                  </p>
                 </div>
               </div>
             </div>

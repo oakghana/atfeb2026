@@ -44,9 +44,18 @@ export async function POST(request: NextRequest) {
     console.log("[v0] User profile:", { userProfile, user_id })
 
     if (!userProfile) {
-      console.error("[v0] User profile not found")
+      console.error("[v0] User profile not found for user_id:", user_id)
+      
+      // Try to get user's email for debugging
+      const { data: authUser } = await supabase.auth.admin.getUserById(user_id)
+      console.error("[v0] Auth user found:", { email: authUser?.user?.email, user_id })
+      
       return NextResponse.json(
-        { error: "User profile not found" },
+        { 
+          error: `User profile not found. Please ensure your profile is created in the system. User ID: ${user_id}`,
+          userEmail: authUser?.user?.email,
+          requiresProfileSetup: true,
+        },
         { status: 404 }
       )
     }
@@ -113,6 +122,7 @@ export async function POST(request: NextRequest) {
         longitude: current_location.longitude,
         accuracy: current_location.accuracy,
         device_info: device_info,
+        reason: reason || null,
         status: "pending",
       })
       .select()
@@ -163,6 +173,12 @@ export async function POST(request: NextRequest) {
         message: "Your off-premises check-in request has been sent to your managers for approval",
         request_id: requestRecord.id,
         pending_approval: true,
+        managers: managers.map((m: any) => ({
+          id: m.id,
+          name: `${m.first_name} ${m.last_name}`,
+          role: m.role,
+          email: m.email,
+        })),
       },
       { status: 200 }
     )

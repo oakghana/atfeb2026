@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -25,7 +24,7 @@ interface PendingRequest {
     last_name: string
     email: string
     department_id: string
-    geofence_locations?: string[]
+
   }
 }
 
@@ -37,80 +36,34 @@ export function PendingOffPremisesRequests() {
   const [error, setError] = useState<string | null>(null)
   const [managerProfile, setManagerProfile] = useState<any>(null)
 
-  console.log('[v0] PendingOffPremisesRequests component mounted')
-
   // Load pending requests
   const loadPendingRequests = async () => {
     try {
       setIsLoading(true)
       setError(null)
-      console.log('[v0] Starting loadPendingRequests')
+      console.log('[v0] Loading pending requests...')
 
-      const supabase = createClient()
-      console.log('[v0] Supabase client created')
-
-      // Get current user with better error handling
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
-      console.log('[v0] Auth result:', { hasUser: !!authUser, authError: authError?.message })
-
-      if (authError) {
-        console.error('[v0] Auth error:', authError)
-        setError('Authentication error: ' + authError.message)
-        return
-      }
-
-      if (!authUser) {
-        console.log('[v0] No authenticated user found')
-        setError('Unable to authenticate - please log in again')
-        return
-      }
-
-      console.log('[v0] Authenticated user:', authUser.id)
-
-      // Get user profile for filtering
-      const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('id, role, department_id')
-        .eq('id', authUser.id)
-        .maybeSingle()
-
-      console.log('[v0] Profile result:', { hasProfile: !!profile, profileError: profileError?.message })
-
-      if (profileError) {
-        console.error('[v0] Profile error:', profileError)
-        setError('Failed to fetch user profile: ' + profileError.message)
-        return
-      }
-
-      if (!profile) {
-        console.log('[v0] User profile not found')
-        setError('User profile not found')
-        return
-      }
-
-      console.log('[v0] User profile loaded:', profile.role)
-      setManagerProfile(profile)
-
-      // Call the API endpoint instead of querying directly
-      console.log('[v0] Fetching pending requests from API')
-      const response = await fetch('/api/attendance/offpremises/pending', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-
-      console.log('[v0] API response status:', response.status)
+      // Use the API endpoint instead of direct Supabase query
+      const response = await fetch('/api/attendance/offpremises/pending')
+      console.log('[v0] Pending API response status:', response.status)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error('[v0] API error response:', errorData)
-        setError('Failed to fetch pending requests: ' + (errorData.error || response.statusText))
+        const errorMessage = errorData.error || `Failed to load requests (${response.status})`
+        console.error('[v0] Pending API error:', errorMessage)
+        setError(errorMessage)
         return
       }
 
       const data = await response.json()
-      console.log('[v0] Requests loaded successfully:', data.requests?.length || 0)
+      console.log('[v0] Pending requests loaded:', data.requests?.length || 0, 'requests')
+      console.log('[v0] First request:', data.requests?.[0])
+
+      if (data.profile) {
+        console.log('[v0] User profile role:', data.profile.role)
+        setManagerProfile(data.profile)
+      }
+
       setRequests(data.requests || [])
     } catch (err: any) {
       console.error('[v0] Exception in loadPendingRequests:', err)
@@ -124,8 +77,8 @@ export function PendingOffPremisesRequests() {
   useEffect(() => {
     loadPendingRequests()
 
-    // Poll every 30 seconds
-    const interval = setInterval(loadPendingRequests, 30000)
+    // Poll every 5 seconds for new requests
+    const interval = setInterval(loadPendingRequests, 5000)
 
     return () => clearInterval(interval)
   }, [])
@@ -224,16 +177,57 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between">
             <div>
               <CardTitle>Pending Off-Premises Check-In Requests</CardTitle>
               <CardDescription>
-                Review and approve staff members requesting to check in from outside their registered QCC location
+                {managerProfile?.role === 'admin' && 'Review and approve staff off-premises check-ins from all locations and departments'}
+                {managerProfile?.role === 'regional_manager' && 'Review and approve staff off-premises check-ins from your assigned location'}
+                {managerProfile?.role === 'department_head' && `Review and approve staff off-premises check-ins from ${managerProfile?.department_id || 'your department'}`}
               </CardDescription>
             </div>
-            <Badge variant="outline" className="text-lg">
-              {requests.length} Pending
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={loadPendingRequests}
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+                className="gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="h-4 w-4" />
+                    Refresh
+                  </>
+                )}
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <a href="/offpremises-review">
+                  <CheckCircle2 className="h-4 w-4" />
+                  View Approved
+                </a>
+              </Button>
+              <div className="text-right">
+                <Badge variant="outline" className="mb-2 block">
+                  {managerProfile?.role === 'admin' && '👤 Admin - All Access'}
+                  {managerProfile?.role === 'regional_manager' && '📍 Regional Manager'}
+                  {managerProfile?.role === 'department_head' && '🏢 Department Head'}
+                </Badge>
+                <Badge variant={requests.length > 0 ? 'default' : 'secondary'} className="text-lg">
+                  {requests.length} Pending
+                </Badge>
+              </div>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -269,6 +263,12 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4" />
                           <span>Requested: {formatDate(request.created_at)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-gray-500">Department:</span>
+                          <span className="font-medium text-gray-700 dark:text-gray-300">
+                            {request.user_profiles?.departments?.name || request.user_profiles?.department_id || 'N/A'}
+                          </span>
                         </div>
                         <div className="flex items-start gap-2 md:col-span-2">
                           <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
