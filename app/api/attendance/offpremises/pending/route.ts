@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
         device_info,
         created_at,
         status,
+        reason,
         user_profiles!pending_offpremises_checkins_user_id_fkey (
           id,
           first_name,
@@ -109,7 +110,26 @@ export async function GET(request: NextRequest) {
     } else if (managerProfile.role === "department_head") {
       // Department heads see requests from their department
       console.log("[v0] Department head - filtering by department:", managerProfile.department_id)
-      query = query.eq("user_profiles.department_id", managerProfile.department_id)
+      // Get staff IDs for this department first
+      const { data: deptStaff, error: staffError } = await supabase
+        .from("user_profiles")
+        .select("id")
+        .eq("department_id", managerProfile.department_id)
+
+      if (staffError) {
+        console.error("[v0] Error fetching department staff:", staffError)
+      }
+
+      const staffIds = deptStaff?.map(s => s.id) || []
+      if (staffIds.length > 0) {
+        query = query.in("user_id", staffIds)
+      } else {
+        console.log("[v0] No staff found for department")
+        return NextResponse.json({
+          requests: [],
+          count: 0,
+        })
+      }
     }
 
     const { data: pendingRequests, error } = await query
