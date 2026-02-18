@@ -91,56 +91,27 @@ export function PendingOffPremisesRequests() {
       console.log('[v0] User profile loaded:', profile.role)
       setManagerProfile(profile)
 
-      // Build query based on role
-      let query = supabase
-        .from('pending_offpremises_checkins')
-        .select(`
-          id,
-          user_id,
-          current_location_name,
-          latitude,
-          longitude,
-          accuracy,
-          device_info,
-          created_at,
-          status,
-          user_profiles!pending_offpremises_checkins_user_id_fkey (
-            id,
-            first_name,
-            last_name,
-            email,
-            department_id
-          )
-        `)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
+      // Call the API endpoint instead of querying directly
+      console.log('[v0] Fetching pending requests from API')
+      const response = await fetch('/api/attendance/offpremises/pending', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
 
-      // Apply role-based filtering
-      if (profile.role === 'admin') {
-        console.log('[v0] Admin - showing all requests')
-        // Admins see all requests
-      } else if (profile.role === 'regional_manager') {
-        console.log('[v0] Regional manager - no location-based filtering available')
-        // Regional managers would need location data in the user_profiles table
-        // For now, show all requests (this can be refined when location data is added)
-      } else if (profile.role === 'department_head') {
-        console.log('[v0] Department head - filtering by department:', profile.department_id)
-        // Department heads see requests from their department
-        query = query.eq('user_profiles.department_id', profile.department_id)
-      }
+      console.log('[v0] API response status:', response.status)
 
-      const { data: pendingRequests, error: queryError } = await query
-
-      console.log('[v0] Query result:', { count: pendingRequests?.length || 0, queryError: queryError?.message })
-
-      if (queryError) {
-        console.error('[v0] Query error:', queryError)
-        setError('Failed to fetch pending requests: ' + queryError.message)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('[v0] API error response:', errorData)
+        setError('Failed to fetch pending requests: ' + (errorData.error || response.statusText))
         return
       }
 
-      console.log('[v0] Requests loaded successfully:', pendingRequests?.length || 0)
-      setRequests(pendingRequests || [])
+      const data = await response.json()
+      console.log('[v0] Requests loaded successfully:', data.requests?.length || 0)
+      setRequests(data.requests || [])
     } catch (err: any) {
       console.error('[v0] Exception in loadPendingRequests:', err)
       setError(err.message || 'An error occurred while loading requests')
