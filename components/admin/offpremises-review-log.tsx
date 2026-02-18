@@ -185,10 +185,9 @@ export function OffPremisesReviewLog() {
       }
 
       // Add pagination
-      const { data: requestRecords, error: fetchError, count } = await query.range(
-        currentPage * pageSize,
-        (currentPage + 1) * pageSize - 1
-      )
+      const { data: requestRecords, error: fetchError, count } = await query
+        .range(currentPage * pageSize, (currentPage + 1) * pageSize - 1)
+        .single()
 
       console.log('[v0] Fetch result:', { count, recordCount: requestRecords?.length || 0, error: fetchError?.message })
 
