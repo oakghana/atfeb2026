@@ -1787,7 +1787,7 @@ export function AttendanceRecorder({
                   userRole={userProfile?.role}
                 />
               )
-            })()} 
+            })()
 
             {/* Check-in/Check-out Buttons */}
             <div className="space-y-4">
