@@ -201,6 +201,17 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
                   </>
                 )}
               </Button>
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <a href="/offpremises-review">
+                  <CheckCircle2 className="h-4 w-4" />
+                  View Approved
+                </a>
+              </Button>
               <div className="text-right">
                 <Badge variant="outline" className="mb-2 block">
                   {managerProfile?.role === 'admin' && '👤 Admin - All Access'}
