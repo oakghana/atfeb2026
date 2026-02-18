@@ -524,14 +524,14 @@ export function OffPremisesReviewLog() {
                           {record.user_profiles?.email}
                         </TableCell>
                         <TableCell className="text-sm">{record.user_profiles?.department_id || 'N/A'}</TableCell>
-                        <TableCell className="max-w-xs">
+                        <TableCell className="max-w-md">
                           <div className="flex items-start gap-2">
                             <MapPin className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
                             <div className="text-sm">
-                              <p className="font-medium">{record.current_location_name}</p>
+                              <p className="font-medium text-gray-800">{record.current_location_name}</p>
                               {record.google_maps_name &&
                                 record.google_maps_name !== record.current_location_name && (
-                                  <p className="text-gray-500 text-xs">{record.google_maps_name}</p>
+                                  <p className="text-gray-500 text-xs mt-1">{record.google_maps_name}</p>
                                 )}
                             </div>
                           </div>

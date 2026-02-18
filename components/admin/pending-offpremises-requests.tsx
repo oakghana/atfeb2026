@@ -41,21 +41,26 @@ export function PendingOffPremisesRequests() {
     try {
       setIsLoading(true)
       setError(null)
+      console.log('[v0] Loading pending requests...')
 
       // Use the API endpoint instead of direct Supabase query
       const response = await fetch('/api/attendance/offpremises/pending')
+      console.log('[v0] Pending API response status:', response.status)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.error || `Failed to load requests (${response.status})`
-        console.error('[v0] API error:', errorMessage)
+        console.error('[v0] Pending API error:', errorMessage)
         setError(errorMessage)
         return
       }
 
       const data = await response.json()
+      console.log('[v0] Pending requests loaded:', data.requests?.length || 0, 'requests')
+      console.log('[v0] First request:', data.requests?.[0])
 
       if (data.profile) {
+        console.log('[v0] User profile role:', data.profile.role)
         setManagerProfile(data.profile)
       }
 
@@ -72,8 +77,8 @@ export function PendingOffPremisesRequests() {
   useEffect(() => {
     loadPendingRequests()
 
-    // Poll every 30 seconds
-    const interval = setInterval(loadPendingRequests, 30000)
+    // Poll every 5 seconds for new requests
+    const interval = setInterval(loadPendingRequests, 5000)
 
     return () => clearInterval(interval)
   }, [])
