@@ -23,6 +23,7 @@ interface PendingRequest {
   approved_at?: string
   rejection_reason?: string
   google_maps_name?: string
+  reason?: string
   user_profiles: {
     id: string
     first_name: string
@@ -314,6 +315,15 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
                               </p>
                             </div>
                           </div>
+                          {request.reason && (
+                            <div className="flex items-start gap-2 md:col-span-2">
+                              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-600" />
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-foreground">Reason for Off-Premises</p>
+                                <p className="text-sm text-muted-foreground">{request.reason}</p>
+                              </div>
+                            </div>
+                          )}
                           {request.rejection_reason && (
                             <div className="flex items-start gap-2 md:col-span-2">
                               <XCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-destructive" />

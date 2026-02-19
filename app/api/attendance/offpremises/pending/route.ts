@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
           approved_at,
           rejection_reason,
           google_maps_name,
+          reason,
           user_profiles!pending_offpremises_checkins_user_id_fkey (
             id,
             first_name,
@@ -120,6 +121,7 @@ export async function GET(request: NextRequest) {
         approved_at,
         rejection_reason,
         google_maps_name,
+        reason,
         user_profiles!pending_offpremises_checkins_user_id_fkey (
           id,
           first_name,

@@ -20,6 +20,8 @@ interface PendingRequest {
   device_info: string
   created_at: string
   status: string
+  google_maps_name?: string
+  reason?: string
   user_profiles: {
     id: string
     first_name: string
@@ -191,9 +193,14 @@ export function OffPremisesRequestModal({
                 <MapPin className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
                   <p className="font-medium text-blue-900 dark:text-blue-100">
-                    {request.current_location_name}
+                    {request.google_maps_name || request.current_location_name}
                   </p>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                  {request.google_maps_name && request.google_maps_name !== request.current_location_name && (
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                      Alternative Name: {request.current_location_name}
+                    </p>
+                  )}
+                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-2">
                     Latitude: {request.latitude.toFixed(6)}
                     <br />
                     Longitude: {request.longitude.toFixed(6)}
@@ -212,6 +219,21 @@ export function OffPremisesRequestModal({
               </div>
             </div>
           </div>
+
+          {/* Reason for Off-Premises */}
+          {request.reason && (
+            <div className="border rounded-lg p-4 bg-amber-50 dark:bg-amber-900/20">
+              <h3 className="font-semibold text-sm text-amber-900 dark:text-amber-300 mb-2">
+                Reason for Off-Premises Check-In
+              </h3>
+              <p className="text-sm text-amber-800 dark:text-amber-400">
+                {request.reason}
+              </p>
+            </div>
+          )}
+
+          {/* Current Location Information */}
+          <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20">
 
           {/* Approval Questions */}
           <Alert>
