@@ -80,16 +80,21 @@ export function OffPremisesRequestModal({
         throw new Error(result.error || 'Failed to process request')
       }
 
+      // Show toast
       toast({
         title: approved ? 'Request Approved' : 'Request Rejected',
         description: approved
           ? `${request.user_profiles.first_name} has been checked in to their assigned location and marked as on official duty outside premises.`
           : `The off-premises check-in request has been rejected.`,
-        action: <div>OK</div>,
       })
 
-      onApprovalComplete()
+      // Close modal immediately
       onClose()
+      
+      // Trigger refresh after a small delay to let modal animation complete
+      setTimeout(() => {
+        onApprovalComplete()
+      }, 300)
     } catch (error: any) {
       toast({
         title: 'Error',
