@@ -109,12 +109,30 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    console.log("[v0] Insert result:", { insertError, hasData: !!requestRecord })
+    console.log("[v0] Insert result:", { insertError, hasData: !!requestRecord, recordId: requestRecord?.id })
 
     if (insertError) {
-      console.error("[v0] Failed to store pending check-in:", insertError)
+      console.error("[v0] Failed to store pending check-in:", {
+        message: insertError.message,
+        code: insertError.code,
+        details: insertError.details,
+        hint: insertError.hint,
+      })
       return NextResponse.json(
-        { error: "Failed to process request: " + insertError.message },
+        { 
+          success: false,
+          error: "Failed to process request: " + insertError.message,
+          errorCode: insertError.code,
+          errorDetails: insertError.details 
+        },
+        { status: 500 }
+      )
+    }
+
+    if (!requestRecord || !requestRecord.id) {
+      console.error("[v0] Request stored but no ID returned from database")
+      return NextResponse.json(
+        { error: "Request was not properly saved - no record returned from database" },
         { status: 500 }
       )
     }
