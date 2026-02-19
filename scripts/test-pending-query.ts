@@ -70,9 +70,9 @@ async function testPendingAPI() {
       .select('status, id');
 
     if (allReqs) {
-      const pending = allReqs.filter((r: any) => r.status === 'pending').length;
-      const approved = allReqs.filter((r: any) => r.status === 'approved').length;
-      const rejected = allReqs.filter((r: any) => r.status === 'rejected').length;
+      const pending = allReqs.filter(r => r.status === 'pending').length;
+      const approved = allReqs.filter(r => r.status === 'approved').length;
+      const rejected = allReqs.filter(r => r.status === 'rejected').length;
       console.log(`[v0] Pending: ${pending}, Approved: ${approved}, Rejected: ${rejected}`);
     }
 
@@ -89,7 +89,7 @@ async function testPendingAPI() {
 
     console.log(`[v0] Found ${today?.length || 0} requests today`);
     if (today && today.length > 0) {
-      today.forEach((req: any, idx: number) => {
+      today.forEach((req, idx) => {
         console.log(`[v0] Request ${idx + 1}: user_id=${req.user_id}, status=${req.status}, created=${req.created_at}`);
       });
     }
