@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Off-premises check-in API called")
     
     const body = await request.json()
-    console.log("[v0] Request body received:", { user_id: body.user_id, location: body.current_location?.name })
+    console.log("[v0] Request body received:", { location: body.current_location?.name, userId: body.user_id })
     
     const { current_location, device_info, user_id, reason } = body
 
@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
         longitude: current_location.longitude,
         accuracy: current_location.accuracy,
         device_info: device_info,
+        google_maps_name: current_location.display_name || current_location.name,
         status: "pending",
       })
       .select()

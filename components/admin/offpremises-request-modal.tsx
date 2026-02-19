@@ -20,12 +20,16 @@ interface PendingRequest {
   device_info: string
   created_at: string
   status: string
+  google_maps_name?: string
   user_profiles: {
     id: string
     first_name: string
     last_name: string
     email: string
     department_id: string
+    employee_id?: string
+    position?: string
+    assigned_location_id?: string
   }
 }
 
@@ -76,16 +80,21 @@ export function OffPremisesRequestModal({
         throw new Error(result.error || 'Failed to process request')
       }
 
+      // Show toast
       toast({
         title: approved ? 'Request Approved' : 'Request Rejected',
         description: approved
           ? `${request.user_profiles.first_name} has been checked in to their assigned location and marked as on official duty outside premises.`
           : `The off-premises check-in request has been rejected.`,
-        action: <div>OK</div>,
       })
 
-      onApprovalComplete()
+      // Close modal immediately
       onClose()
+      
+      // Trigger refresh after a small delay to let modal animation complete
+      setTimeout(() => {
+        onApprovalComplete()
+      }, 300)
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -139,6 +148,18 @@ export function OffPremisesRequestModal({
                   <p className="text-gray-600 dark:text-gray-400">{request.user_profiles.email}</p>
                 </div>
               </div>
+              {request.user_profiles.employee_id && (
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-gray-500" />
+                  <span>Employee ID: {request.user_profiles.employee_id}</span>
+                </div>
+              )}
+              {request.user_profiles.position && (
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-gray-500" />
+                  <span>Position: {request.user_profiles.position}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-gray-500" />
                 <span>Request Time: {formatDate(request.created_at)}</span>
@@ -156,9 +177,14 @@ export function OffPremisesRequestModal({
                 <MapPin className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
                   <p className="font-medium text-blue-900 dark:text-blue-100">
-                    {request.current_location_name}
+                    {request.google_maps_name || request.current_location_name}
                   </p>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                  {request.google_maps_name && request.google_maps_name !== request.current_location_name && (
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                      Alternative Name: {request.current_location_name}
+                    </p>
+                  )}
+                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-2">
                     Latitude: {request.latitude.toFixed(6)}
                     <br />
                     Longitude: {request.longitude.toFixed(6)}

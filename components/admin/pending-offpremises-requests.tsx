@@ -73,6 +73,9 @@ export function PendingOffPremisesRequests() {
       }
 
       const data = await response.json()
+      console.log("[v0] Loaded requests:", data.requests)
+      console.log("[v0] Total count:", data.count)
+      console.log("[v0] Pending filter:", data.requests?.filter((r: any) => r.status === 'pending'))
       setAllRequests(data.requests || [])
     } catch (err: any) {
       setError(err.message || 'An error occurred while loading requests')
@@ -267,6 +270,12 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
                             <div className="flex items-center gap-2">
                               <User className="h-4 w-4" />
                               <span>ID: {request.user_profiles.employee_id}</span>
+                            </div>
+                          )}
+                          {request.user_profiles?.position && (
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4" />
+                              <span>Position: {request.user_profiles.position}</span>
                             </div>
                           )}
                           <div className="flex items-center gap-2">
