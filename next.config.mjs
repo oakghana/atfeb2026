@@ -35,6 +35,11 @@ const nextConfig = {
     ],
     optimizeCss: false, // Disabled to avoid critters dependency
   },
+  // Workaround for Turbopack crash: use webpack instead
+  // This resolves "Next.js package not found" error
+  webpack: (config) => {
+    return config
+  },
 }
 
 export default nextConfig
