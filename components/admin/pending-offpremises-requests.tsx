@@ -38,20 +38,20 @@ interface PendingRequest {
 export function PendingOffPremisesRequests() {
   const [selectedRequest, setSelectedRequest] = useState<PendingRequest | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [requests, setRequests] = useState<PendingRequest[]>([])
+  const [allRequests, setAllRequests] = useState<PendingRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [managerProfile, setManagerProfile] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<string>('all')
 
-  // Load requests with status filter - calls the API directly (API handles auth + profile check)
-  const loadPendingRequests = async (statusFilter: string = 'all') => {
+  // Always load ALL requests, then filter client-side for accurate tab counts
+  const loadPendingRequests = async () => {
     try {
       setIsLoading(true)
       setError(null)
 
-      // Call the API endpoint with status filter - the API handles authentication and role checks
-      const response = await fetch(`/api/attendance/offpremises/pending?status=${statusFilter}`, {
+      // Always fetch all statuses - the API handles authentication and role checks
+      const response = await fetch(`/api/attendance/offpremises/pending?status=all`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -73,7 +73,7 @@ export function PendingOffPremisesRequests() {
       }
 
       const data = await response.json()
-      setRequests(data.requests || [])
+      setAllRequests(data.requests || [])
     } catch (err: any) {
       setError(err.message || 'An error occurred while loading requests')
     } finally {
@@ -81,15 +81,18 @@ export function PendingOffPremisesRequests() {
     }
   }
 
-  // Load requests on mount and when tab changes, with polling
+  // Load all requests on mount, poll every 30 seconds
   useEffect(() => {
-    loadPendingRequests(activeTab)
-
-    // Poll every 30 seconds
-    const interval = setInterval(() => loadPendingRequests(activeTab), 30000)
-
+    loadPendingRequests()
+    const interval = setInterval(loadPendingRequests, 30000)
     return () => clearInterval(interval)
-  }, [activeTab])
+  }, [])
+
+  // Derive counts and filtered list from allRequests
+  const pendingCount = allRequests.filter(r => r.status === 'pending').length
+  const approvedCount = allRequests.filter(r => r.status === 'approved').length
+  const rejectedCount = allRequests.filter(r => r.status === 'rejected').length
+  const filteredRequests = activeTab === 'all' ? allRequests : allRequests.filter(r => r.status === activeTab)
 
   const handleTabChange = (value: string) => {
     setActiveTab(value)
@@ -108,10 +111,6 @@ export function PendingOffPremisesRequests() {
     }
   }
 
-  const pendingCount = requests.filter(r => r.status === 'pending').length
-  const approvedCount = requests.filter(r => r.status === 'approved').length
-  const rejectedCount = requests.filter(r => r.status === 'rejected').length
-
   const handleRequestClick = (request: PendingRequest) => {
     setSelectedRequest(request)
     setIsModalOpen(true)
@@ -120,7 +119,7 @@ export function PendingOffPremisesRequests() {
   const handleApprovalComplete = () => {
     setIsModalOpen(false)
     setSelectedRequest(null)
-    loadPendingRequests() // Refresh the list
+    loadPendingRequests()
   }
 
   const formatDate = (dateString: string) => {
@@ -215,7 +214,7 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-sm">
-                {requests.length} Total
+                {allRequests.length} Total
               </Badge>
             </div>
           </div>
@@ -224,27 +223,27 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="grid w-full grid-cols-4 mb-4">
               <TabsTrigger value="all">
-                All ({activeTab === 'all' ? requests.length : '...'})
+                All ({allRequests.length})
               </TabsTrigger>
               <TabsTrigger value="pending">
-                Pending ({activeTab === 'all' ? pendingCount : activeTab === 'pending' ? requests.length : '...'})
+                Pending ({pendingCount})
               </TabsTrigger>
               <TabsTrigger value="approved">
-                Approved ({activeTab === 'all' ? approvedCount : activeTab === 'approved' ? requests.length : '...'})
+                Approved ({approvedCount})
               </TabsTrigger>
               <TabsTrigger value="rejected">
-                Rejected ({activeTab === 'all' ? rejectedCount : activeTab === 'rejected' ? requests.length : '...'})
+                Rejected ({rejectedCount})
               </TabsTrigger>
             </TabsList>
 
-            {requests.length === 0 ? (
+            {filteredRequests.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <CheckCircle2 className="mx-auto h-12 w-12 mb-3 text-green-600" />
                 <p>No {activeTab === 'all' ? '' : activeTab} requests found.</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {requests.map((request) => (
+                {filteredRequests.map((request) => (
                   <div
                     key={request.id}
                     className="border rounded-lg p-4 hover:bg-muted/50 cursor-pointer transition-colors"

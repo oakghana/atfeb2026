@@ -88,13 +88,7 @@ const navigationItems = [
     roles: ["admin", "it-admin", "regional_manager", "department_head"],
     category: "main",
   },
-  {
-    title: "Off-Premises Review",
-    href: "/offpremises-review",
-    icon: CheckCircle2,
-    roles: ["admin", "it-admin", "regional_manager", "department_head"],
-    category: "main",
-  },
+
   {
     title: "Excuse Duty",
     href: "/dashboard/excuse-duty",
