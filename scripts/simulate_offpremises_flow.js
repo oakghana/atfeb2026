@@ -10,22 +10,38 @@ async function simulateOffPremisesFlow() {
   console.log('OFF-PREMISES CHECK-IN FLOW SIMULATION')
   console.log('==========================================\n')
 
-  // Step 1: Find a test user (staff member)
-  console.log('STEP 1: Finding test staff user...')
-  const { data: staffUsers } = await supabase
+  // Step 1: Find a test user (any user)
+  console.log('STEP 1: Finding test user...')
+  
+  // First check total user count
+  const { count: totalUsers } = await supabase
+    .from('user_profiles')
+    .select('*', { count: 'exact', head: true })
+  console.log(`Total users in database: ${totalUsers}`)
+  
+  const { data: allUsers, error: userError } = await supabase
     .from('user_profiles')
     .select('id, first_name, last_name, email, role, department_id')
-    .eq('role', 'staff')
-    .limit(5)
+    .limit(10)
   
-  if (!staffUsers || staffUsers.length === 0) {
-    console.log('ERROR: No staff users found')
+  if (userError) {
+    console.log('ERROR fetching users:', userError.message)
     return
   }
+  
+  if (!allUsers || allUsers.length === 0) {
+    console.log('ERROR: No users found')
+    return
+  }
+  
+  console.log(`Found ${allUsers.length} users:`)
+  allUsers.forEach(u => console.log(`  - ${u.first_name} ${u.last_name} (${u.role})`))
+  console.log()
 
-  const testUser = staffUsers[0]
+  const testUser = allUsers[0]
   console.log(`✓ Using test user: ${testUser.first_name} ${testUser.last_name} (${testUser.email})`)
   console.log(`  User ID: ${testUser.id}`)
+  console.log(`  Role: ${testUser.role}`)
   console.log(`  Department: ${testUser.department_id}\n`)
 
   // Step 2: Create a pending off-premises request with a specific timestamp
