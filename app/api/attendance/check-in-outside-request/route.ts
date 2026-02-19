@@ -87,10 +87,11 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Final managers found:", { count: managers.length, managers })
 
     if (managers.length === 0) {
-      console.error("[v0] No managers found for user")
+      console.error("[v0] No managers found for user. Department:", userProfile.department_id, "Reports to:", userProfile.reports_to_id)
       return NextResponse.json(
         {
-          error: "No managers found to approve your request",
+          success: false,
+          error: "Cannot submit off-premises request: No supervisor or department head found in your department. Please contact HR to assign a supervisor to your profile.",
           requiresManualApproval: true,
         },
         { status: 400 }
