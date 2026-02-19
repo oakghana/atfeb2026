@@ -48,22 +48,65 @@ async function main() {
     console.log('Total records:', allRequests.length)
   }
 
-  // 4. Check specifically for pending requests
-  const { data: pendingOnly, error: pendingErr } = await supabase
-    .from('pending_offpremises_checkins')
-    .select('id, user_id, status, created_at, current_location_name')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false })
+  // 4. Check the it-admin user's profile to understand manager chain
+  const { data: itAdmins } = await supabase
+    .from('user_profiles')
+    .select('id, first_name, last_name, role, department_id, reports_to_id, assigned_location_id')
+    .eq('role', 'it-admin')
   
-  console.log('\n--- Pending requests ---')
-  if (pendingErr) {
-    console.log('Error:', pendingErr.message)
-  } else {
-    console.log('Count:', pendingOnly?.length || 0)
-    pendingOnly?.forEach(r => {
-      console.log(`  ${r.created_at} - user: ${r.user_id?.substring(0,8)}... - location: ${r.current_location_name}`)
+  console.log('\n--- IT-Admin profiles ---')
+  if (itAdmins) {
+    itAdmins.forEach(u => {
+      console.log(`  ${u.first_name} ${u.last_name} (${u.id.substring(0,8)}...)`)
+      console.log(`    department_id: ${u.department_id}`)
+      console.log(`    reports_to_id: ${u.reports_to_id}`)
+      console.log(`    assigned_location_id: ${u.assigned_location_id}`)
     })
   }
+
+  // 5. Check if there are any admin users who can be fallback approvers
+  const { data: admins } = await supabase
+    .from('user_profiles')
+    .select('id, first_name, last_name, role, department_id')
+    .in('role', ['admin', 'department_head', 'regional_manager'])
+    .limit(10)
+  
+  console.log('\n--- Admin/Manager users (first 10) ---')
+  if (admins) {
+    admins.forEach(u => {
+      console.log(`  [${u.role}] ${u.first_name} ${u.last_name} - dept: ${u.department_id}`)
+    })
+  }
+
+  // 6. For the first it-admin, check if there's a department_head in their department
+  if (itAdmins && itAdmins.length > 0) {
+    const itAdmin = itAdmins[0]
+    const { data: deptManagers } = await supabase
+      .from('user_profiles')
+      .select('id, first_name, last_name, role')
+      .in('role', ['department_head', 'regional_manager'])
+      .eq('department_id', itAdmin.department_id)
+    
+    console.log(`\n--- Managers in IT-Admin's department (${itAdmin.department_id}) ---`)
+    console.log('Count:', deptManagers?.length || 0)
+    deptManagers?.forEach(m => {
+      console.log(`  [${m.role}] ${m.first_name} ${m.last_name}`)
+    })
+  }
+
+  // 7. Check staff_notifications for recent off-premises notifications
+  const { data: recentNotifs } = await supabase
+    .from('staff_notifications')
+    .select('id, type, title, created_at, is_read')
+    .eq('type', 'offpremises_checkin_request')
+    .order('created_at', { ascending: false })
+    .limit(5)
+  
+  console.log('\n--- Recent off-premises notifications ---')
+  console.log('Count:', recentNotifs?.length || 0)
+  recentNotifs?.forEach(n => {
+    console.log(`  ${n.created_at} - ${n.title} - read: ${n.is_read}`)
+  })
 }
 
 main()
