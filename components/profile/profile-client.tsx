@@ -24,6 +24,7 @@ interface UserProfile {
   employee_id: string
   position: string
   phone_number?: string
+  phone?: string
   role: string
   is_active: boolean
   profile_image_url?: string
@@ -31,6 +32,16 @@ interface UserProfile {
     id: string
     name: string
     code: string
+  }
+  assigned_location?: {
+    id: string
+    name: string
+    address?: string
+    district_id?: string
+    districts?: {
+      id: string
+      name: string
+    }
   }
   districts?: {
     id: string
@@ -458,7 +469,7 @@ export function ProfileClient({ initialUser, initialProfile }: ProfileClientProp
                   <Label htmlFor="phone">Phone Number</Label>
                   <div className="p-2 bg-muted rounded-md flex items-center gap-2">
                     <Phone className="h-4 w-4 text-muted-foreground" />
-                    {profile.phone_number || "Not provided"}
+                    {profile.phone_number || profile.phone || "Not provided"}
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">Only admin can change phone number</p>
                 </div>

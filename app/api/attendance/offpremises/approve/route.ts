@@ -98,12 +98,12 @@ export async function POST(request: NextRequest) {
     if (approved) {
       console.log("[v0] Approving request and creating check-in")
       
-      // Create attendance record for the user
+      // Create attendance record for the user with ORIGINAL request time (not approval time)
       const { data: attendanceRecord, error: attendanceError } = await supabase
         .from("attendance_records")
         .insert({
           user_id: pendingRequest.user_id,
-          check_in_time: new Date().toISOString(),
+          check_in_time: pendingRequest.created_at, // Use original request time, not approval time
           actual_location_name: pendingRequest.current_location_name,
           actual_latitude: pendingRequest.latitude,
           actual_longitude: pendingRequest.longitude,

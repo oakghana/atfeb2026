@@ -71,7 +71,7 @@ const navigationItems = [
     title: "Dashboard",
     href: "/dashboard/overview",
     icon: Home,
-    roles: ["admin", "regional_manager", "department_head", "staff"],
+    roles: ["admin", "it-admin", "regional_manager", "department_head", "staff"],
     category: "main",
   },
   {
@@ -88,13 +88,7 @@ const navigationItems = [
     roles: ["admin", "regional_manager", "department_head"],
     category: "main",
   },
-  {
-    title: "Off-Premises Review",
-    href: "/offpremises-review",
-    icon: CheckCircle2,
-    roles: ["admin", "regional_manager", "department_head"],
-    category: "main",
-  },
+
   {
     title: "Excuse Duty",
     href: "/dashboard/excuse-duty",
@@ -134,7 +128,7 @@ const navigationItems = [
     title: "Help",
     href: "/dashboard/help",
     icon: HelpCircle,
-    roles: ["admin", "regional_manager", "department_head", "staff"],
+    roles: ["admin", "it-admin", "regional_manager", "department_head", "staff"],
     category: "main",
   },
   {
@@ -235,7 +229,7 @@ const navigationItems = [
     title: "Settings",
     href: "/dashboard/settings",
     icon: Settings,
-    roles: ["admin", "regional_manager", "department_head", "staff"],
+    roles: ["admin", "it-admin", "regional_manager", "department_head", "staff"],
     category: "settings",
   },
 ]

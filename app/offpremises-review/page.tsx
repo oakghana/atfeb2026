@@ -13,14 +13,14 @@ export default async function OffPremisesReviewPage() {
     redirect("/auth/login")
   }
 
-  // Check if user has admin or department_head role
+  // Check if user has admin, it-admin, or department_head role
   const { data: profile } = await supabase
-    .from("profiles")
+    .from("user_profiles")
     .select("role")
     .eq("id", user.id)
     .single()
 
-  if (!profile || !["admin", "department_head", "regional_manager"].includes(profile.role)) {
+  if (!profile || !["admin", "it-admin", "department_head", "regional_manager"].includes(profile.role)) {
     redirect("/dashboard")
   }
 
