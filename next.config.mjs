@@ -17,7 +17,9 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
   poweredByHeader: false,
   reactStrictMode: true,
+  // Disable Turbopack and use SWC instead - Turbopack is causing "Next.js package not found" crashes
   experimental: {
+    turbopack: false,
     optimizePackageImports: [
       'lucide-react',
       '@radix-ui/react-accordion',
