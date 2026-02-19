@@ -1,12 +1,19 @@
-import { createAdminClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 
 async function getLatestOffPremisesRequest() {
   try {
-    const adminClient = await createAdminClient()
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    // Get the current authenticated user
-    // Since this is a server script, we'll fetch all requests and let you identify your own
-    const { data: allRequests, error } = await adminClient
+    if (!supabaseUrl || !supabaseKey) {
+      console.error("[v0] Missing Supabase credentials")
+      return { error: "Missing Supabase credentials" }
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // Fetch the latest off-premises check-in request
+    const { data: allRequests, error } = await supabase
       .from("pending_offpremises_checkins")
       .select(
         `
@@ -46,7 +53,9 @@ async function getLatestOffPremisesRequest() {
     }
 
     const latestRequest = allRequests[0]
-    console.log("[v0] Latest Off-Premises Check-in Request:")
+    console.log("\n\n✅ YES - Off-premises check-in requests ARE saved in the database!")
+    console.log("=====================================")
+    console.log("LATEST OFF-PREMISES CHECK-IN REQUEST:")
     console.log("=====================================")
     console.log(`ID: ${latestRequest.id}`)
     console.log(
@@ -63,15 +72,18 @@ async function getLatestOffPremisesRequest() {
     console.log(`Created At: ${new Date(latestRequest.created_at).toLocaleString()}`)
     
     if (latestRequest.approved_at) {
-      console.log(`Approved At: ${new Date(latestRequest.approved_at).toLocaleString()}`)
+      console.log(`✅ Approved At: ${new Date(latestRequest.approved_at).toLocaleString()}`)
       console.log(`Approved By ID: ${latestRequest.approved_by_id}`)
     } else {
-      console.log("Approved At: Not approved yet")
+      console.log("⏳ Approved At: Not approved yet (Status: " + latestRequest.status + ")")
     }
     
-    console.log(`Rejection Reason: ${latestRequest.rejection_reason || "None"}`)
+    if (latestRequest.rejection_reason) {
+      console.log(`❌ Rejection Reason: ${latestRequest.rejection_reason}`)
+    }
+    
     console.log(`Device Info: ${latestRequest.device_info}`)
-    console.log("=====================================")
+    console.log("=====================================\n\n")
 
     return { request: latestRequest }
   } catch (error) {
