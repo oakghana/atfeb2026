@@ -26,6 +26,17 @@ interface PendingRequest {
     last_name: string
     email: string
     department_id: string
+    employee_id?: string
+    position?: string
+    assigned_location_id?: string
+    departments?: {
+      id: string
+      name: string
+    }
+    locations?: {
+      id: string
+      name: string
+    }
   }
 }
 
@@ -139,6 +150,30 @@ export function OffPremisesRequestModal({
                   <p className="text-gray-600 dark:text-gray-400">{request.user_profiles.email}</p>
                 </div>
               </div>
+              {request.user_profiles.employee_id && (
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-gray-500" />
+                  <span>Employee ID: {request.user_profiles.employee_id}</span>
+                </div>
+              )}
+              {request.user_profiles.departments && (
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-gray-500" />
+                  <span>Department: {request.user_profiles.departments.name}</span>
+                </div>
+              )}
+              {request.user_profiles.position && (
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-gray-500" />
+                  <span>Position: {request.user_profiles.position}</span>
+                </div>
+              )}
+              {request.user_profiles.locations && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-gray-500" />
+                  <span>Assigned Location: {request.user_profiles.locations.name}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-gray-500" />
                 <span>Request Time: {formatDate(request.created_at)}</span>

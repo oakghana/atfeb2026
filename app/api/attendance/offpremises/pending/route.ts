@@ -66,7 +66,15 @@ export async function GET(request: NextRequest) {
             employee_id,
             department_id,
             position,
-            assigned_location_id
+            assigned_location_id,
+            departments (
+              id,
+              name
+            ),
+            locations (
+              id,
+              name
+            )
           )
         `
         )
@@ -120,7 +128,15 @@ export async function GET(request: NextRequest) {
           employee_id,
           department_id,
           position,
-          assigned_location_id
+          assigned_location_id,
+          departments (
+            id,
+            name
+          ),
+          locations (
+            id,
+            name
+          )
         )
       `
       )
