@@ -83,34 +83,8 @@ export async function GET(request: NextRequest) {
       query = query.eq("status", statusFilter)
     }
 
-    // Apply role-based filtering
-    if (managerProfile.role === "admin") {
-      // Admins see all requests
-    } else if (managerProfile.role === "regional_manager") {
-      const { data: locationStaff } = await adminClient
-        .from("user_profiles")
-        .select("id")
-        .eq("assigned_location_id", managerProfile.assigned_location_id)
-
-      const staffIds = locationStaff?.map(s => s.id) || []
-      if (staffIds.length > 0) {
-        query = query.in("user_id", staffIds)
-      } else {
-        return NextResponse.json({ requests: [], count: 0 })
-      }
-    } else if (managerProfile.role === "department_head") {
-      const { data: deptStaff } = await adminClient
-        .from("user_profiles")
-        .select("id")
-        .eq("department_id", managerProfile.department_id)
-
-      const staffIds = deptStaff?.map(s => s.id) || []
-      if (staffIds.length > 0) {
-        query = query.in("user_id", staffIds)
-      } else {
-        return NextResponse.json({ requests: [], count: 0 })
-      }
-    }
+    // NO role-based filtering - ALL managers see ALL requests regardless of location/department
+    // The request still contains department_id and assigned_location_id for reference
 
     const { data: pendingRequests, error } = await query
 

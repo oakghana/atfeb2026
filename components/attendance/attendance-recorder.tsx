@@ -1131,8 +1131,16 @@ export function AttendanceRecorder({
       console.log("[v0] API response body:", result)
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to send confirmation request")
+        console.error("[v0] Off-premises request failed:", result)
+        throw new Error(result.error || "Failed to submit off-premises request")
       }
+
+      if (!result.success) {
+        console.error("[v0] Off-premises request not successful:", result)
+        throw new Error(result.error || "Request was not successful")
+      }
+
+      console.log("[v0] Off-premises request submitted successfully")
 
       setFlashMessage({
         message: `Off-premises check-in request submitted successfully! Your request is now awaiting supervisor review. Location: ${locationName}. Once approved by your supervisor, you will be automatically checked in with your original request time.`,
@@ -1140,7 +1148,7 @@ export function AttendanceRecorder({
       })
 
       toast({
-        title: "Request Submitted Successfully",
+        title: "Request Submitted Successfully",  
         description: "Your off-premises check-in request is awaiting supervisor review. You will be notified once approved.",
         action: <ToastAction altText="OK">OK</ToastAction>,
       })
