@@ -40,10 +40,58 @@ export async function GET(request: NextRequest) {
     }
 
     if (!["department_head", "regional_manager", "admin"].includes(managerProfile.role)) {
-      return NextResponse.json(
-        { error: "Only managers can view off-premises requests" },
-        { status: 403 }
-      )
+      // Staff members can only see their own pending requests
+      let query = adminClient
+        .from("pending_offpremises_checkins")
+        .select(
+          `
+          id,
+          user_id,
+          current_location_name,
+          latitude,
+          longitude,
+          accuracy,
+          device_info,
+          created_at,
+          status,
+          approved_by_id,
+          approved_at,
+          rejection_reason,
+          google_maps_name,
+          user_profiles!pending_offpremises_checkins_user_id_fkey (
+            id,
+            first_name,
+            last_name,
+            email,
+            employee_id,
+            department_id,
+            position,
+            assigned_location_id
+          )
+        `
+        )
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+
+      // Apply status filter if not "all"
+      if (statusFilter !== "all") {
+        query = query.eq("status", statusFilter)
+      }
+
+      const { data: staffRequests, error } = await query
+
+      if (error) {
+        console.error("[v0] Failed to fetch staff off-premises requests:", error)
+        return NextResponse.json(
+          { error: "Failed to fetch requests", details: error.message },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({
+        requests: staffRequests || [],
+        count: staffRequests?.length || 0,
+      })
     }
 
     // Build query using admin client to bypass RLS
