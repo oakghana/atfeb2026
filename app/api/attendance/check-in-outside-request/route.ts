@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
         accuracy: current_location.accuracy,
         device_info: device_info,
         google_maps_name: current_location.display_name || current_location.name,
+        reason: reason || "Not provided",
         status: "pending",
       })
       .select()
