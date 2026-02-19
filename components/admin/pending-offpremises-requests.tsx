@@ -73,6 +73,9 @@ export function PendingOffPremisesRequests() {
       }
 
       const data = await response.json()
+      console.log("[v0] Loaded requests:", data.requests)
+      console.log("[v0] Total count:", data.count)
+      console.log("[v0] Pending filter:", data.requests?.filter((r: any) => r.status === 'pending'))
       setAllRequests(data.requests || [])
     } catch (err: any) {
       setError(err.message || 'An error occurred while loading requests')
