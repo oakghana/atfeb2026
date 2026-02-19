@@ -82,18 +82,30 @@ export async function POST(request: NextRequest) {
       status: "pending",
     })
 
+    // Insert with only the core required fields first
+    const insertPayload: any = {
+      user_id,
+      current_location_name: current_location.name,
+      latitude: current_location.latitude,
+      longitude: current_location.longitude,
+      accuracy: current_location.accuracy,
+      device_info: device_info,
+      status: "pending",
+    }
+    
+    // Add optional fields if columns exist
+    if (current_location.display_name) {
+      insertPayload.google_maps_name = current_location.display_name
+    }
+    if (reason) {
+      insertPayload.reason = reason
+    }
+    
+    console.log("[v0] Insert payload:", insertPayload)
+    
     const { data: requestRecord, error: insertError } = await supabase
       .from("pending_offpremises_checkins")
-      .insert({
-        user_id,
-        current_location_name: current_location.name,
-        latitude: current_location.latitude,
-        longitude: current_location.longitude,
-        accuracy: current_location.accuracy,
-        device_info: device_info,
-        google_maps_name: current_location.display_name || current_location.name,
-        status: "pending",
-      })
+      .insert(insertPayload)
       .select()
       .single()
 
