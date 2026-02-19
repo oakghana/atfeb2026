@@ -1135,13 +1135,13 @@ export function AttendanceRecorder({
       }
 
       setFlashMessage({
-        message: `Your off-premises request has been sent to your department head and regional manager for review. Location: ${locationName}. Reason: ${offPremisesReason}. Once approved, you will be automatically checked in and marked as working outside premises.`,
-        type: "info",
+        message: `Off-premises check-in request submitted successfully! Your request is now awaiting supervisor review. Location: ${locationName}. Once approved by your supervisor, you will be automatically checked in with your original request time.`,
+        type: "success",
       })
 
       toast({
-        title: "Request Submitted",
-        description: "Your off-premises request is awaiting manager approval.",
+        title: "Request Submitted Successfully",
+        description: "Your off-premises check-in request is awaiting supervisor review. You will be notified once approved.",
         action: <ToastAction altText="OK">OK</ToastAction>,
       })
 

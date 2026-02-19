@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!["department_head", "regional_manager", "admin", "it-admin"].includes(approverProfile.role)) {
+    if (!["department_head", "regional_manager", "admin"].includes(approverProfile.role)) {
       console.error("[v0] User not authorized to approve:", approverProfile.role)
       return NextResponse.json(
         { error: "Only managers can approve off-premises check-ins" },

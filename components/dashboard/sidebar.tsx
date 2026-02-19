@@ -85,7 +85,7 @@ const navigationItems = [
     title: "Off-Premises Approvals",
     href: "/offpremises-approvals",
     icon: MapPin,
-    roles: ["admin", "it-admin", "regional_manager", "department_head"],
+    roles: ["admin", "regional_manager", "department_head"],
     category: "main",
   },
 

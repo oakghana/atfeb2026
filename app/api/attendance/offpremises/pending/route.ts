@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    if (!["department_head", "regional_manager", "admin", "it-admin"].includes(managerProfile.role)) {
+    if (!["department_head", "regional_manager", "admin"].includes(managerProfile.role)) {
       return NextResponse.json(
         { error: "Only managers can view off-premises requests" },
         { status: 403 }
@@ -84,8 +84,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Apply role-based filtering
-    if (managerProfile.role === "admin" || managerProfile.role === "it-admin") {
-      // Admins and IT-Admins see all requests
+    if (managerProfile.role === "admin") {
+      // Admins see all requests
     } else if (managerProfile.role === "regional_manager") {
       const { data: locationStaff } = await adminClient
         .from("user_profiles")
