@@ -51,52 +51,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get the specific manager(s) this user reports to
-    let managers = []
+    // Get ALL managers (admins, regional managers, department heads) - no department/location filtering
+    console.log("[v0] Looking for all managers (admin, regional_manager, department_head)...")
+    const { data: allManagers } = await supabase
+      .from("user_profiles")
+      .select("id, email, first_name, last_name, role")
+      .in("role", ["admin", "regional_manager", "department_head"])
+      .eq("is_active", true)
     
-    if (userProfile.reports_to_id) {
-      // User has a direct manager assigned
-      console.log("[v0] Looking for direct manager:", userProfile.reports_to_id)
-      const { data: directManager } = await supabase
-        .from("user_profiles")
-        .select("id, email, first_name, last_name, role")
-        .eq("id", userProfile.reports_to_id)
-        .single()
-      
-      console.log("[v0] Direct manager result:", directManager)
-      if (directManager) {
-        managers.push(directManager)
-      }
-    }
-    
-    // If no direct manager, get all department heads and regional managers in the department
-    if (managers.length === 0) {
-      console.log("[v0] No direct manager, looking for department managers in:", userProfile.department_id)
-      const { data: deptManagers } = await supabase
-        .from("user_profiles")
-        .select("id, email, first_name, last_name, role")
-        .in("role", ["department_head", "regional_manager"])
-        .eq("department_id", userProfile.department_id)
-      
-      console.log("[v0] Department managers result:", { count: deptManagers?.length || 0, managers: deptManagers })
-      if (deptManagers && deptManagers.length > 0) {
-        managers = deptManagers
-      }
-    }
+    console.log("[v0] Managers found:", { count: allManagers?.length || 0 })
 
-    console.log("[v0] Final managers found:", { count: managers.length, managers })
-
-    if (managers.length === 0) {
-      console.error("[v0] No managers found for user. Department:", userProfile.department_id, "Reports to:", userProfile.reports_to_id)
+    if (!allManagers || allManagers.length === 0) {
+      console.error("[v0] No managers found in the system")
       return NextResponse.json(
         {
           success: false,
-          error: "Cannot submit off-premises request: No supervisor or department head found in your department. Please contact HR to assign a supervisor to your profile.",
+          error: "Cannot submit off-premises request: No managers found in the system. Please contact HR.",
           requiresManualApproval: true,
         },
         { status: 400 }
       )
     }
+
+    const managers = allManagers
 
     // Store the off-premises check-in request for manager approval
     console.log("[v0] Inserting pending check-in:", {
