@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 
+// Force Next.js to use webpack instead of Turbopack
+// This completely bypasses the Turbopack "Next.js package not found" crash bug
+process.env.NEXT_SKIP_TURBOPACK_TESTS = "true"
+process.env.TURBOPACK = "false"
+
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
@@ -35,14 +40,6 @@ const nextConfig = {
       'date-fns',
     ],
     optimizeCss: false,
-  },
-  // Explicit Turbopack configuration for Next.js 16
-  turbopack: {
-    config: {
-      resolve: {
-        preferRelative: true,
-      },
-    },
   },
 }
 
