@@ -1841,6 +1841,8 @@ export function AttendanceRecorder({
                     isCheckingOut={isLoading}
                     userDepartment={userProfile?.departments}
                     userRole={userProfile?.role}
+                    isAtQCCLocation={locationValidation?.canCheckOut === true && !localTodayAttendance?.on_official_duty_outside_premises}
+                    hasApprovedOffPremises={localTodayAttendance?.approval_status === "approved_offpremises"}
                   />
                 )
               })()
@@ -1986,8 +1988,8 @@ export function AttendanceRecorder({
         </div>
       )}
 
-      {/* Checkout button - Always visible when checked in */}
-      {localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time && (
+      {/* Checkout button - Only show when outside QCC location (off-premises) or when ActiveSessionTimer button shouldn't show */}
+      {localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time && (!isAtQCCLocation || localTodayAttendance?.on_official_duty_outside_premises) && (
         <>
           <Button
             onClick={handleCheckOut}
