@@ -69,6 +69,26 @@ export async function POST(request: Request) {
     if (findError || !attendance) {
       console.log("[v0] No active check-in found for checkout:", findError?.message)
 
+      // Check if user has pending off-premises request - prevent normal checkout
+      const { data: pendingOffPremises } = await supabase
+        .from("attendance_records")
+        .select("approval_status, off_premises_request_id")
+        .eq("user_id", user.id)
+        .eq("attendance_date", todayDate)
+        .eq("approval_status", "pending_supervisor_approval")
+        .maybeSingle()
+
+      if (pendingOffPremises) {
+        return NextResponse.json(
+          {
+            error: "Cannot check out - Off-premises request pending approval",
+            message: "Your off-premises check-in request is awaiting supervisor approval. Check-out will be available after approval.",
+            reason: "PENDING_OFF_PREMISES_APPROVAL",
+          },
+          { status: 403 }
+        )
+      }
+
       // Check if user has already checked out today
       const { data: completedAttendance } = await supabase
         .from("attendance_records")

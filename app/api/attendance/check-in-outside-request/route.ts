@@ -139,6 +139,37 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Request stored successfully:", requestRecord.id)
 
+    // CREATE TEMPORARY ATTENDANCE RECORD WITH PENDING APPROVAL STATUS
+    const today = new Date().toISOString().split('T')[0]
+    const { data: tempAttendanceRecord, error: attendanceError } = await supabase
+      .from("attendance_records")
+      .insert({
+        user_id,
+        attendance_date: today,
+        check_in_time: new Date().toISOString(),
+        location_id: null, // Not at a QCC location
+        check_in_latitude: current_location.latitude,
+        check_in_longitude: current_location.longitude,
+        check_in_location_name: current_location.name,
+        status: "present", // Mark as present temporarily
+        off_premises_request_id: requestRecord.id,
+        approval_status: "pending_supervisor_approval", // KEY: Indicates pending supervisor review
+        supervisor_approval_remarks: `Off-premises check-in request submitted at ${new Date().toLocaleTimeString()}. Reason: ${reason || 'Not provided'}. Awaiting supervisor approval.`,
+        on_official_duty_outside_premises: false, // Will be set to true if approved
+        device_info: device_info,
+      })
+      .select()
+      .single()
+
+    if (attendanceError) {
+      console.warn("[v0] Failed to create temporary attendance record:", attendanceError)
+      // Log warning but don't fail - the request is still valid
+    } else {
+      console.log("[v0] Temporary attendance record created:", tempAttendanceRecord?.id)
+    }
+
+    console.log("[v0] Request stored successfully:", requestRecord.id)
+
     // Send notifications to managers
     const managerNotifications = managers.map((manager: any) => ({
       user_id: manager.id,
