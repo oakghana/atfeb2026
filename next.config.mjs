@@ -4,7 +4,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    unoptimized: false, // Enable image optimization
+    unoptimized: false,
     formats: ['image/webp', 'image/avif'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
@@ -33,10 +33,12 @@ const nextConfig = {
       'recharts',
       'date-fns',
     ],
-    optimizeCss: false, // Disabled to avoid critters dependency
+    optimizeCss: false,
   },
-  // Use Turbopack (Next.js 16 default)
-  turbopack: {},
+  // Disable Turbopack to use webpack - fixes "Next.js package not found" Turbopack crash
+  turbo: {
+    disabled: true,
+  },
 }
 
 export default nextConfig
