@@ -43,7 +43,11 @@ export async function GET(request: NextRequest) {
         check_out_latitude,
         check_out_longitude,
         check_in_location_id,
-        check_out_location_id
+        check_out_location_id,
+        approval_status,
+        supervisor_approval_remarks,
+        on_official_duty_outside_premises,
+        off_premises_request_id
       `)
       .eq("user_id", user.id)
       .order("check_in_time", { ascending: false })

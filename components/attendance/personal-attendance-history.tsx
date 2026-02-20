@@ -443,19 +443,20 @@ export function PersonalAttendanceHistory() {
                       <TableHead>Check Out Location</TableHead>
                       <TableHead>Hours</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Off-Premises Status</TableHead>
                       <TableHead>Notes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8">
+                        <TableCell colSpan={9} className="text-center py-8">
                           Loading records...
                         </TableCell>
                       </TableRow>
                     ) : records.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8">
+                        <TableCell colSpan={9} className="text-center py-8">
                           No attendance records found for the selected period
                         </TableCell>
                       </TableRow>
@@ -512,6 +513,25 @@ export function PersonalAttendanceHistory() {
                             <Badge variant={record.status === "present" ? "default" : "secondary"}>
                               {record.status.replace("_", " ")}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              {record.approval_status === "pending_supervisor_approval" && (
+                                <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200">
+                                  ⏳ Pending Approval
+                                </Badge>
+                              )}
+                              {record.approval_status === "approved_offpremises" && (
+                                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                  ✓ Off-Premises Approved
+                                </Badge>
+                              )}
+                              {record.on_official_duty_outside_premises && (
+                                <div className="text-xs text-gray-600 mt-1 p-1 bg-blue-50 rounded">
+                                  {record.supervisor_approval_remarks}
+                                </div>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1">
