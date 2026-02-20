@@ -36,15 +36,6 @@ const nextConfig = {
     ],
     optimizeCss: false,
   },
-  // Disable Turbopack completely - use webpack instead
-  // This prevents "Next.js package not found" panic crashes
-  webpack: (config, { isServer }) => {
-    return config
-  },
-  onDemandEntries: {
-    maxInactiveAge: 60 * 1000,
-    pagesBufferLength: 5,
-  },
 }
 
 export default nextConfig
