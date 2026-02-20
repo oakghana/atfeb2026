@@ -117,62 +117,92 @@ export default function LoginPage() {
         email = result.email
       }
 
-      // Call custom sign-in endpoint instead of Supabase auth
-      console.log("[v0] Calling custom sign-in API for:", email)
+      // Authenticate using Supabase auth
+      console.log("[v0] Calling Supabase auth for:", email)
       
-      const signInResponse = await fetch("/api/auth/signin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      })
-
-      if (!signInResponse.ok) {
-        const errorData = await signInResponse.json()
-        console.log("[v0] Sign-in failed:", errorData)
-        showFieldError("Credentials", errorData.error || "Invalid email or password")
-        return
+      let data, error
+      try {
+        const result = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+        data = result.data
+        error = result.error
+      } catch (authError: any) {
+        // Handle AbortError silently - request was cancelled but may have succeeded
+        if (authError.name === "AbortError") {
+          // Check if we have a valid session despite the abort
+          const { data: sessionData } = await supabase.auth.getSession().catch(() => ({ data: null }))
+          if (sessionData?.session) {
+            // Session exists, treat as successful login
+            data = { user: sessionData.session.user, session: sessionData.session }
+            error = null
+          } else {
+            throw new Error("Authentication request was cancelled. Please try again.")
+          }
+        } else {
+          throw authError
+        }
       }
 
-      const authResult = await signInResponse.json()
-      console.log("[v0] Sign-in successful for user:", authResult.user.id)
+      if (error) {
+        // Log failed attempt
+        if (data?.user?.id) {
+          await logLoginActivity(data.user.id, "login_failed", false, "password")
+        }
 
-      const userId = authResult.user.id
-
-      // Check user approval status
-      const approvalCheck = await checkUserApproval(userId)
-
-      if (!approvalCheck.approved) {
-        await logLoginActivity(userId, "login_blocked_unapproved", false, "password")
-        showWarning(approvalCheck.error || "Account not approved", "Account Approval Required")
-        if (approvalCheck.error?.includes("pending admin approval")) {
-          router.push("/auth/pending-approval")
+        // Handle specific error types
+        if (error.message.includes("Invalid login credentials")) {
+          showFieldError("Credentials", "Invalid credentials. Please check your staff number/email and password.")
+        } else if (error.message.includes("Email not confirmed")) {
+          showWarning(
+            "Please check your email and click the confirmation link before logging in.",
+            "Email Confirmation Required",
+          )
+        } else {
+          showError(error.message, "Login Failed")
         }
         return
       }
 
-      const deviceInfo = getDeviceInfo()
-      const deviceCheckResponse = await fetch("/api/auth/check-device-binding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          device_id: deviceInfo.device_id,
-          device_info: deviceInfo,
-        }),
-      })
+      // Check user approval status
+      if (data?.user?.id) {
+        const approvalCheck = await checkUserApproval(data.user.id)
 
-      const deviceCheck = await deviceCheckResponse.json()
+        if (!approvalCheck.approved) {
+          await logLoginActivity(data.user.id, "login_blocked_unapproved", false, "password")
+          await supabase.auth.signOut()
+          showWarning(approvalCheck.error || "Account not approved", "Account Approval Required")
+          if (approvalCheck.error?.includes("pending admin approval")) {
+            router.push("/auth/pending-approval")
+          }
+          return
+        }
 
-      if (!deviceCheck.allowed) {
-        await logLoginActivity(userId, "login_blocked_device_violation", false, "password")
-        showError(
-          deviceCheck.message || "This device is registered to another user. Your supervisor has been notified.",
-          "Device Security Violation",
-        )
-        return
-      }
+        const deviceInfo = getDeviceInfo()
+        const deviceCheckResponse = await fetch("/api/auth/check-device-binding", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            device_id: deviceInfo.device_id,
+            device_info: deviceInfo,
+          }),
+        })
 
-      // Log successful login
-      await logLoginActivity(userId, "login_success", true, "password")
+        const deviceCheck = await deviceCheckResponse.json()
+
+        if (!deviceCheck.allowed) {
+          await logLoginActivity(data.user.id, "login_blocked_device_violation", false, "password")
+          await supabase.auth.signOut()
+          showError(
+            deviceCheck.message || "This device is registered to another user. Your supervisor has been notified.",
+            "Device Security Violation",
+          )
+          return
+        }
+
+        // Log successful login
+        await logLoginActivity(data.user.id, "login_success", true, "password")
 
       // Clear attendance and geolocation cache
       clearAttendanceCache()
