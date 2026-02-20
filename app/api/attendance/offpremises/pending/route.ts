@@ -133,10 +133,10 @@ export async function GET(request: NextRequest) {
       const deptId = managerProfile.department_id
       const locId = managerProfile.assigned_location_id
       if (deptId || locId) {
-        // use PostgREST `or` to combine conditions
+        // use PostgREST `or` to combine conditions with proper formatting
         const conditions: string[] = []
-        if (deptId) conditions.push(`user_profiles.department_id.eq.${deptId}`)
-        if (locId) conditions.push(`user_profiles.assigned_location_id.eq.${locId}`)
+        if (deptId) conditions.push(`(user_profiles.department_id.eq.${deptId})`)
+        if (locId) conditions.push(`(user_profiles.assigned_location_id.eq.${locId})`)
         if (conditions.length > 0) {
           queryWithReason = queryWithReason.or(conditions.join(','))
         }
