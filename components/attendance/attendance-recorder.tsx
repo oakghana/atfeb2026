@@ -1101,7 +1101,13 @@ export function AttendanceRecorder({
 
   const handleSendOffPremisesRequest = async () => {
     if (!pendingOffPremisesLocation) return
-    if (!offPremisesReason.trim()) {
+    
+    // For checkout requests after 9+ hours, reason is not required
+    const checkInTime = new Date(localTodayAttendance?.check_in_time || new Date())
+    const workHours = (new Date().getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
+    const reasonRequired = offPremisesMode !== 'checkout' || workHours <= 9
+    
+    if (reasonRequired && !offPremisesReason.trim()) {
       toast({
         title: "Reason Required",
         description: "Please provide a reason for your off-premises request.",
@@ -1149,6 +1155,7 @@ export function AttendanceRecorder({
         user_id: currentUser.id,
         reason: offPremisesReason.trim(),
         request_type: offPremisesMode,
+        workHours: workHours, // Pass work hours for auto-approval decision
       }
       
       console.log("[v0] Sending off-premises request:", payload)
@@ -1189,24 +1196,37 @@ export function AttendanceRecorder({
       }
 
       // safety check: API may return 200 but indicate failure or omit key fields
-      if (result && (result.success === false || !result.request_id)) {
+      if (result && (result.success === false || (!result.request_id && !result.auto_approved))) {
         console.error("[v0] Off-premises request not successful or missing id:", result)
         const msg = result.error || result.message || "Request was not successful"
         throw new Error(msg)
       }
 
-      console.log("[v0] Off-premises request submitted successfully", { request_id: result.request_id })
+      console.log("[v0] Off-premises request submitted successfully", { request_id: result.request_id, auto_approved: result.auto_approved })
 
-      setFlashMessage({
-        message: `Off-premises ${offPremisesMode === 'checkout' ? 'check-out' : 'check-in'} request sent to your supervisor for approval. We'll notify you when the supervisor approves and your attendance will be recorded using the ORIGINAL request time and the submitted location.`,
-        type: "success",
-      })
+      if (result.auto_approved) {
+        setFlashMessage({
+          message: `Your off-premises ${offPremisesMode === 'checkout' ? 'check-out' : 'check-in'} has been automatically approved and recorded. You've worked ${workHours.toFixed(1)} hours today.`,
+          type: "success",
+        })
 
-      toast({
-        title: "Off‑Premises Request Sent",
-        description: `Your request was sent to your supervisor — waiting for approval. You will be automatically ${offPremisesMode === 'checkout' ? 'checked out' : 'checked in'} if approved.`,
-        action: <ToastAction altText="OK">OK</ToastAction>,
-      })
+        toast({
+          title: "Off‑Premises Request Approved",
+          description: `Your ${offPremisesMode === 'checkout' ? 'check-out' : 'check-in'} has been automatically processed.`,
+          action: <ToastAction altText="OK">OK</ToastAction>,
+        })
+      } else {
+        setFlashMessage({
+          message: `Off-premises ${offPremisesMode === 'checkout' ? 'check-out' : 'check-in'} request sent to your supervisor for approval. We'll notify you when the supervisor approves and your attendance will be recorded using the ORIGINAL request time and the submitted location.`,
+          type: "success",
+        })
+
+        toast({
+          title: "Off‑Premises Request Sent",
+          description: `Your request was sent to your supervisor — waiting for approval. You will be automatically ${offPremisesMode === 'checkout' ? 'checked out' : 'checked in'} if approved.`,
+          action: <ToastAction altText="OK">OK</ToastAction>,
+        })
+      }
 
       setPendingOffPremisesLocation(null)
       setOffPremisesReason("")

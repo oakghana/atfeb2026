@@ -3,6 +3,21 @@ import { type NextRequest, NextResponse } from "next/server"
 
 console.log("[v0] check-in-outside-request route module loaded")
 
+// Helper function to calculate distance between two coordinates using Haversine formula
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3 // Earth's radius in meters
+  const φ1 = (lat1 * Math.PI) / 180
+  const φ2 = (lat2 * Math.PI) / 180
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180
+  
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  const distance = R * c
+  
+  return distance
+}
+
 export async function POST(request: NextRequest) {
   console.log("[v0] POST handler invoked for check-in-outside-request")
   
@@ -42,7 +57,7 @@ export async function POST(request: NextRequest) {
     // Get user's direct manager (department head or regional manager they report to)
     const { data: userProfile, error: userProfileError } = await supabase
       .from("user_profiles")
-      .select("id, department_id, role, first_name, last_name, email")
+      .select("id, department_id, role, first_name, last_name, email, assigned_location_id")
       .eq("id", user_id)
       .maybeSingle()
 
@@ -59,6 +74,132 @@ export async function POST(request: NextRequest) {
         { error: "User profile not found" },
         { status: 404 }
       )
+    }
+
+    // For checkout requests, check if staff has worked > 9 hours
+    let shouldAutoApprove = false
+    let isWithinRange = false
+    if (finalRequestType === 'checkout') {
+      // Get today's attendance record
+      const today = new Date().toISOString().split('T')[0]
+      const { data: todayAttendance } = await supabase
+        .from('attendance_records')
+        .select('check_in_time')
+        .eq('user_id', user_id)
+        .gte('check_in_time', `${today}T00:00:00`)
+        .lt('check_in_time', `${today}T23:59:59`)
+        .is('check_out_time', null)
+        .order('check_in_time', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (todayAttendance?.check_in_time) {
+        const checkInTime = new Date(todayAttendance.check_in_time)
+        const checkOutTime = new Date()
+        const workHours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
+        
+        console.log("[v0] Work hours calculated:", { workHours })
+
+        // If staff has worked more than 9 hours, check if they're within range
+        if (workHours > 9) {
+          console.log("[v0] Staff has worked more than 9 hours, checking if within range...")
+
+          // Get assigned location details
+          if (userProfile.assigned_location_id) {
+            const { data: assignedLocation } = await supabase
+              .from('geofence_locations')
+              .select('latitude, longitude, radius_meters')
+              .eq('id', userProfile.assigned_location_id)
+              .maybeSingle()
+
+            if (assignedLocation) {
+              const distance = calculateDistance(
+                current_location.latitude,
+                current_location.longitude,
+                assignedLocation.latitude,
+                assignedLocation.longitude
+              )
+              const tolerance = 50 // 50 meter tolerance
+              const effectiveRadius = assignedLocation.radius_meters + tolerance
+              isWithinRange = distance <= effectiveRadius
+
+              console.log("[v0] Distance check:", { distance, effectiveRadius, isWithinRange })
+
+              // Auto-approve if within range
+              if (isWithinRange) {
+                shouldAutoApprove = true
+                console.log("[v0] Auto-approval triggered: >9 hours and within range")
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // If auto-approve is enabled, process the checkout immediately
+    if (shouldAutoApprove && finalRequestType === 'checkout') {
+      console.log("[v0] Processing auto-approved checkout for >9 hours staff...")
+      
+      const today = new Date().toISOString().split('T')[0]
+      const { data: openAttendance } = await supabase
+        .from('attendance_records')
+        .select('id, check_in_time')
+        .eq('user_id', user_id)
+        .gte('check_in_time', `${today}T00:00:00`)
+        .lt('check_in_time', `${today}T23:59:59`)
+        .is('check_out_time', null)
+        .order('check_in_time', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (openAttendance) {
+        const checkOutTime = new Date().toISOString()
+        const checkInTime = new Date(openAttendance.check_in_time)
+        const workHours = Math.round(((new Date(checkOutTime).getTime() - checkInTime.getTime()) / (1000 * 60 * 60)) * 100) / 100
+
+        // Update attendance record with checkout info
+        const { error: updateError } = await supabase
+          .from('attendance_records')
+          .update({
+            check_out_time: checkOutTime,
+            check_out_location_id: null,
+            check_out_latitude: current_location.latitude,
+            check_out_longitude: current_location.longitude,
+            check_out_location_name: current_location.display_name || current_location.name || 'Off-Premises (auto-approved)',
+            check_out_method: 'remote_offpremises',
+            is_remote_checkout: true,
+            work_hours: workHours,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', openAttendance.id)
+
+        if (updateError) {
+          console.error("[v0] Failed to record auto-approved checkout:", updateError)
+          // Continue to create pending record as fallback
+        } else {
+          console.log("[v0] Auto-approved checkout recorded successfully")
+          
+          // Send notification to staff
+          await supabase.from('staff_notifications').insert({
+            user_id: user_id,
+            type: 'offpremises_checkout_auto_approved',
+            title: 'Off-Premises Check-Out Approved',
+            message: `Your off-premises check-out has been automatically approved. You worked ${workHours} hours today and have been checked out remotely from ${current_location.display_name || current_location.name}.`,
+            data: { location_name: current_location.display_name || current_location.name },
+            is_read: false,
+          }).catch(err => console.warn('[v0] Failed to send auto-approval notification:', err))
+
+          return NextResponse.json(
+            {
+              success: true,
+              message: "Your off-premises check-out has been automatically approved and recorded",
+              auto_approved: true,
+              request_id: null,
+            },
+            { status: 200 }
+          )
+        }
+      }
     }
 
     // Get ALL managers (admins, regional managers, department heads) - no department/location filtering
@@ -157,12 +298,17 @@ export async function POST(request: NextRequest) {
 
     console.log('[v0] Request stored successfully:', requestRecord.id)
 
+    // If staff has worked > 9 hours but is outside range, indicate that supervisor approval is required
+    const notificationMessage = finalRequestType === 'checkout' && !isWithinRange && (body.workHours || 0) > 9
+      ? `${userProfile.first_name} ${userProfile.last_name} is requesting a check-out after working more than 9 hours, but is currently OUTSIDE their assigned location range. Review and approve or deny.`
+      : `${userProfile.first_name} ${userProfile.last_name} is requesting to check-in from outside their assigned location: ${current_location.display_name || current_location.name}. Reason: ${reason || 'Not provided'}. Please review and approve or deny.`
+
     // Send notifications to managers
     const managerNotifications = managers.map((manager: any) => ({
       user_id: manager.id,
       type: "offpremises_checkin_request",
-      title: "Off-Premises Check-In Request",
-      message: `${userProfile.first_name} ${userProfile.last_name} is requesting to check-in from outside their assigned location: ${current_location.display_name || current_location.name}. Reason: ${reason || 'Not provided'}. Please review and approve or deny.`,
+      title: finalRequestType === 'checkout' ? "Off-Premises Check-Out Request" : "Off-Premises Check-In Request",
+      message: notificationMessage,
       data: {
         request_id: requestRecord.id,
         staff_user_id: user_id,
@@ -171,6 +317,7 @@ export async function POST(request: NextRequest) {
         google_maps_name: current_location.display_name || current_location.name,
         coordinates: `${current_location.latitude}, ${current_location.longitude}`,
         reason: reason || 'Not provided',
+        request_type: finalRequestType,
       },
       is_read: false,
     }))
@@ -187,7 +334,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: "Your off-premises check-in request has been sent to your managers for approval",
+        message: finalRequestType === 'checkout' 
+          ? "Your off-premises check-out request has been sent to your supervisor for approval"
+          : "Your off-premises check-in request has been sent to your managers for approval",
         request_id: requestRecord.id,
         pending_approval: true,
       },
