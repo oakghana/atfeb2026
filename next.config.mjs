@@ -36,6 +36,14 @@ const nextConfig = {
     ],
     optimizeCss: false,
   },
+  // Explicit Turbopack configuration for Next.js 16
+  turbopack: {
+    config: {
+      resolve: {
+        preferRelative: true,
+      },
+    },
+  },
 }
 
 export default nextConfig
