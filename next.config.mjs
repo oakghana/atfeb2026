@@ -1,4 +1,8 @@
 /** @type {import('next').NextConfig} */
+
+// Force webpack instead of Turbopack to avoid "Next.js package not found" crash
+process.env.NEXT_PRIVATE_TURBOPACK_ENABLED = "false"
+
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
@@ -34,10 +38,6 @@ const nextConfig = {
       'date-fns',
     ],
     optimizeCss: false,
-  },
-  // Disable Turbopack to use webpack - fixes "Next.js package not found" Turbopack crash
-  turbo: {
-    disabled: true,
   },
 }
 
