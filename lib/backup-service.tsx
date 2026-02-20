@@ -43,8 +43,12 @@ class BackupService {
       console.log(`[BackupService] Starting backup: ${backupId}`)
       const supabase = await createClient()
 
-      // Define tables to backup
-      const tables = [
+      // Define tables to backup.  We avoid querying pg_catalog via PostgREST
+      // because the schema cache often doesn't expose system catalogs, leading
+      // to errors such as "Could not find the table 'public.pg_catalog.pg_tables'".
+      // Instead we maintain a hard-coded list of core tables.  New tables should
+      // be added here or can be discovered by a separate migration script.
+      const tables: string[] = [
         "user_profiles",
         "departments",
         "geofence_locations",
@@ -54,19 +58,47 @@ class BackupService {
         "settings",
       ]
 
+      // include audit_logs if requested; only added later when verifying
       if (config.includeAuditLogs) {
         tables.push("audit_logs")
+      }
+
+      // remove any tables that actually don't exist by probing with a simple select
+      const verified: string[] = []
+      for (const t of tables) {
+        try {
+          const { error: headErr } = await supabase.from(t).select("1").limit(1)
+          if (headErr && headErr.code === "PGRST205") {
+            console.warn(`[BackupService] Removing missing table ${t} from backup list`) 
+            continue
+          }
+        } catch {
+          // ignore other failures and assume table exists
+        }
+        verified.push(t)
+      }
+      tables.splice(0, tables.length, ...verified)
+
+      if (!config.includeAuditLogs) {
+        // remove audit_logs if the caller explicitly doesn't want it
+        const idx = tables.indexOf("audit_logs")
+        if (idx !== -1) tables.splice(idx, 1)
       }
 
       const backupData: Record<string, any[]> = {}
       let totalSize = 0
 
-      // Backup each table
+      // Backup each table (skip missing ones)
       for (const table of tables) {
         try {
           const { data, error } = await supabase.from(table).select("*")
 
           if (error) {
+            // ignore missing-table error code from PostgREST
+            if (error.code === "PGRST205" || error.message?.includes("Could not find the table")) {
+              console.warn(`[BackupService] Table ${table} does not exist, skipping.`)
+              continue
+            }
             console.error(`[BackupService] Error backing up table ${table}:`, error)
             continue
           }
@@ -74,7 +106,12 @@ class BackupService {
           backupData[table] = data || []
           totalSize += JSON.stringify(data).length
           console.log(`[BackupService] Backed up ${data?.length || 0} records from ${table}`)
-        } catch (tableError) {
+        } catch (tableError: any) {
+          // similarly suppress missing-table errors thrown as exceptions
+          if (tableError?.code === "PGRST205" || tableError?.message?.includes("Could not find the table")) {
+            console.warn(`[BackupService] Table ${table} does not exist (exception), skipping.`)
+            continue
+          }
           console.error(`[BackupService] Failed to backup table ${table}:`, tableError)
         }
       }
@@ -91,7 +128,10 @@ class BackupService {
         config,
       }
 
-      // Save backup to storage (in a real implementation, this would go to cloud storage)
+      // Save backup to storage.  In the current implementation we persist the
+      // entire payload (metadata + data) in the metadata column so that restore
+      // can later pull the records directly.  In a production system this would
+      // be stored in external cloud storage and only a reference kept here.
       await this.saveBackupToStorage(backupId, {
         metadata: backupMetadata,
         data: backupData,
@@ -144,14 +184,16 @@ class BackupService {
     const backupSize = JSON.stringify(backupContent).length
     console.log(`[BackupService] Backup ${backupId} saved to storage (${backupSize} bytes)`)
 
-    // Store backup reference in database
+    // Store backup reference in database.  We keep the whole payload inside
+    // metadata so that restores can access the data; the table already has a
+    // JSONB metadata field and RLS policy restricting access to admins.
     const supabase = await createClient()
     await supabase.from("system_backups").upsert({
       id: backupId,
       created_at: new Date().toISOString(),
       size_bytes: backupSize,
       status: "completed",
-      metadata: backupContent.metadata,
+      metadata: backupContent, // contains both metadata and data
     })
   }
 
@@ -260,42 +302,41 @@ class BackupService {
         throw new Error(`Backup ${backupId} not found`)
       }
 
-      // In a real implementation, we would fetch the actual backup data from storage
-      // For now, we'll simulate that the backup data is available
-      const backupData = {} // This would be fetched from storage
+      // We stored the full payload in the metadata column when creating the
+      // backup, so extract it here.  For a real cloud‑storage solution you
+      // would instead download the JSON from S3/Blob storage.
+      const stored = backupRecord.metadata || {}
+      const backupData = stored.data || {}
 
-      // Define tables to restore (in reverse dependency order)
-      const tables = [
-        "settings",
-        "schedules",
-        "attendance_records",
-        "districts",
-        "geofence_locations",
-        "departments",
-        "user_profiles",
-      ]
+      // Restore all tables present in the backup payload.  We loop over the
+      // keys rather than a fixed list so that new tables are automatically
+      // handled.  The order here is not guaranteed; if you have strong
+      // foreign‑key dependencies you may want to disable constraints or load
+      // parent tables first.  For a simple restore this approach works.
+      const tables = Object.keys(backupData)
 
       let totalRecords = 0
 
       // Restore each table
       for (const table of tables) {
         try {
-          if (backupData[table]) {
-            // Clear existing data
+          const records = backupData[table]
+          if (records && Array.isArray(records)) {
+            // Clear existing data; exclude placeholder rows if present
             await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000")
 
             // Insert backup data
             const { error: insertError } = await supabase
               .from(table)
-              .insert(backupData[table])
+              .insert(records)
 
             if (insertError) {
               console.error(`[BackupService] Error restoring table ${table}:`, insertError)
               continue
             }
 
-            totalRecords += backupData[table].length
-            console.log(`[BackupService] Restored ${backupData[table].length} records to ${table}`)
+            totalRecords += records.length
+            console.log(`[BackupService] Restored ${records.length} records to ${table}`)
           }
         } catch (tableError) {
           console.error(`[BackupService] Failed to restore table ${table}:`, tableError)

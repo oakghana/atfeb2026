@@ -96,6 +96,112 @@ export async function POST(request: NextRequest) {
     // Regional managers can approve all in current setup since we don't have location filtering
 
     if (approved) {
+      console.log("[v0] Approving request (type=%s)", pendingRequest.request_type || 'checkin')
+
+      // If this is a CHECK-OUT request, attempt to mark the staff member as checked out
+      if ((pendingRequest.request_type || 'checkin') === 'checkout') {
+        console.log('[v0] Processing off-premises CHECK-OUT approval')
+
+        // Find today's open attendance record for the user (no check_out_time)
+        const today = new Date().toISOString().split('T')[0]
+        const { data: openAttendance, error: findError } = await supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('user_id', pendingRequest.user_id)
+          .gte('check_in_time', `${today}T00:00:00`)
+          .lte('check_in_time', `${today}T23:59:59`)
+          .is('check_out_time', null)
+          .order('check_in_time', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (findError) console.error('[v0] Error finding open attendance for checkout:', findError)
+
+        if (openAttendance) {
+          const checkOutTime = new Date(pendingRequest.created_at || new Date().toISOString()).toISOString()
+          const checkInTime = new Date(openAttendance.check_in_time)
+          const workHours = Math.round(((new Date(checkOutTime).getTime() - checkInTime.getTime()) / (1000 * 60 * 60)) * 100) / 100
+
+          const updatePayload: any = {
+            check_out_time: checkOutTime,
+            check_out_location_id: null,
+            check_out_latitude: pendingRequest.latitude || null,
+            check_out_longitude: pendingRequest.longitude || null,
+            check_out_location_name: pendingRequest.google_maps_name || pendingRequest.current_location_name || 'Off‑Premises (approved)',
+            check_out_method: 'remote_offpremises',
+            is_remote_checkout: true,
+            work_hours: workHours,
+            updated_at: new Date().toISOString(),
+          }
+
+          if (comments) updatePayload.early_checkout_reason = comments
+
+          const { data: updated, error: updateError } = await supabase
+            .from('attendance_records')
+            .update(updatePayload)
+            .eq('id', openAttendance.id)
+            .select()
+            .single()
+
+          if (updateError) {
+            console.error('[v0] Failed to record remote checkout:', updateError)
+            // continue to update request status below
+          }
+
+          // Update pending request status
+          const { error: reqUpdateErr } = await supabase
+            .from('pending_offpremises_checkins')
+            .update({
+              status: 'approved',
+              approved_by_id: user_id,
+              approved_at: new Date().toISOString(),
+            })
+            .eq('id', request_id)
+
+          if (reqUpdateErr) {
+            console.error('[v0] Failed to update request status after checkout approval:', reqUpdateErr)
+            return NextResponse.json({ error: 'Failed to update request status' }, { status: 500 })
+          }
+
+          // Notify staff
+          await supabase.from('staff_notifications').insert({
+            user_id: pendingRequest.user_id,
+            type: 'offpremises_checkout_approved',
+            title: 'Off‑Premises Check‑Out Approved',
+            message: `Your off‑premises check‑out request from ${pendingRequest.google_maps_name || pendingRequest.current_location_name} has been approved — you were checked out remotely at ${new Date(checkOutTime).toLocaleString()}.`,
+            data: { request_id, attendance_record_id: updated?.id },
+            is_read: false,
+          }).catch(err => console.warn('[v0] Failed to send checkout approval notification:', err))
+
+          return NextResponse.json({ success: true, message: 'Off‑premises check‑out approved and recorded', attendance_record_id: updated?.id }, { status: 200 })
+        } else {
+          console.warn('[v0] No open attendance record found for user — approving request without recording checkout')
+
+          // Mark request approved but inform approver that no open attendance record existed
+          const { error: statusErr } = await supabase
+            .from('pending_offpremises_checkins')
+            .update({ status: 'approved', approved_by_id: user_id, approved_at: new Date().toISOString() })
+            .eq('id', request_id)
+
+          if (statusErr) {
+            console.error('[v0] Failed to update request status (no open attendance):', statusErr)
+            return NextResponse.json({ error: 'Failed to update request status' }, { status: 500 })
+          }
+
+          await supabase.from('staff_notifications').insert({
+            user_id: pendingRequest.user_id,
+            type: 'offpremises_checkout_approved',
+            title: 'Off‑Premises Check‑Out Approved (manual follow-up required)',
+            message: `Your off‑premises check‑out request has been approved by your manager but no active check‑in was found to attach the checkout to. Please contact HR or your manager for manual correction.`,
+            data: { request_id },
+            is_read: false,
+          }).catch(err => console.warn('[v0] Failed to send notification (no open attendance):', err))
+
+          return NextResponse.json({ success: true, message: 'Request approved but no open attendance record found' }, { status: 200 })
+        }
+      }
+
+      // Default: approve as a CHECK‑IN (existing behavior)
       console.log("[v0] Approving request and creating check-in")
       
       // Create attendance record for the user with ORIGINAL request time (not approval time)
@@ -121,7 +227,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Update pending request status
-      const { error: updateError } = await supabase
+      const { error: updateError2 } = await supabase
         .from("pending_offpremises_checkins")
         .update({
           status: "approved",
@@ -130,8 +236,8 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", request_id)
 
-      if (updateError) {
-        console.error("[v0] Failed to update request status:", updateError)
+      if (updateError2) {
+        console.error("[v0] Failed to update request status:", updateError2)
         return NextResponse.json(
           { error: "Failed to update request status" },
           { status: 500 }

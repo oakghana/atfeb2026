@@ -26,12 +26,20 @@ export function isOperationalDept(dept?: DeptInfo): boolean {
   return code === "operations" || code === "operational" || name.includes("operations") || name.includes("operational")
 }
 
+export function isTransportDept(dept?: DeptInfo): boolean {
+  if (!dept) return false
+  const code = (dept.code || "").toString().toLowerCase()
+  const name = (dept.name || "").toString().toLowerCase()
+  return code === "transport" || name.includes("transport")
+}
+
 export function isExemptFromTimeRestrictions(dept?: DeptInfo, role?: string | null): boolean {
   if (!dept && !role) return false
-  // Operational and Security departments are exempt from time restrictions
+  // Operational, Security and Transport departments are exempt from time restrictions
   if (isOperationalDept(dept)) return true
   if (isSecurityDept(dept)) return true
-  // Admin roles are also exempt
+  if (isTransportDept(dept)) return true
+  // Admin, department/head and regional manager roles are also exempt
   const lowerRole = (role || "").toLowerCase()
   return lowerRole === "admin" || lowerRole === "department_head" || lowerRole === "regional_manager"
 }

@@ -184,6 +184,8 @@ export function AttendanceRecorder({
   const [showOffPremisesReasonDialog, setShowOffPremisesReasonDialog] = useState(false)
   const [offPremisesReason, setOffPremisesReason] = useState("")
   const [pendingOffPremisesLocation, setPendingOffPremisesLocation] = useState<LocationData | null>(null)
+  // 'checkin' | 'checkout' - reused by the off-premises reason dialog
+  const [offPremisesMode, setOffPremisesMode] = useState<'checkin' | 'checkout'>('checkin')
 
   // Helper: treat Security department as exempt from lateness / early-checkout reason prompts
   const isSecurityStaff = useMemo(() => {
@@ -224,6 +226,7 @@ export function AttendanceRecorder({
   const [localTodayAttendance, setLocalTodayAttendance] = useState(initialTodayAttendance)
 
   const [checkoutTimeReached, setCheckoutTimeReached] = useState(false)
+  const [minutesUntilOffPremisesCheckout, setMinutesUntilOffPremisesCheckout] = useState<number | null>(null)
 
   const [isCheckInProcessing, setIsCheckInProcessing] = useState(false)
   const [lastCheckInAttempt, setLastCheckInAttempt] = useState<number>(0)
@@ -363,7 +366,11 @@ export function AttendanceRecorder({
     !!localTodayAttendance?.check_in_time && // Must have a check-in record
     !localTodayAttendance?.check_out_time &&
     !isOnLeave &&
-    locationValidation?.canCheckOut === true // MUST be within proximity range (with null check)
+    // Allow checkout when either location validation passes, the session was started
+    // as an off‑premises request, or the minimum two‑hour duration has been reached.
+    (locationValidation?.canCheckOut === true ||
+      localTodayAttendance?.on_official_duty_outside_premises === true ||
+      checkoutTimeReached)
 
   const handleQRScanSuccess = async (qrData: QRCodeData) => {
     console.log("[v0] QR scan successful, mode:", qrScanMode)
@@ -544,34 +551,51 @@ export function AttendanceRecorder({
     if (localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time) {
       const checkInTime = new Date(localTodayAttendance.check_in_time)
       const now = new Date()
-  const hoursSinceCheckIn = (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
-  
-  if (hoursSinceCheckIn < 2) {
-    // Calculate minutes until 2 hours have passed
-    const minutesLeft = Math.ceil((2 - hoursSinceCheckIn) * 60)
-    setMinutesUntilCheckout(minutesLeft)
+      const hoursSinceCheckIn = (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
 
-        // Update every minute
-    const interval = setInterval(() => {
-      const currentNow = new Date()
-      const currentHoursSinceCheckIn = (currentNow.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
-      
-      if (currentHoursSinceCheckIn >= 2) {
+      // normal 2‑hour timer logic
+      const wasOffPremises = !!localTodayAttendance?.on_official_duty_outside_premises || !!localTodayAttendance?.is_remote_location
+      if (wasOffPremises) {
         setMinutesUntilCheckout(null)
-        setCheckoutTimeReached(true)
-        clearInterval(interval)
+        setCheckoutTimeReached(false)
       } else {
-        const currentMinutesLeft = Math.ceil((2 - currentHoursSinceCheckIn) * 60)
-        setMinutesUntilCheckout(currentMinutesLeft)
+        if (hoursSinceCheckIn < 2) {
+          const minutesLeft = Math.ceil((2 - hoursSinceCheckIn) * 60)
+          setMinutesUntilCheckout(minutesLeft)
+
+          const interval = setInterval(() => {
+            const now2 = new Date()
+            const hours2 = (now2.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
+            if (hours2 >= 2) {
+              setMinutesUntilCheckout(null)
+              setCheckoutTimeReached(true)
+              clearInterval(interval)
+            } else {
+              setMinutesUntilCheckout(Math.ceil((2 - hours2) * 60))
+            }
+          }, 60000)
+
+          return () => clearInterval(interval)
+        } else {
+          setMinutesUntilCheckout(null)
+          setCheckoutTimeReached(true)
+        }
       }
-    }, 60000) // Update every minute
 
-        return () => clearInterval(interval)
+      // off-premises checkout request timer (1 hour)
+      if (wasOffPremises) {
+        if (hoursSinceCheckIn < 1) {
+          setMinutesUntilOffPremisesCheckout(Math.ceil((1 - hoursSinceCheckIn) * 60))
+        } else {
+          setMinutesUntilOffPremisesCheckout(null)
+        }
       } else {
-        setMinutesUntilCheckout(null)
+        setMinutesUntilOffPremisesCheckout(null)
       }
     } else {
       setMinutesUntilCheckout(null)
+      setCheckoutTimeReached(false)
+      setMinutesUntilOffPremisesCheckout(null)
     }
   }, [localTodayAttendance?.check_in_time, localTodayAttendance?.check_out_time])
 
@@ -581,7 +605,6 @@ export function AttendanceRecorder({
         const checkInTime = new Date(localTodayAttendance.check_in_time)
         const now = new Date()
         const hoursSinceCheckIn = (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
-
         setCheckoutTimeReached(hoursSinceCheckIn >= 2)
       } else {
         setCheckoutTimeReached(false)
@@ -589,8 +612,7 @@ export function AttendanceRecorder({
     }
 
     checkCheckoutTime()
-    const interval = setInterval(checkCheckoutTime, 60000) // Check every minute
-
+    const interval = setInterval(checkCheckoutTime, 60000)
     return () => clearInterval(interval)
   }, [localTodayAttendance])
 
@@ -1114,6 +1136,7 @@ export function AttendanceRecorder({
         device_info: getDeviceInfo(),
         user_id: currentUser.id,
         reason: offPremisesReason.trim(),
+        request_type: offPremisesMode,
       }
       
       console.log("[v0] Sending off-premises request:", payload)
@@ -1124,40 +1147,62 @@ export function AttendanceRecorder({
         body: JSON.stringify(payload),
       })
 
-      console.log("[v0] API response status:", response.status)
+      console.log("[v0] API response status:", response.status, response.statusText)
 
-      const result = await response.json()
-      
-      console.log("[v0] API response body:", result)
+      let result: any = {}
+      let rawBody: string | null = null
+      try {
+        rawBody = await response.text()
+        try {
+          result = rawBody ? JSON.parse(rawBody) : {}
+        } catch (jsonErr) {
+          console.warn("[v0] Response body not JSON, keeping raw text", jsonErr)
+        }
+      } catch (err) {
+        console.warn("[v0] Failed to read API response body", err)
+      }
+
+      console.log("[v0] API response body:", result, "raw:", rawBody)
 
       if (!response.ok) {
-        console.error("[v0] Off-premises request failed:", result)
-        throw new Error(result.error || "Failed to submit off-premises request")
+        // prefer an explicit error string if available, fall back to raw text or status
+        const errMsg = result?.error || result?.message || rawBody || `HTTP ${response.status}`
+        console.error("[v0] Off-premises request failed:", {
+          status: response.status,
+          statusText: response.statusText,
+          body: result,
+          rawBody,
+        })
+        throw new Error(errMsg)
       }
 
-      if (!result.success) {
-        console.error("[v0] Off-premises request not successful:", result)
-        throw new Error(result.error || "Request was not successful")
+      // safety check: API may return 200 but indicate failure or omit key fields
+      if (result && (result.success === false || !result.request_id)) {
+        console.error("[v0] Off-premises request not successful or missing id:", result)
+        const msg = result.error || result.message || "Request was not successful"
+        throw new Error(msg)
       }
 
-      console.log("[v0] Off-premises request submitted successfully")
+      console.log("[v0] Off-premises request submitted successfully", { request_id: result.request_id })
 
       setFlashMessage({
-        message: `Off-premises check-in request submitted successfully! Your request is now awaiting supervisor review. Location: ${locationName}. Once approved by your supervisor, you will be automatically checked in with your original request time.`,
+        message: `Off-premises ${offPremisesMode === 'checkout' ? 'check-out' : 'check-in'} request sent to your supervisor for approval. We'll notify you when the supervisor approves and your attendance will be recorded using the ORIGINAL request time and the submitted location.`,
         type: "success",
       })
 
       toast({
-        title: "Request Submitted Successfully",  
-        description: "Your off-premises check-in request is awaiting supervisor review. You will be notified once approved.",
+        title: "Off‑Premises Request Sent",
+        description: `Your request was sent to your supervisor — waiting for approval. You will be automatically ${offPremisesMode === 'checkout' ? 'checked out' : 'checked in'} if approved.`,
         action: <ToastAction altText="OK">OK</ToastAction>,
       })
 
       setPendingOffPremisesLocation(null)
       setOffPremisesReason("")
 
+      // Refresh attendance status after submitting off-premises request
+      // `handleRefreshStatus` was removed/renamed — call the established refetch instead.
       setTimeout(() => {
-        handleRefreshStatus()
+        fetchTodayAttendance()
       }, 2000)
 
     } catch (error: any) {
@@ -1186,14 +1231,19 @@ export function AttendanceRecorder({
       return
     }
 
-    if (minutesUntilCheckout !== null && minutesUntilCheckout > 0) {
+    // ensure we know who is checking out
+    if (!userProfile?.id) {
+      console.warn("[v0] Attempting checkout without user profile")
       setFlashMessage({
-        message: `You must wait ${minutesUntilCheckout} more minute${minutesUntilCheckout !== 1 ? "s" : ""} before checking out. A minimum of 2 hours is required between check-in and check-out.`,
-        type: "info",
+        message: "Unable to identify current user. Please refresh and try again.",
+        type: "error",
       })
       return
     }
 
+    const userId = userProfile.id
+
+    // Determine if the user started in an approved remote/off‑premises 
     setIsLoading(true)
     try {
       // OPTIMIZATION: Fetch location data ONCE and reuse everywhere
@@ -1220,12 +1270,52 @@ export function AttendanceRecorder({
       // OPTIMIZATION: Validate location ONCE
       const checkoutValidation = validateCheckoutLocation(locationData, realTimeLocations || [], checkOutRadius)
 
+      // compute flags used for button labels and error logic
+      const wasOffPremises = !!localTodayAttendance?.on_official_duty_outside_premises || !!localTodayAttendance?.is_remote_location
+      const isOffPremisesCheckedIn = wasOffPremises && !checkoutValidation.canCheckOut
+
+      // If the user is not inside any location and not previously flagged remote,
+      // block checkout. out-of-range users are allowed remote checkouts immediately.
+      // additional off-premises request logic
       if (!checkoutValidation.canCheckOut) {
-        console.log("[v0] Location validation failed - user out of range:", checkoutValidation.message)
-        throw new Error(checkoutValidation.message)
+        if (wasOffPremises && minutesUntilOffPremisesCheckout && minutesUntilOffPremisesCheckout > 0) {
+          setFlashMessage({
+            message: `Please wait ${minutesUntilOffPremisesCheckout} more minute${minutesUntilOffPremisesCheckout !== 1 ? "s" : ""} before requesting off‑premises check‑out`,
+            type: "info",
+          })
+          return
+        }
+
+        // submit a remote checkout request instead of performing immediate checkout
+        try {
+          const response = await fetch("/api/attendance/check-in-outside-request", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: userId,
+              current_location: locationData,
+              device_info: getDeviceInfo(),
+              request_type: "checkout",
+              reason: early_checkout_reason || null,
+            }),
+          })
+          const result = await response.json()
+          if (!response.ok) {
+            throw new Error(result.error || "Failed to submit checkout request")
+          }
+          setFlashMessage({ message: result.message || "Checkout request submitted", type: "success" })
+          return
+        } catch (reqErr: any) {
+          console.error("[v0] Failed to send off-premises checkout request:", reqErr)
+          throw reqErr
+        }
       }
 
-      console.log("[v0] Location validation passed - user within range")
+      if (checkoutValidation.canCheckOut) {
+        console.log("[v0] Location validation passed - user within range")
+      } else {
+        console.log("[v0] Off‑premises/remote checkout allowed")
+      }
 
       // Check if early checkout is needed
       const now = new Date()
@@ -1725,16 +1815,6 @@ export function AttendanceRecorder({
         </Alert>
       )}
 
-      {minutesUntilCheckout !== null && minutesUntilCheckout > 0 && isCheckedIn && !isCheckedOut && (
-        <Alert className="bg-yellow-50 border-yellow-200 dark:bg-yellow-900/60 dark:border-yellow-500/50">
-          <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-300" />
-          <AlertTitle className="text-yellow-800 dark:text-yellow-100">Check-Out Pending</AlertTitle>
-          <AlertDescription className="text-yellow-700 dark:text-yellow-200">
-            You can check out in {minutesUntilCheckout} minute{minutesUntilCheckout !== 1 ? "s" : ""}. A minimum of 2
-            hours is required between check-in and check-out.
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* Time Restriction Warning */}
       {timeRestrictionWarning && (
@@ -1781,6 +1861,11 @@ export function AttendanceRecorder({
                 const checkInLocationData = realTimeLocations?.find(
                   (loc) => loc.id === localTodayAttendance.check_in_location_id
                 )
+                // Consider them off-premises only while still out of range; once locationValidation allows checkout we revert to normal
+                const wasOffPremises = !!localTodayAttendance?.on_official_duty_outside_premises || !!localTodayAttendance?.is_remote_location
+                const isOffPremisesCheckedIn =
+                  wasOffPremises && !(locationValidation?.canCheckOut === true)
+
                 return (
                   <ActiveSessionTimer
                     checkInTime={localTodayAttendance.check_in_time}
@@ -1794,6 +1879,7 @@ export function AttendanceRecorder({
                     isCheckingOut={isLoading}
                     userDepartment={userProfile?.departments}
                     userRole={userProfile?.role}
+                    isOffPremisesCheckedIn={isOffPremisesCheckedIn}
                   />
                 )
               })()
@@ -1939,48 +2025,23 @@ export function AttendanceRecorder({
         </div>
       )}
 
-      {/* Checkout button - Always visible when checked in */}
-      {localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time && (
-        <>
-          <Button
-            onClick={handleCheckOut}
-            disabled={
-              isCheckingIn || isProcessing || isLoading || !checkoutTimeReached || !locationValidation?.canCheckOut
-            }
-            className="w-full bg-red-600 hover:bg-red-700 text-white shadow-lg relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
-            size="lg"
-            title={!checkoutTimeReached ? "Minimum 2 hours required between check-in and check-out" : !locationValidation?.canCheckOut ? "You must be at your assigned location to check out" : "Check out from your shift"}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <div className="relative z-10 flex items-center justify-center w-full">
-              {isCheckingIn ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  {checkingMessage || "Checking Out..."}
-                </>
-              ) : (
-                <>
-                  <LogOut className="mr-2 h-5 w-5" />
-                  Check Out
-                </>
-              )}
-            </div>
-          </Button>
+{/* Checkout actions/warnings for active session (ActiveSessionTimer handles the CTA) */}
+            {localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time && (
+              <>
+                {/* Transfer warning messages here so we don't duplicate the CTA button (ActiveSessionTimer shows the 'Check Out Now' button). */}
+                {!checkoutTimeReached && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
+                    Minimum 2 hours required between check-in and check-out. {minutesUntilCheckout} minutes remaining.
+                  </p>
+                )}
 
-          {/* Warning messages for checkout */}
-          {!checkoutTimeReached && (
-            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
-              Minimum 2 hours required between check-in and check-out. {minutesUntilCheckout} minutes remaining.
-            </p>
-          )}
-          
-          {checkoutTimeReached && !locationValidation?.canCheckOut && (
-            <p className="text-xs text-red-500 mt-2 text-center">
-              You are outside the approved location range. Please move closer to a QCC location to check out.
-            </p>
-          )}
-        </>
-      )}
+                {checkoutTimeReached && !locationValidation?.canCheckOut && (
+                    <p className="text-xs text-green-700 mt-2 text-center">
+                      You are outside the approved location range. Since you've been checked in for at least two hours, you may use the <strong>Off‑Premises Check Out</strong> option to record a remote checkout.
+                    </p>
+                )}
+              </>
+            )}
 
       {/* Refresh Status Card */}
       <Card>

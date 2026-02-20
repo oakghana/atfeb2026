@@ -12,7 +12,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log("[v0] Request body received:", { location: body.current_location?.name, userId: body.user_id })
     
-    const { current_location, device_info, user_id, reason } = body
+    const { current_location, device_info, user_id, reason, request_type, action, mode } = body
+
+    // Normalize request type: accept `request_type`, `action`, or `mode` (legacy)
+    const normalizedRequestType = (request_type || action || mode || 'checkin').toString().toLowerCase()
+    const allowedTypes = ['checkin','checkout']
+    const finalRequestType = allowedTypes.includes(normalizedRequestType) ? normalizedRequestType : 'checkin'
 
     if (!current_location) {
       console.error("[v0] Missing current_location")
@@ -35,16 +40,21 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Admin client created")
 
     // Get user's direct manager (department head or regional manager they report to)
-    const { data: userProfile } = await supabase
+    const { data: userProfile, error: userProfileError } = await supabase
       .from("user_profiles")
-      .select("department_id, reports_to_id, role, first_name, last_name")
+      .select("id, department_id, role, first_name, last_name, email")
       .eq("id", user_id)
-      .single()
+      .maybeSingle()
 
-    console.log("[v0] User profile:", { userProfile, user_id })
+    console.log("[v0] User profile query result:", { userProfile, userProfileError, user_id })
+
+    if (userProfileError) {
+      console.error("[v0] Error querying user_profiles:", userProfileError)
+      return NextResponse.json({ error: userProfileError.message }, { status: 500 })
+    }
 
     if (!userProfile) {
-      console.error("[v0] User profile not found")
+      console.error("[v0] User profile not found for user_id:", user_id)
       return NextResponse.json(
         { error: "User profile not found" },
         { status: 404 }
@@ -82,32 +92,70 @@ export async function POST(request: NextRequest) {
       status: "pending",
     })
 
-    const { data: requestRecord, error: insertError } = await supabase
-      .from("pending_offpremises_checkins")
-      .insert({
-        user_id,
-        current_location_name: current_location.name,
-        latitude: current_location.latitude,
-        longitude: current_location.longitude,
-        accuracy: current_location.accuracy,
-        device_info: device_info,
-        google_maps_name: current_location.display_name || current_location.name,
-        status: "pending",
-      })
-      .select()
-      .single()
+    // Try inserting with `reason` column if it exists; fall back if DB doesn't have that column yet
+    let requestRecord: any = null
+    try {
+      const insertRes = await supabase
+        .from("pending_offpremises_checkins")
+        .insert({
+          user_id,
+          current_location_name: current_location.name,
+          latitude: current_location.latitude,
+          longitude: current_location.longitude,
+          accuracy: current_location.accuracy,
+          device_info: device_info,
+          request_type: finalRequestType,
+          google_maps_name: current_location.display_name || current_location.name,
+          reason: reason || null,
+          status: "pending",
+        })
+        .select()
+        .single()
 
-    console.log("[v0] Insert result:", { insertError, hasData: !!requestRecord })
+      requestRecord = insertRes.data
+      if (insertRes.error) throw insertRes.error
+    } catch (err: any) {
+      // If column `reason` OR `request_type` is missing (older schemas), or if
+      // PostgREST schema cache hasn't picked up the new column (PGRST204), retry
+      const msg = (err?.message || "").toString().toLowerCase()
+      const missingReason = msg.includes("column pending_offpremises_checkins.reason does not exist") || err?.code === '42703' || err?.code === 'PGRST204' || msg.includes("schema cache") && msg.includes("reason")
+      const missingRequestType = msg.includes("column pending_offpremises_checkins.request_type does not exist") || err?.code === '42703' || err?.code === 'PGRST204' || msg.includes("schema cache") && msg.includes("request_type")
 
-    if (insertError) {
-      console.error("[v0] Failed to store pending check-in:", insertError)
-      return NextResponse.json(
-        { error: "Failed to process request: " + insertError.message },
-        { status: 500 }
-      )
+      if (missingReason || missingRequestType) {
+        console.warn('[v0] Database missing columns or schema stale; retrying insert without reason/request_type')
+        const payload: any = {
+          user_id,
+          current_location_name: current_location.name,
+          latitude: current_location.latitude,
+          longitude: current_location.longitude,
+          accuracy: current_location.accuracy,
+          device_info: device_info,
+          google_maps_name: current_location.display_name || current_location.name,
+          status: 'pending',
+        }
+
+        // only include reason/request_type if DB likely supports them
+        if (!missingReason && reason) payload.reason = reason
+        if (!missingRequestType && request_type) payload.request_type = request_type
+
+        const { data: retryRecord, error: retryError } = await supabase
+          .from('pending_offpremises_checkins')
+          .insert(payload)
+          .select()
+          .single()
+
+        if (retryError) {
+          console.error('[v0] Failed retrying insert without reason/request_type:', retryError)
+          return NextResponse.json({ error: 'Failed to process request: ' + retryError.message }, { status: 500 })
+        }
+        requestRecord = retryRecord
+      } else {
+        console.error('[v0] Failed to store pending check-in:', err)
+        return NextResponse.json({ error: 'Failed to process request: ' + (err?.message || String(err)) }, { status: 500 })
+      }
     }
 
-    console.log("[v0] Request stored successfully:", requestRecord.id)
+    console.log('[v0] Request stored successfully:', requestRecord.id)
 
     // Send notifications to managers
     const managerNotifications = managers.map((manager: any) => ({
@@ -146,14 +194,19 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     )
   } catch (error: any) {
+    // normalize error to string message so we never return an empty object
+    const message =
+      (error && (error.message || String(error))) ||
+      "Failed to process off-premises request"
+
     console.error("[v0] Off-premises check-in request error:", {
-      message: error?.message,
+      message,
       code: error?.code,
       name: error?.name,
       stack: error?.stack?.split('\n').slice(0, 3).join('\n'),
     })
     return NextResponse.json(
-      { error: error.message || "Failed to process request" },
+      { error: message },
       { status: 500 }
     )
   }

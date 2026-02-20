@@ -117,9 +117,36 @@ export default function LoginPage() {
         email = result.email
       }
 
+      // Preflight: verify network connectivity to Supabase auth endpoint
+      try {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+        if (supabaseUrl) {
+          try {
+            // a lightweight connectivity check — server will likely return 401 but we only care that it doesn't throw
+            await fetch(`${supabaseUrl}/auth/v1/token`, { method: 'GET', cache: 'no-store' })
+          } catch (netErr) {
+            showError('Unable to reach authentication service. Check network, VPN, or browser extensions and try again.', 'Network Error')
+            setIsLoading(false)
+            return
+          }
+        }
+      } catch (preflightErr) {
+        // ignore and continue — preflight is best-effort
+      }
+
       // Single authentication call with AbortError handling
       let data, error
       try {
+        // Debug: log Supabase client config in console (first 8 chars of anon key only)
+        try {
+          console.debug('[v0] Supabase debug', {
+            url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+            anonKeyPrefix: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substr(0, 8) + '...' : false,
+          })
+        } catch (dbgErr) {
+          // ignore
+        }
+
         const result = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -127,6 +154,9 @@ export default function LoginPage() {
         data = result.data
         error = result.error
       } catch (authError: any) {
+        // Log detailed error for debugging (don't expose to users)
+        console.error('[v0] supabase.auth.signInWithPassword ERROR', authError)
+
         // Handle AbortError silently - request was cancelled but may have succeeded
         if (authError.name === "AbortError") {
           // Check if we have a valid session despite the abort
@@ -139,6 +169,7 @@ export default function LoginPage() {
             throw new Error("Authentication request was cancelled. Please try again.")
           }
         } else {
+          // Re-throw so outer catch shows friendly message
           throw authError
         }
       }
@@ -215,7 +246,12 @@ export default function LoginPage() {
         window.location.href = "/dashboard/attendance"
       }, 800)
     } catch (error: unknown) {
-      showError(error instanceof Error ? error.message : "An error occurred during login", "Login Error")
+      const msg = error instanceof Error ? error.message : String(error)
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        showError('Network error while contacting authentication service. Check your internet connection, try Incognito, or disable browser extensions that may block requests.', 'Network Error')
+      } else {
+        showError(msg || 'An error occurred during login', 'Login Error')
+      }
     } finally {
       setIsLoading(false)
     }

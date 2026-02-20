@@ -17,6 +17,7 @@ interface PendingRequest {
   longitude: number
   accuracy: number
   device_info: string
+  reason?: string | null
   created_at: string
   status: string
   approved_by_id?: string
@@ -255,10 +256,15 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold text-lg">
-                            {request.user_profiles?.first_name} {request.user_profiles?.last_name}
-                          </h3>
-                          {getStatusBadge(request.status)}
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-lg">
+                              {request.user_profiles?.first_name} {request.user_profiles?.last_name}
+                            </h3>
+                            {request.request_type && (
+                              <Badge className="text-xs ml-1">{request.request_type === 'checkout' ? 'Checkout' : 'Check‑in'}</Badge>
+                            )}
+                            {getStatusBadge(request.status)}
+                          </div>
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-muted-foreground">
@@ -295,6 +301,9 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
                               <p className="text-xs">
                                 {request.latitude.toFixed(4)}, {request.longitude.toFixed(4)} (accuracy: {Math.round(request.accuracy)}m)
                               </p>
+                              {request.reason && (
+                                <p className="text-sm mt-2 text-muted-foreground"><strong>Reason:</strong> {request.reason}</p>
+                              )}
                             </div>
                           </div>
                           {request.rejection_reason && (

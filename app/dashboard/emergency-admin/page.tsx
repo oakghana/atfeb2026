@@ -30,7 +30,8 @@ import {
   Server,
   HardDrive,
   Wifi,
-  WifiOff
+  WifiOff,
+  Loader2
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -61,6 +62,82 @@ export default function EmergencyAdminPage() {
   const [actionTarget, setActionTarget] = useState('')
   const [actionReason, setActionReason] = useState('')
   const [isExecuting, setIsExecuting] = useState(false)
+
+  // backup/restore state
+  const [creatingBackup, setCreatingBackup] = useState(false)
+  const [restoringBackup, setRestoringBackup] = useState<string | null>(null)
+
+  const handleCreateBackup = async () => {
+    setCreatingBackup(true)
+    try {
+      const res = await fetch("/api/admin/backup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create", config: { frequency: "daily", retentionDays: 30, includeAuditLogs: true, notifyOnCompletion: false, adminEmails: [] } }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || "Backup failed")
+      }
+      // support both admin and settings API formats
+      const returnedId = data.backupId || data.backup?.backupId
+      if (returnedId) {
+        alert("Backup completed successfully: " + returnedId)
+      } else {
+        alert("Backup completed, but no ID was returned")
+      }
+
+      // offer file download of the raw backup payload
+      try {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `${returnedId || 'backup'}.json`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } catch (downloadErr) {
+        console.warn("Failed to trigger backup download:", downloadErr)
+      }
+    } catch (err) {
+      console.error("Backup error:", err)
+      alert("Backup failed: " + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setCreatingBackup(false)
+    }
+  }
+
+  const handleRestorePrompt = () => {
+    const id = prompt("Enter backup ID to restore:")
+    if (id) {
+      handleRestoreBackup(id)
+    }
+  }
+
+  const handleRestoreBackup = async (backupId: string) => {
+    if (!confirm("Restoring a backup will overwrite current data. Continue?")) return
+    setRestoringBackup(backupId)
+    try {
+      const res = await fetch("/api/admin/backup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restore", backupId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || "Restore failed")
+      }
+      alert("Restore completed successfully")
+      window.location.reload()
+    } catch (err) {
+      console.error("Restore error:", err)
+      alert("Restore failed: " + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setRestoringBackup(null)
+    }
+  }
 
   const supabase = createClient()
 
@@ -434,13 +511,22 @@ export default function EmergencyAdminPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button className="h-20 flex-col">
-                  <Download className="h-6 w-6 mb-2" />
-                  Create Backup
+                <Button
+                  className="h-20 flex-col"
+                  onClick={() => handleCreateBackup()}
+                  disabled={creatingBackup}
+                >
+                  {creatingBackup ? <Loader2 className="animate-spin h-6 w-6 mb-2" /> : <Download className="h-6 w-6 mb-2" />}
+                  {creatingBackup ? "Creating…" : "Create Backup"}
                 </Button>
-                <Button variant="outline" className="h-20 flex-col">
-                  <Upload className="h-6 w-6 mb-2" />
-                  Restore from Backup
+                <Button
+                  variant="outline"
+                  className="h-20 flex-col"
+                  onClick={() => handleRestorePrompt()}
+                  disabled={restoringBackup !== null}
+                >
+                  {restoringBackup ? <Loader2 className="animate-spin h-6 w-6 mb-2" /> : <Upload className="h-6 w-6 mb-2" />}
+                  {restoringBackup ? "Restoring…" : "Restore from Backup"}
                 </Button>
               </div>
 

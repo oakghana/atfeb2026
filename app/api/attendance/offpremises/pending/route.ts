@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build query using admin client to bypass RLS
-    let query = adminClient
+    let queryWithReason = adminClient
       .from("pending_offpremises_checkins")
       .select(
         `
@@ -106,6 +106,8 @@ export async function GET(request: NextRequest) {
         longitude,
         accuracy,
         device_info,
+        request_type,
+        reason,
         created_at,
         status,
         approved_by_id,
@@ -128,20 +130,65 @@ export async function GET(request: NextRequest) {
 
     // Apply status filter
     if (statusFilter !== "all") {
-      query = query.eq("status", statusFilter)
+      queryWithReason = queryWithReason.eq("status", statusFilter)
     }
 
-    // NO role-based filtering - ALL managers see ALL requests regardless of location/department
-    // The request still contains department_id and assigned_location_id for reference
+    // Try selecting with `reason` and `request_type` columns first (schema-safe)
+    let pendingRequests: any = null
+    let selectError: any = null
+    try {
+      const res = await queryWithReason
+      pendingRequests = res.data
+      selectError = res.error
+      if (selectError) throw selectError
+    } catch (err: any) {
+      // If `reason` OR `request_type` column is missing on older DBs, retry without them
+      const missingReason = err?.message?.includes("column pending_offpremises_checkins.reason does not exist") || err?.code === '42703'
+      const missingRequestType = err?.message?.includes("column pending_offpremises_checkins.request_type does not exist") || err?.code === '42703'
 
-    const { data: pendingRequests, error } = await query
+      if (missingReason || missingRequestType) {
+        console.warn('[v0] `reason`/`request_type` column missing from pending_offpremises_checkins; retrying select without them')
+        let fallbackQuery = adminClient
+          .from('pending_offpremises_checkins')
+          .select(`
+            id,
+            user_id,
+            current_location_name,
+            latitude,
+            longitude,
+            accuracy,
+            device_info,
+            created_at,
+            status,
+            approved_by_id,
+            approved_at,
+            rejection_reason,
+            google_maps_name,
+            user_profiles!pending_offpremises_checkins_user_id_fkey (
+              id,
+              first_name,
+              last_name,
+              email,
+              employee_id,
+              department_id,
+              position,
+              assigned_location_id
+            )
+          `)
+          .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error("[v0] Failed to fetch off-premises requests:", error)
-      return NextResponse.json(
-        { error: "Failed to fetch requests", details: error.message },
-        { status: 500 }
-      )
+        if (statusFilter !== 'all') fallbackQuery = fallbackQuery.eq('status', statusFilter)
+
+        const fallbackRes = await fallbackQuery
+        if (fallbackRes.error) {
+          console.error('[v0] Failed to fetch off-premises requests (fallback):', fallbackRes.error)
+          return NextResponse.json({ error: 'Failed to fetch requests', details: fallbackRes.error.message }, { status: 500 })
+        }
+        pendingRequests = fallbackRes.data
+      } else {
+        console.error('[v0] Failed to fetch off-premises requests:', err)
+        return NextResponse.json({ error: 'Failed to fetch requests', details: err?.message || String(err) }, { status: 500 })
+      }
     }
 
     return NextResponse.json({

@@ -125,10 +125,12 @@ export function OffPremisesRequestModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-yellow-600" />
-            Review Off-Premises Check-In Request
+            {request.request_type === 'checkout' ? 'Review Off‑Premises Check‑Out Request' : 'Review Off‑Premises Check‑In Request'}
           </DialogTitle>
           <DialogDescription>
-            Staff member is requesting to check in from outside their assigned QCC location
+            {request.request_type === 'checkout'
+              ? 'Staff member is requesting to check out remotely from their current off‑premises location.'
+              : 'Staff member is requesting to check in from outside their assigned QCC location'}
           </DialogDescription>
         </DialogHeader>
 
@@ -204,15 +206,31 @@ export function OffPremisesRequestModal({
             </div>
           </div>
 
+          {/* Staff-provided reason (visible to approver) */}
+          <div className="border rounded-lg p-4 bg-white/50">
+            <h4 className="font-semibold text-sm mb-2">Staff Reason</h4>
+            <p className="text-sm text-foreground whitespace-pre-wrap">{request.reason || 'Not provided'}</p>
+          </div>
+
           {/* Approval Questions */}
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Before You Approve</AlertTitle>
             <AlertDescription>
               <ul className="list-disc ml-5 mt-2 space-y-1 text-sm">
-                <li>Did you send this staff member to this location on official duty?</li>
-                <li>Are they unable to come to their registered QCC location to check in?</li>
-                <li>Should they be marked as on official duty outside their premises today?</li>
+                {request.request_type === 'checkout' ? (
+                  <>
+                    <li>Is the staff member currently checked in and awaiting check‑out?</li>
+                    <li>Is this check‑out being performed on official duty from an off‑premises site?</li>
+                    <li>Do the recorded coordinates match the staff's reported location?</li>
+                  </>
+                ) : (
+                  <>
+                    <li>Did you send this staff member to this location on official duty?</li>
+                    <li>Are they unable to come to their registered QCC location to check in?</li>
+                    <li>Should they be marked as on official duty outside their premises today?</li>
+                  </>
+                )}
               </ul>
             </AlertDescription>
           </Alert>
@@ -235,7 +253,11 @@ export function OffPremisesRequestModal({
             <CheckCircle2 className="h-4 w-4 text-green-600" />
             <AlertTitle className="text-green-900 dark:text-green-300">What Happens If Approved</AlertTitle>
             <AlertDescription className="text-green-800 dark:text-green-400 text-sm mt-1">
-              The staff member will be automatically checked in to their assigned QCC location and marked as working on official duty outside premises. Their actual location will be recorded for audit purposes.
+              {request.request_type === 'checkout' ? (
+                'If approved the staff member will be checked out remotely — the check‑out time and coordinates from the original request will be recorded on their attendance for today.'
+              ) : (
+                'The staff member will be automatically checked in to their assigned QCC location and marked as working on official duty outside premises. Their actual location will be recorded for audit purposes.'
+              )}
             </AlertDescription>
           </Alert>
         </div>
@@ -263,7 +285,7 @@ export function OffPremisesRequestModal({
             className="bg-green-600 hover:bg-green-700 gap-2"
           >
             {isApproving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-            Approve & Check In
+            {request.request_type === 'checkout' ? 'Approve & Check Out' : 'Approve & Check In'}
           </Button>
         </DialogFooter>
       </DialogContent>

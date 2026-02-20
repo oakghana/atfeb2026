@@ -30,39 +30,72 @@ export function useRealTimeLocations() {
   const supabase = createClient()
 
   const fetchLocations = useCallback(async () => {
-    try {
-      console.log("[v0] Real-time locations - Fetching locations")
-      const response = await fetch("/api/attendance/user-location")
-      const result = await response.json()
+    const MAX_RETRIES = 2
+    let attempt = 0
 
-      if (response.ok && result.success) {
-        console.log("[v0] Real-time locations - Fetched", result.data?.length, "locations")
-        setLocations(result.data || [])
-        setUserRole(result.user_role)
-        setIsAssignedLocationOnly(result.assigned_location_only || false)
-        setError(null)
-        setLastUpdate(Date.now())
+    while (attempt <= MAX_RETRIES) {
+      try {
+        console.log("[v0] Real-time locations - Fetching locations (attempt)", attempt + 1)
+        const response = await fetch("/api/attendance/user-location", { credentials: "same-origin" })
 
-        if (result.message) {
-          console.log("[v0] Real-time locations - Message:", result.message)
+        // Try to parse body safely
+        let result: any = {}
+        try {
+          result = await response.json()
+        } catch (e) {
+          console.warn("[v0] Real-time locations - failed to parse response JSON", e)
         }
-      } else {
-        console.error("[v0] Real-time locations - Fetch error:", result.error)
+
+        if (response.ok && result.success) {
+          console.log("[v0] Real-time locations - Fetched", result.data?.length, "locations")
+          setLocations(result.data || [])
+          setUserRole(result.user_role)
+          setIsAssignedLocationOnly(result.assigned_location_only || false)
+          setError(null)
+          setLastUpdate(Date.now())
+          return
+        }
+
+        // Handle authentication / authorization specially
+        if (response.status === 401) {
+          console.warn("[v0] Real-time locations - Unauthenticated (401). User session may have expired.")
+          setError("Not authenticated — please sign in again")
+          setLocations([])
+          return
+        }
+
         if (response.status === 403) {
+          console.warn("[v0] Real-time locations - Access forbidden (403)")
           setError("Location access restricted to administrators")
           setLocations([])
-        } else if (response.status === 404) {
+          return
+        }
+
+        if (response.status === 404) {
           setError("User profile not found. Please contact your administrator.")
           setLocations([])
-        } else {
-          setError(result.error || result.message || "Failed to fetch locations")
+          return
         }
+
+        // Other non-OK responses — surface server message if present
+        const errMsg = result?.error || result?.message || `HTTP ${response.status}`
+        console.error("[v0] Real-time locations - Fetch error:", errMsg)
+        setError(errMsg)
+        setLocations([])
+        return
+      } catch (err: any) {
+        console.error("[v0] Real-time locations - Exception while fetching locations:", err?.message || err)
+        attempt += 1
+        if (attempt > MAX_RETRIES) {
+          setError("Failed to fetch locations — network or server error")
+          setLocations([])
+          break
+        }
+        // small backoff
+        await new Promise((res) => setTimeout(res, 500 * attempt))
+      } finally {
+        setLoading(false)
       }
-    } catch (err) {
-      console.error("[v0] Real-time locations - Exception:", err)
-      setError("Failed to fetch locations")
-    } finally {
-      setLoading(false)
     }
   }, [])
 

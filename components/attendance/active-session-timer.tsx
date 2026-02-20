@@ -20,6 +20,8 @@ interface ActiveSessionTimerProps {
   isCheckingOut?: boolean
   userDepartment?: { code?: string | null; name?: string | null } | undefined | null
   userRole?: string | null
+  // New: indicates the user was checked in via an approved off‑premises request
+  isOffPremisesCheckedIn?: boolean
 }
 
 export function ActiveSessionTimer({
@@ -34,6 +36,7 @@ export function ActiveSessionTimer({
   isCheckingOut = false,
   userDepartment,
   userRole,
+  isOffPremisesCheckedIn = false,
 }: ActiveSessionTimerProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [timeUntilCheckout, setTimeUntilCheckout] = useState<{
@@ -137,31 +140,62 @@ export function ActiveSessionTimer({
         </div>
 
         {/* Checkout Button - Show when ready */}
-        {timeUntilCheckout.canCheckout && onCheckOut && (
+        {(timeUntilCheckout.canCheckout || isOffPremisesCheckedIn) && onCheckOut && (
           <Button
             onClick={onCheckOut}
-            disabled={!canCheckOut || isCheckingOut || !canCheckOutAtTime(new Date(), userDepartment, userRole)}
+            // once the minimum work period has elapsed we allow checkout regardless of the 6pm deadline
+            // allow checkout if location is valid OR the user has met time/remote conditions
+            disabled={
+              isCheckingOut ||
+              !(
+                canCheckOut ||
+                canCheckOutAtTime(new Date(), userDepartment, userRole) ||
+                timeUntilCheckout.canCheckout ||
+                isOffPremisesCheckedIn
+              )
+            }
             variant="destructive"
             className="w-full transition-all duration-300 bg-red-600 hover:bg-red-700 text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
             size="lg"
-            title={!canCheckOutAtTime(new Date(), userDepartment, userRole) ? `Check-out only allowed before ${getCheckOutDeadline()}` : "Check out from your location"}
+            title={
+              // explain why button is disabled if still blocked by time restrictions
+              !(canCheckOut || canCheckOutAtTime(new Date(), userDepartment, userRole) || timeUntilCheckout.canCheckout || isOffPremisesCheckedIn)
+                ? `Check-out only allowed before ${getCheckOutDeadline()} or after minimum work period of ${minimumWorkMinutes} minutes or if in range`
+                : isOffPremisesCheckedIn
+                ? "Off‑premises checkout allowed — will be recorded as remote"
+                : "Check out from your location"
+            }
           >
             {isCheckingOut ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Checking Out...
+                {isOffPremisesCheckedIn ? 'Checking Out (Off‑Premises)...' : 'Checking Out...'}
               </>
             ) : (
               <>
                 <LogOut className="mr-2 h-5 w-5" />
-                Check Out Now
+                {isOffPremisesCheckedIn ? 'Off‑Premises Check Out' : 'Check Out Now'}
               </>
             )}
           </Button>
         )}
 
         {/* Countdown Timer */}
-        {!timeUntilCheckout.canCheckout ? (
+        {(timeUntilCheckout.canCheckout || isOffPremisesCheckedIn) ? (
+          <div className="rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/60 dark:to-emerald-900/60 border border-green-200 dark:border-green-500/50 p-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-green-500 rounded-full p-2">
+                <Clock className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-green-900 dark:text-green-100">Ready to check out</p>
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  {isOffPremisesCheckedIn ? 'Off‑premises checkout allowed — will be recorded as remote.' : 'You can now check out from your location'}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
           <div className="rounded-lg bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/60 dark:to-amber-900/60 border border-orange-200 dark:border-orange-500/50 p-4">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
@@ -181,20 +215,6 @@ export function ActiveSessionTimer({
                   <span className="w-12">{String(timeUntilCheckout.seconds).padStart(2, "0")}</span>
                 </div>
                 <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">until checkout available</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/60 dark:to-emerald-900/60 border border-green-200 dark:border-green-500/50 p-4">
-            <div className="flex items-center gap-3">
-              <div className="bg-green-500 rounded-full p-2">
-                <Clock className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="font-semibold text-green-900 dark:text-green-100">Ready to check out</p>
-                <p className="text-sm text-green-700 dark:text-green-300">
-                  You can now check out from your location
-                </p>
               </div>
             </div>
           </div>
