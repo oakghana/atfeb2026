@@ -1,10 +1,16 @@
 /** @type {import('next').NextConfig} */
+
+// Force Next.js to use webpack instead of Turbopack
+// This completely bypasses the Turbopack "Next.js package not found" crash bug
+process.env.NEXT_SKIP_TURBOPACK_TESTS = "true"
+process.env.TURBOPACK = "false"
+
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
   images: {
-    unoptimized: false, // Enable image optimization
+    unoptimized: false,
     formats: ['image/webp', 'image/avif'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
@@ -33,7 +39,7 @@ const nextConfig = {
       'recharts',
       'date-fns',
     ],
-    optimizeCss: false, // Disabled to avoid critters dependency
+    optimizeCss: false,
   },
 }
 

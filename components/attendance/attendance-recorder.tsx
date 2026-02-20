@@ -88,6 +88,9 @@ interface AttendanceRecorderProps {
     check_out_location_name?: string
     is_remote_location?: boolean
     different_checkout_location?: boolean
+    off_premises_request_id?: string // NEW: Link to off-premises request
+    approval_status?: "pending_supervisor_approval" | "approved_offpremises" | "normal_checkin" // NEW: Approval status
+    on_official_duty_outside_premises?: boolean // NEW: Flag for off-premises duty
   } | null
   geoSettings?: GeoSettings
   locations?: GeofenceLocation[]
@@ -364,6 +367,50 @@ export function AttendanceRecorder({
     !localTodayAttendance?.check_out_time &&
     !isOnLeave &&
     locationValidation?.canCheckOut === true // MUST be within proximity range (with null check)
+
+  // SMART CHECKOUT BUTTON LOGIC - Show only ONE button type
+  const isOffPremisesApproved = localTodayAttendance?.approval_status === "approved_offpremises"
+  const isOffPremisesPending = localTodayAttendance?.approval_status === "pending_supervisor_approval"
+  const isAtQCCLocation = locationValidation?.canCheckOut === true && !localTodayAttendance?.on_official_duty_outside_premises
+  
+  const shouldShowOffPremisesCheckout = isOffPremisesApproved && !isAtQCCLocation
+  const shouldShowNormalCheckout = canCheckOutButton && (!isOffPremisesApproved || isAtQCCLocation)
+  const shouldDisableCheckout = isOffPremisesPending // Disable checkout while waiting for approval
+
+  const handleOffPremisesCheckout = async () => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/attendance/offpremises-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userProfile?.id,
+          checkout_location: userLocation,
+          device_info: getDeviceInfo(),
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || result.message || "Failed to checkout off-premises")
+      }
+
+      setSuccess(result.message || "Off-premises checkout recorded successfully")
+      
+      // Refetch attendance data to update UI
+      setTimeout(() => {
+        window.location.reload()
+      }, 1500)
+    } catch (err: any) {
+      console.error("[v0] Off-premises checkout error:", err)
+      setError(err.message || "Failed to checkout")
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleQRScanSuccess = async (qrData: QRCodeData) => {
     console.log("[v0] QR scan successful, mode:", qrScanMode)
@@ -1794,6 +1841,8 @@ export function AttendanceRecorder({
                     isCheckingOut={isLoading}
                     userDepartment={userProfile?.departments}
                     userRole={userProfile?.role}
+                    isAtQCCLocation={locationValidation?.canCheckOut === true && !localTodayAttendance?.on_official_duty_outside_premises}
+                    hasApprovedOffPremises={localTodayAttendance?.approval_status === "approved_offpremises"}
                   />
                 )
               })()
@@ -1939,8 +1988,8 @@ export function AttendanceRecorder({
         </div>
       )}
 
-      {/* Checkout button - Always visible when checked in */}
-      {localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time && (
+      {/* Checkout button - Only show when outside QCC location (off-premises) or when ActiveSessionTimer button shouldn't show */}
+      {localTodayAttendance?.check_in_time && !localTodayAttendance?.check_out_time && (!isAtQCCLocation || localTodayAttendance?.on_official_duty_outside_premises) && (
         <>
           <Button
             onClick={handleCheckOut}

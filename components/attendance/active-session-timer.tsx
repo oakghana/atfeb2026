@@ -20,6 +20,8 @@ interface ActiveSessionTimerProps {
   isCheckingOut?: boolean
   userDepartment?: { code?: string | null; name?: string | null } | undefined | null
   userRole?: string | null
+  isAtQCCLocation?: boolean // NEW: Track if user is at a QCC location
+  hasApprovedOffPremises?: boolean // NEW: Track if user has approved off-premises request
 }
 
 export function ActiveSessionTimer({
@@ -34,6 +36,8 @@ export function ActiveSessionTimer({
   isCheckingOut = false,
   userDepartment,
   userRole,
+  isAtQCCLocation = true, // Default to true for normal checkin
+  hasApprovedOffPremises = false, // Default to false
 }: ActiveSessionTimerProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [timeUntilCheckout, setTimeUntilCheckout] = useState<{
@@ -136,8 +140,8 @@ export function ActiveSessionTimer({
           </div>
         </div>
 
-        {/* Checkout Button - Show when ready */}
-        {timeUntilCheckout.canCheckout && onCheckOut && (
+        {/* Checkout Button - ONLY show when at QCC location (not for off-premises) */}
+        {timeUntilCheckout.canCheckout && onCheckOut && isAtQCCLocation && (
           <Button
             onClick={onCheckOut}
             disabled={!canCheckOut || isCheckingOut || !canCheckOutAtTime(new Date(), userDepartment, userRole)}

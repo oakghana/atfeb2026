@@ -82,29 +82,90 @@ export async function POST(request: NextRequest) {
       status: "pending",
     })
 
+    // Insert with only the core required fields first
+    const insertPayload: any = {
+      user_id,
+      current_location_name: current_location.name,
+      latitude: current_location.latitude,
+      longitude: current_location.longitude,
+      accuracy: current_location.accuracy,
+      device_info: device_info,
+      status: "pending",
+    }
+    
+    // Add optional fields if columns exist
+    if (current_location.display_name) {
+      insertPayload.google_maps_name = current_location.display_name
+    }
+    if (reason) {
+      insertPayload.reason = reason
+    }
+    
+    console.log("[v0] Insert payload:", insertPayload)
+    
     const { data: requestRecord, error: insertError } = await supabase
       .from("pending_offpremises_checkins")
+      .insert(insertPayload)
+      .select()
+      .single()
+
+    console.log("[v0] Insert result:", { insertError, hasData: !!requestRecord, recordId: requestRecord?.id })
+
+    if (insertError) {
+      console.error("[v0] Failed to store pending check-in:", {
+        message: insertError.message,
+        code: insertError.code,
+        details: insertError.details,
+        hint: insertError.hint,
+      })
+      return NextResponse.json(
+        { 
+          success: false,
+          error: "Failed to process request: " + insertError.message,
+          errorCode: insertError.code,
+          errorDetails: insertError.details 
+        },
+        { status: 500 }
+      )
+    }
+
+    if (!requestRecord || !requestRecord.id) {
+      console.error("[v0] Request stored but no ID returned from database")
+      return NextResponse.json(
+        { error: "Request was not properly saved - no record returned from database" },
+        { status: 500 }
+      )
+    }
+
+    console.log("[v0] Request stored successfully:", requestRecord.id)
+
+    // CREATE TEMPORARY ATTENDANCE RECORD WITH PENDING APPROVAL STATUS
+    const today = new Date().toISOString().split('T')[0]
+    const { data: tempAttendanceRecord, error: attendanceError } = await supabase
+      .from("attendance_records")
       .insert({
         user_id,
-        current_location_name: current_location.name,
-        latitude: current_location.latitude,
-        longitude: current_location.longitude,
-        accuracy: current_location.accuracy,
+        attendance_date: today,
+        check_in_time: new Date().toISOString(),
+        location_id: null, // Not at a QCC location
+        check_in_latitude: current_location.latitude,
+        check_in_longitude: current_location.longitude,
+        check_in_location_name: current_location.name,
+        status: "present", // Mark as present temporarily
+        off_premises_request_id: requestRecord.id,
+        approval_status: "pending_supervisor_approval", // KEY: Indicates pending supervisor review
+        supervisor_approval_remarks: `Off-premises check-in request submitted at ${new Date().toLocaleTimeString()}. Reason: ${reason || 'Not provided'}. Awaiting supervisor approval.`,
+        on_official_duty_outside_premises: false, // Will be set to true if approved
         device_info: device_info,
-        google_maps_name: current_location.display_name || current_location.name,
-        status: "pending",
       })
       .select()
       .single()
 
-    console.log("[v0] Insert result:", { insertError, hasData: !!requestRecord })
-
-    if (insertError) {
-      console.error("[v0] Failed to store pending check-in:", insertError)
-      return NextResponse.json(
-        { error: "Failed to process request: " + insertError.message },
-        { status: 500 }
-      )
+    if (attendanceError) {
+      console.warn("[v0] Failed to create temporary attendance record:", attendanceError)
+      // Log warning but don't fail - the request is still valid
+    } else {
+      console.log("[v0] Temporary attendance record created:", tempAttendanceRecord?.id)
     }
 
     console.log("[v0] Request stored successfully:", requestRecord.id)

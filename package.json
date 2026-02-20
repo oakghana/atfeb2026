@@ -3,8 +3,8 @@
   "version": "2.1.23.26",
   "private": true,
   "scripts": {
-    "build": "next build",
-    "dev": "next dev",
+    "build": "TURBOPACK=false next build",
+    "dev": "TURBOPACK=false next dev",
     "lint": "next lint",
     "test": "vitest",
     "start": "next start"
