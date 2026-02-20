@@ -1897,10 +1897,9 @@ export function AttendanceRecorder({
                 const checkInLocationData = realTimeLocations?.find(
                   (loc) => loc.id === localTodayAttendance.check_in_location_id
                 )
-                // Consider them off-premises only while still out of range; once locationValidation allows checkout we revert to normal
-                const wasOffPremises = !!localTodayAttendance?.on_official_duty_outside_premises || !!localTodayAttendance?.is_remote_location
-                const isOffPremisesCheckedIn =
-                  wasOffPremises && !(locationValidation?.canCheckOut === true)
+                // Consider them off-premises only if they cannot checkout (still outside range)
+                // If they are within range (canCheckOut === true), always show regular "Check Out Now" button
+                const isOffPremisesCheckedIn = !(locationValidation?.canCheckOut === true)
 
                 return (
                   <ActiveSessionTimer
