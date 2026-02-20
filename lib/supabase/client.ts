@@ -2,6 +2,18 @@ import { createBrowserClient } from "@supabase/ssr"
 
 let clientInstance: ReturnType<typeof createBrowserClient> | null = null
 
+// Suppress LockManager warning from Supabase
+if (typeof window !== "undefined") {
+  const originalError = console.error
+  console.error = function (...args: any[]) {
+    // Suppress only the LockManager LockManager warning
+    if (args[0]?.includes?.("Navigator LockManager") || args[0]?.includes?.("@supabase/gotrue-js")) {
+      return
+    }
+    originalError.apply(console, args)
+  }
+}
+
 // Polyfill for LockManager if it doesn't exist
 if (typeof window !== "undefined" && !navigator.locks) {
   ;(navigator as any).locks = {
