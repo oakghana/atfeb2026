@@ -14,9 +14,10 @@ export function createClient() {
 
   clientInstance = createBrowserClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-      persistSession: true,
-      detectSessionInUrl: true,
-      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      persistSession: false,
+      detectSessionInUrl: false,
+      autoRefreshToken: false,
+      shouldInitializeSession: false,
     },
   })
 
