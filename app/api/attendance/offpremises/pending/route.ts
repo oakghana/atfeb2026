@@ -129,40 +129,21 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
 
     // if non-admin manager, restrict to own department or assigned location
-    // Note: Filter based on nested user_profiles data client-side since PostgREST doesn't support OR on nested filters well
     if (managerProfile.role !== 'admin') {
-      // Fetch all records first, then filter client-side
-      const allRes = await queryWithReason
-      if (allRes.error) {
-        console.error('[v0] Failed to fetch off-premises requests:', allRes.error)
-        return NextResponse.json({ error: 'Failed to fetch requests', details: allRes.error.message }, { status: 500 })
-      }
-
       const deptId = managerProfile.department_id
       const locId = managerProfile.assigned_location_id
-      
-      // Filter records based on department_id or assigned_location_id
-      let filteredRequests = allRes.data || []
       if (deptId || locId) {
-        filteredRequests = filteredRequests.filter((req: any) => {
-          const userDept = req.user_profiles?.department_id
-          const userLoc = req.user_profiles?.assigned_location_id
-          return (deptId && userDept === deptId) || (locId && userLoc === locId)
-        })
+        // use PostgREST `or` to combine conditions with proper formatting
+        const conditions: string[] = []
+        if (deptId) conditions.push(`(user_profiles.department_id.eq.${deptId})`)
+        if (locId) conditions.push(`(user_profiles.assigned_location_id.eq.${locId})`)
+        if (conditions.length > 0) {
+          queryWithReason = queryWithReason.or(conditions.join(','))
+        }
       }
-
-      // Apply status filter if needed
-      if (statusFilter !== 'all') {
-        filteredRequests = filteredRequests.filter((req: any) => req.status === statusFilter)
-      }
-
-      return NextResponse.json({
-        requests: filteredRequests || [],
-        count: filteredRequests?.length || 0,
-      })
     }
 
-    // For admin users, apply status filter and handle missing columns gracefully
+    // Apply status filter
     if (statusFilter !== "all") {
       queryWithReason = queryWithReason.eq("status", statusFilter)
     }
