@@ -223,6 +223,7 @@ export function AttendanceRecorder({
 
   const [recentCheckIn, setRecentCheckIn] = useState(false)
   const [recentCheckOut, setRecentCheckOut] = useState(false)
+  const [checkInCountdown, setCheckInCountdown] = useState<number | null>(null)
   const [localTodayAttendance, setLocalTodayAttendance] = useState(initialTodayAttendance)
 
   const [checkoutTimeReached, setCheckoutTimeReached] = useState(false)
@@ -770,6 +771,23 @@ export function AttendanceRecorder({
       })
     }
   }, [userLocation, realTimeLocations, proximitySettings, windowsCapabilities, deviceRadiusSettings])
+
+  // Handle 2-hour countdown timer for off-premises checkout window after check-in
+  useEffect(() => {
+    if (checkInCountdown === null || checkInCountdown === 0) return
+
+    const timer = setInterval(() => {
+      setCheckInCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          clearInterval(timer)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [checkInCountdown])
 
   const fetchUserProfile = async () => {
     try {
@@ -1556,12 +1574,15 @@ export function AttendanceRecorder({
           device_sharing_warning: result.deviceSharingWarning?.message || null
         }
         setLocalTodayAttendance(attendanceWithWarning)
+        
+        // Start 2-hour countdown timer for off-premises checkout window
+        // 2 hours = 7200 seconds
+        setCheckInCountdown(7200)
       }
 
-      setFlashMessage({
-        message: result.message || "Successfully checked in!",
-        type: "success",
-      })
+      // Don't show flash message - let the check-in success state display instead
+      // This provides better UX with comprehensive check-in information
+      setFlashMessage(null)
 
       // Refresh attendance data
       await fetchTodayAttendance()
@@ -1829,6 +1850,68 @@ export function AttendanceRecorder({
             </p>
             <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
               You can view your full attendance history in the reports section.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Check-In Success Card */}
+      {isCheckedIn && !isCheckedOut && (
+        <div className="rounded-lg border-2 border-blue-500 bg-gradient-to-br from-blue-50 via-cyan-50 to-blue-50 dark:from-blue-950/30 dark:via-cyan-950/30 dark:to-blue-950/30 p-6 shadow-lg">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-12 w-12 rounded-full bg-blue-500 flex items-center justify-center">
+              <CheckCircle2 className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-blue-900 dark:text-blue-100">✓ Successfully Checked In!</h3>
+              <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                Your work session has started
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white/60 dark:bg-black/30 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+            <div className="bg-white/50 dark:bg-gray-900/50 rounded-lg p-3">
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Check-In Time</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                {new Date(localTodayAttendance.check_in_time).toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                })}
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                📍 {localTodayAttendance.check_in_location_name}
+              </p>
+            </div>
+
+            <div className="bg-white/50 dark:bg-gray-900/50 rounded-lg p-3">
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Off-Premises Eligible In</p>
+              {checkInCountdown !== null && checkInCountdown > 0 ? (
+                <>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {Math.floor(checkInCountdown / 3600)}:{Math.floor((checkInCountdown % 3600) / 60).toString().padStart(2, "0")}:{(checkInCountdown % 60).toString().padStart(2, "0")}
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    ⏱️ 2-hour countdown timer
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                    Available Now
+                  </p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                    ✓ Off-premises checkout eligible
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 text-center">
+            <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">
+              Welcome back! You can use the "Off-Premises Check Out" option after the 2-hour threshold has been met.
             </p>
           </div>
         </div>
