@@ -1575,6 +1575,12 @@ export function AttendanceRecorder({
     }
   }
 
+  const handleEarlyCheckoutCancel = () => {
+    setShowEarlyCheckoutDialog(false)
+    setEarlyCheckoutReason("")
+    setIsCheckingOut(false)
+  }
+
   const handleEarlyCheckoutConfirm = async () => {
     const trimmedReason = earlyCheckoutReason.trim()
     
