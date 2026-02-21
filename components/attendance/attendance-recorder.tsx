@@ -310,6 +310,7 @@ export function AttendanceRecorder({
   const [refreshTimer, setRefreshTimer] = useState<number | null>(null)
 
   const [minutesUntilCheckout, setMinutesUntilCheckout] = useState<number | null>(null)
+  const [checkInCountdown, setCheckInCountdown] = useState<number | null>(null)
 
   const fetchTodayAttendance = async () => {
     try {
@@ -1461,6 +1462,23 @@ export function AttendanceRecorder({
     }
   }
 
+  // Handle 2-hour countdown timer for off-premises checkout eligibility
+  useEffect(() => {
+    if (checkInCountdown === null || checkInCountdown === 0) return
+
+    const timer = setInterval(() => {
+      setCheckInCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          clearInterval(timer)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [checkInCountdown])
+
   // Extracted check-in API call for lateness dialog flow
   const performCheckInAPI = async (locationData: any, nearestLocation: any, reason: string) => {
     try {
@@ -1537,6 +1555,10 @@ export function AttendanceRecorder({
           device_sharing_warning: result.deviceSharingWarning?.message || null
         }
         setLocalTodayAttendance(attendanceWithWarning)
+        
+        // Start 2-hour countdown timer for off-premises checkout eligibility
+        // 2 hours = 7200 seconds
+        setCheckInCountdown(7200)
       }
 
       setFlashMessage({
@@ -1892,6 +1914,7 @@ export function AttendanceRecorder({
                     userDepartment={userProfile?.departments}
                     userRole={userProfile?.role}
                     isOffPremisesCheckedIn={isOffPremisesCheckedIn}
+                    checkInCountdown={checkInCountdown}
                   />
                 )
               })()
