@@ -903,6 +903,7 @@ export function AttendanceRecorder({
   }
 
   const handleCheckIn = async () => {
+    console.log("[v0] *** BUTTON CLICKED - handleCheckIn invoked ***")
     console.log("[v0] Check-in initiated")
 
     if (isCheckInProcessing) {
@@ -1941,6 +1942,7 @@ export function AttendanceRecorder({
 
             {/* Check-in/Check-out Buttons */}
             <div className="space-y-4">
+              {console.log("[v0] Rendering buttons section:", { localTodayAttendance, hasCheckInTime: !!localTodayAttendance?.check_in_time })}
               {!localTodayAttendance?.check_in_time && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
