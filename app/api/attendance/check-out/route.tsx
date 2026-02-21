@@ -519,22 +519,11 @@ export async function POST(request: NextRequest) {
       checkoutData.early_checkout_reason = early_checkout_reason
     }
 
-    const { data: updatedRecord, error: updateError } = await supabase
+    // First, perform the update without joins (to avoid foreign key relationship errors)
+    const { error: updateError } = await supabase
       .from("attendance_records")
       .update(checkoutData)
       .eq("id", attendanceRecord.id)
-      .select(`
-        *,
-        geofence_locations!check_in_location_id (
-          name,
-          address
-        ),
-        checkout_location:geofence_locations!check_out_location_id (
-          name,
-          address
-        )
-      `)
-      .single()
 
     if (updateError) {
       console.error("[v0] Update error:", updateError)
@@ -546,6 +535,25 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json({ error: "Failed to record check-out", dbError: devDetails }, { status: 500 })
+    }
+
+    // Then, fetch the updated record separately
+    const { data: updatedRecord, error: fetchError } = await supabase
+      .from("attendance_records")
+      .select("*")
+      .eq("id", attendanceRecord.id)
+      .single()
+
+    if (fetchError || !updatedRecord) {
+      console.error("[v0] Fetch error after update:", fetchError)
+      // Still consider this a success since the update happened
+      return NextResponse.json({
+        success: true,
+        earlyCheckoutWarning,
+        deviceSharingWarning,
+        data: { ...checkoutData, id: attendanceRecord.id },
+        message: `Successfully checked out. Work hours: ${(Math.round(checkoutData.work_hours * 100) / 100).toFixed(2)}`,
+      })
     }
 
     try {

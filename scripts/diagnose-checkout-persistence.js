@@ -18,21 +18,12 @@ async function diagnoseCheckoutIssue() {
     const today = new Date().toISOString().split("T")[0];
     console.log(`[v0] Checking attendance records for today: ${today}\n`);
 
-    // Fetch today's attendance records
+    // Fetch today's attendance records (without join to avoid relationship errors)
     const { data: records, error } = await supabase
       .from("attendance_records")
-      .select(`
-        id,
-        user_id,
-        check_in_time,
-        check_out_time,
-        work_hours,
-        check_in_location_name,
-        check_out_location_name,
-        is_remote_checkout,
-        check_out_method,
-        user_profiles(id, first_name, last_name, employee_id)
-      `)
+      .select(
+        "id, user_id, check_in_time, check_out_time, work_hours, check_in_location_name, check_out_location_name, is_remote_checkout, check_out_method"
+      )
       .gte("check_in_time", `${today}T00:00:00`)
       .lte("check_in_time", `${today}T23:59:59`)
       .order("check_in_time", { ascending: false });
@@ -50,10 +41,8 @@ async function diagnoseCheckoutIssue() {
     console.log(`[v0] Found ${records.length} attendance record(s) for today:\n`);
 
     records.forEach((record, index) => {
-      const userName = record.user_profiles
-        ? `${record.user_profiles.first_name} ${record.user_profiles.last_name}`
-        : "Unknown";
-      const employeeId = record.user_profiles?.employee_id || "N/A";
+      const userName = `User ID: ${record.user_id}`;
+      const employeeId = record.user_id;
 
       console.log(`[v0] Record ${index + 1}:`);
       console.log(`   - User: ${userName} (ID: ${employeeId})`);
