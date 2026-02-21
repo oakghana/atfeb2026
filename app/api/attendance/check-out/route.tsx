@@ -524,18 +524,41 @@ export async function POST(request: NextRequest) {
       adminSupabase = null
     }
 
-    // Try to update with admin client first, then fallback to regular client
-    const clientToUse = adminSupabase || supabase
-    console.log("[v0] Using", adminSupabase ? "admin" : "regular", "client for checkout update")
+    // CRITICAL: Always use admin client for checkout updates
+    // The regular client with ANON key cannot bypass RLS to update check_out_time
+    let adminSupabase
+    try {
+      adminSupabase = await createAdminClient()
+      if (!adminSupabase) {
+        throw new Error("Admin client creation returned null/undefined")
+      }
+      console.log("[v0] Admin client created successfully for checkout")
+    } catch (adminClientError) {
+      console.error("[v0] CRITICAL: Failed to create admin client for checkout:", adminClientError)
+      console.error("[v0] SUPABASE_SERVICE_ROLE_KEY available:", !!process.env.SUPABASE_SERVICE_ROLE_KEY)
+      // Do NOT fallback to regular client for checkout - it won't work due to RLS
+      return NextResponse.json(
+        {
+          error: "Critical: Unable to initialize checkout - database access denied",
+          details: process.env.NODE_ENV !== "production" ? adminClientError instanceof Error ? adminClientError.message : String(adminClientError) : undefined,
+        },
+        { status: 500 },
+      )
+    }
 
-    const { error: updateError, data: updateData } = await clientToUse
+    const { error: updateError, data: updateData } = await adminSupabase
       .from("attendance_records")
       .update(checkoutData)
       .eq("id", attendanceRecord.id)
       .select("*")
       .single()
 
-    console.log("[v0] Checkout update result:", { error: updateError, hasData: !!updateData, id: attendanceRecord.id })
+    console.log("[v0] Checkout update result:", { 
+      error: updateError, 
+      hasData: !!updateData, 
+      id: attendanceRecord.id,
+      checkoutTimeInResponse: updateData?.check_out_time
+    })
 
     if (updateError) {
       console.error("[v0] Update error:", updateError)
