@@ -68,14 +68,11 @@ export function requiresLatenessReason(date: Date = new Date(), dept?: DeptInfo,
  * Returns true when an early-checkout reason should be enforced.
  * - Enforced only when location-level flag is true and it's not a weekend
  * - Department heads and regional managers are exempt
- * - NOT enforced if staff has worked more than 9 hours on an active QCC location
  */
-export function requiresEarlyCheckoutReason(date: Date = new Date(), locationRequires: boolean = true, role?: string | null, workHours?: number): boolean {
+export function requiresEarlyCheckoutReason(date: Date = new Date(), locationRequires: boolean = true, role?: string | null): boolean {
   if (!locationRequires) return false
   if (isWeekend(date)) return false
   if (isExemptFromAttendanceReasons(role)) return false
-  // If staff has worked more than 9 hours, no reason required for early checkout
-  if (workHours && workHours > 9) return false
   return true
 }
 

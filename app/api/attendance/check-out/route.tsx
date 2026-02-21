@@ -453,7 +453,7 @@ export async function POST(request: NextRequest) {
     // Get location-specific checkout end time (default to 17:00 if not set)
     const checkOutEndTime = userProfileData?.assigned_location?.check_out_end_time || "17:00"
     const requireEarlyCheckoutReason = userProfileData?.assigned_location?.require_early_checkout_reason ?? true
-    const effectiveRequireEarlyCheckoutReason = requiresEarlyCheckoutReason(checkOutTime, requireEarlyCheckoutReason, userProfileData?.role, workHours)
+    const effectiveRequireEarlyCheckoutReason = requiresEarlyCheckoutReason(checkOutTime, requireEarlyCheckoutReason, userProfileData?.role)
     
     // Parse checkout end time (HH:MM format)
     const [endHour, endMinute] = checkOutEndTime.split(":").map(Number)

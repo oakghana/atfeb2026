@@ -1334,15 +1334,11 @@ export function AttendanceRecorder({
       const checkoutHour = now.getHours()
       const checkoutMinutes = now.getMinutes()
       
-      // Calculate work hours to determine if reason should be required
-      const checkInTime = new Date(localTodayAttendance?.check_in_time || now)
-      const workHours = (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
-      
       // Fetch location-specific working hours configuration
       const assignedLocation = realTimeLocations?.find(loc => loc.id === userProfile?.assigned_location_id)
       const checkOutEndTime = assignedLocation?.check_out_end_time || "17:00"
       const requireEarlyCheckoutReason = assignedLocation?.require_early_checkout_reason ?? true
-      const effectiveRequireEarlyCheckoutReason = requiresEarlyCheckoutReason(now, requireEarlyCheckoutReason, userProfile?.role, workHours)
+      const effectiveRequireEarlyCheckoutReason = requiresEarlyCheckoutReason(now, requireEarlyCheckoutReason)
       
       // Parse checkout end time (HH:MM format)
       const [endHour, endMinute] = checkOutEndTime.split(":").map(Number)
