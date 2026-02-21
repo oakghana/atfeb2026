@@ -310,6 +310,7 @@ export function AttendanceRecorder({
   const [refreshTimer, setRefreshTimer] = useState<number | null>(null)
 
   const [minutesUntilCheckout, setMinutesUntilCheckout] = useState<number | null>(null)
+  const [checkInCountdown, setCheckInCountdown] = useState<number | null>(null)
 
   const fetchTodayAttendance = async () => {
     try {
@@ -902,6 +903,7 @@ export function AttendanceRecorder({
   }
 
   const handleCheckIn = async () => {
+    console.log("[v0] *** BUTTON CLICKED - handleCheckIn invoked ***")
     console.log("[v0] Check-in initiated")
 
     if (isCheckInProcessing) {
@@ -1461,8 +1463,39 @@ export function AttendanceRecorder({
     }
   }
 
+  // Handle 2-hour countdown timer for off-premises checkout eligibility
+  useEffect(() => {
+    console.log("[v0] Countdown useEffect triggered with checkInCountdown:", checkInCountdown)
+    if (checkInCountdown === null || checkInCountdown === 0) {
+      console.log("[v0] Countdown timer exit - value is null or 0")
+      return
+    }
+
+    console.log("[v0] Starting countdown interval, will decrement from", checkInCountdown)
+    const timer = setInterval(() => {
+      setCheckInCountdown(prev => {
+        const newValue = (prev || 0) - 1
+        if (newValue % 60 === 0 || newValue <= 5) {
+          console.log("[v0] Countdown timer value:", newValue)
+        }
+        if (prev === null || prev <= 1) {
+          console.log("[v0] Countdown timer finished")
+          clearInterval(timer)
+          return 0
+        }
+        return newValue
+      })
+    }, 1000)
+
+    return () => {
+      console.log("[v0] Cleaning up countdown interval")
+      clearInterval(timer)
+    }
+  }, [checkInCountdown])
+
   // Extracted check-in API call for lateness dialog flow
   const performCheckInAPI = async (locationData: any, nearestLocation: any, reason: string) => {
+    console.log("[v0] *** performCheckInAPI CALLED ***", { locationData, nearestLocation, reason })
     try {
       const deviceInfo = getDeviceInfo()
       const checkInData: any = {
@@ -1476,6 +1509,7 @@ export function AttendanceRecorder({
         lateness_reason: reason || null,
       }
 
+      console.log("[v0] Sending check-in API request with data:", checkInData)
       const response = await fetch("/api/attendance/check-in", {
         method: "POST",
         headers: {
@@ -1528,15 +1562,23 @@ export function AttendanceRecorder({
         return
       }
 
-      console.log("[v0] ✓ Check-in successful")
+      console.log("[v0] ✓ Check-in successful", { resultAttendance: result.attendance })
 
       if (result.attendance) {
+        console.log("[v0] Setting local attendance and countdown timer")
         // Add device sharing warning to the attendance data if present
         const attendanceWithWarning = {
           ...result.attendance,
           device_sharing_warning: result.deviceSharingWarning?.message || null
         }
         setLocalTodayAttendance(attendanceWithWarning)
+        
+        // Start 2-hour countdown timer for off-premises checkout eligibility
+        // 2 hours = 7200 seconds
+        console.log("[v0] *** STARTING COUNTDOWN TIMER - Setting to 7200 seconds ***")
+        setCheckInCountdown(7200)
+      } else {
+        console.log("[v0] ERROR: No attendance data in result!")
       }
 
       setFlashMessage({
@@ -1892,6 +1934,7 @@ export function AttendanceRecorder({
                     userDepartment={userProfile?.departments}
                     userRole={userProfile?.role}
                     isOffPremisesCheckedIn={isOffPremisesCheckedIn}
+                    checkInCountdown={checkInCountdown}
                   />
                 )
               })()
@@ -1899,6 +1942,7 @@ export function AttendanceRecorder({
 
             {/* Check-in/Check-out Buttons */}
             <div className="space-y-4">
+              {console.log("[v0] Rendering buttons section:", { localTodayAttendance, hasCheckInTime: !!localTodayAttendance?.check_in_time })}
               {!localTodayAttendance?.check_in_time && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
