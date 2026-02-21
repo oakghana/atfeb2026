@@ -513,17 +513,6 @@ export async function POST(request: NextRequest) {
       checkoutData.early_checkout_reason = early_checkout_reason
     }
 
-    // Use admin client for UPDATE to bypass RLS policies
-    let adminSupabase
-    try {
-      adminSupabase = await createAdminClient()
-      console.log("[v0] Admin client created successfully for checkout")
-    } catch (adminClientError) {
-      console.error("[v0] Admin client creation failed, will use regular client:", adminClientError)
-      // Fallback: use regular client - the RLS policy should allow updating own record
-      adminSupabase = null
-    }
-
     // CRITICAL: Always use admin client for checkout updates
     // The regular client with ANON key cannot bypass RLS to update check_out_time
     let adminSupabase
