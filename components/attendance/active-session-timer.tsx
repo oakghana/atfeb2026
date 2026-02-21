@@ -83,8 +83,9 @@ export function ActiveSessionTimer({
   const elapsedMinutes = elapsedTime % 60
 
   return (
-    <Card className="border-2 border-green-500/30 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/40 dark:to-emerald-900/40 dark:border-green-500/50">
-      <CardContent className="p-6 space-y-4">
+    <>
+      <Card className="border-2 border-green-500/30 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/40 dark:to-emerald-900/40 dark:border-green-500/50">
+        <CardContent className="p-6 space-y-4">
         {/* Active Session Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
