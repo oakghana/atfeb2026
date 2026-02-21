@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 import { validateCheckoutLocation, type LocationData } from "@/lib/geolocation"
 import { requiresEarlyCheckoutReason, canCheckOutAtTime, getCheckOutDeadline } from "@/lib/attendance-utils"
@@ -38,13 +38,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle(),
       supabase
         .from("attendance_records")
-        .select(`
-          *,
-          geofence_locations!check_in_location_id (
-            name,
-            address
-          )
-        `)
+        .select("*")
         .eq("user_id", user.id)
         .gte("check_in_time", `${today}T00:00:00`)
         .lt("check_in_time", `${today}T23:59:59`)
@@ -519,22 +513,20 @@ export async function POST(request: NextRequest) {
       checkoutData.early_checkout_reason = early_checkout_reason
     }
 
-    const { data: updatedRecord, error: updateError } = await supabase
+    // Use authenticated client - RLS policies allow users to update their own attendance
+    const { error: updateError, data: updateData } = await supabase
       .from("attendance_records")
       .update(checkoutData)
       .eq("id", attendanceRecord.id)
-      .select(`
-        *,
-        geofence_locations!check_in_location_id (
-          name,
-          address
-        ),
-        checkout_location:geofence_locations!check_out_location_id (
-          name,
-          address
-        )
-      `)
+      .select("*")
       .single()
+
+    console.log("[v0] Checkout update result:", { 
+      error: updateError, 
+      hasData: !!updateData, 
+      id: attendanceRecord.id,
+      checkoutTimeInResponse: updateData?.check_out_time
+    })
 
     if (updateError) {
       console.error("[v0] Update error:", updateError)
@@ -546,6 +538,33 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json({ error: "Failed to record check-out", dbError: devDetails }, { status: 500 })
+    }
+
+    console.log("[v0] Checkout update successful for attendance record:", attendanceRecord.id)
+
+    // Use the updated record from the response if available, otherwise fetch it
+    let updatedRecord = updateData
+    
+    if (!updatedRecord) {
+      const { data: fetchedRecord, error: fetchError } = await supabase
+        .from("attendance_records")
+        .select("*")
+        .eq("id", attendanceRecord.id)
+        .single()
+
+      if (fetchError) {
+        console.error("[v0] Fetch error after update:", fetchError)
+        // Still consider this a success since the update happened
+        return NextResponse.json({
+          success: true,
+          earlyCheckoutWarning,
+          deviceSharingWarning,
+          data: { ...checkoutData, id: attendanceRecord.id },
+          message: `Successfully checked out. Work hours: ${(Math.round(checkoutData.work_hours * 100) / 100).toFixed(2)}`,
+        })
+      }
+      
+      updatedRecord = fetchedRecord
     }
 
     try {

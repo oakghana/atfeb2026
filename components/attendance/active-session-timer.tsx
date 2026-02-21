@@ -4,7 +4,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Clock, MapPin, Timer, Calendar, LogOut, Loader2 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { CheckoutSuccessModal } from "./checkout-success-modal"
+import { useState, useCallback, useEffect } from "react"
 import { formatDistanceToNow } from "date-fns"
 import { canCheckOutAtTime, getCheckOutDeadline } from "@/lib/attendance-utils"
 
@@ -39,6 +40,14 @@ export function ActiveSessionTimer({
   isOffPremisesCheckedIn = false,
 }: ActiveSessionTimerProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successData, setSuccessData] = useState<{
+    checkoutTime: string
+    checkoutLocation: string
+    workHours: number
+    workMinutes: number
+    isRemoteCheckout: boolean
+  } | null>(null)
   const [timeUntilCheckout, setTimeUntilCheckout] = useState<{
     hours: number
     minutes: number
@@ -74,8 +83,9 @@ export function ActiveSessionTimer({
   const elapsedMinutes = elapsedTime % 60
 
   return (
-    <Card className="border-2 border-green-500/30 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/40 dark:to-emerald-900/40 dark:border-green-500/50">
-      <CardContent className="p-6 space-y-4">
+    <>
+      <Card className="border-2 border-green-500/30 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/40 dark:to-emerald-900/40 dark:border-green-500/50">
+        <CardContent className="p-6 space-y-4">
         {/* Active Session Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -267,5 +277,17 @@ export function ActiveSessionTimer({
         </div>
       </CardContent>
     </Card>
-  )
+
+    {/* Success Modal */}
+    <CheckoutSuccessModal
+      open={showSuccessModal}
+      onOpenChange={setShowSuccessModal}
+      checkoutTime={successData?.checkoutTime || ""}
+      checkoutLocation={successData?.checkoutLocation || ""}
+      workHours={successData?.workHours || 0}
+      workMinutes={successData?.workMinutes || 0}
+      isRemoteCheckout={successData?.isRemoteCheckout || false}
+    />
+  </>
+)
 }

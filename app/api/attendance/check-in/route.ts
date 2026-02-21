@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 import { requiresLatenessReason, canCheckInAtTime, getCheckInDeadline } from "@/lib/attendance-utils"
 
@@ -567,11 +567,14 @@ export async function POST(request: NextRequest) {
       attendanceData.is_remote_location = true
     }
 
+    // Use authenticated client - RLS policies allow users to insert their own attendance
     const { data: attendanceRecord, error: attendanceError } = await supabase
       .from("attendance_records")
       .insert(attendanceData)
       .select("*")
       .single()
+
+    console.log("[v0] Check-in insert result:", { error: attendanceError, hasData: !!attendanceRecord })
 
     // Calculate check-in position for the location today
     let checkInPosition = null

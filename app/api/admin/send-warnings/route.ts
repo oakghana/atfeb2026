@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: profile } = await supabase.from("user_profiles").select("*").eq("id", user.id).single()
+    const { data: profile } = await supabase.from("user_profiles").select("id, role, email").eq("id", user.id).single()
 
     if (!profile || !["admin", "regional_manager", "department_head"].includes(profile.role)) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
