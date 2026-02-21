@@ -38,13 +38,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle(),
       supabase
         .from("attendance_records")
-        .select(`
-          *,
-          geofence_locations!check_in_location_id (
-            name,
-            address
-          )
-        `)
+        .select("*")
         .eq("user_id", user.id)
         .gte("check_in_time", `${today}T00:00:00`)
         .lt("check_in_time", `${today}T23:59:59`)
