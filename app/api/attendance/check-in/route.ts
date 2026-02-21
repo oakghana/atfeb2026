@@ -567,12 +567,26 @@ export async function POST(request: NextRequest) {
       attendanceData.is_remote_location = true
     }
 
-    const adminSupabase = await createAdminClient()
-    const { data: attendanceRecord, error: attendanceError } = await adminSupabase
+    let adminSupabase
+    try {
+      adminSupabase = await createAdminClient()
+      console.log("[v0] Admin client created successfully for check-in")
+    } catch (adminClientError) {
+      console.error("[v0] Admin client creation failed, will use regular client:", adminClientError)
+      adminSupabase = null
+    }
+
+    // Try with admin client first, fallback to regular client
+    const clientToUse = adminSupabase || supabase
+    console.log("[v0] Using", adminSupabase ? "admin" : "regular", "client for check-in insert")
+
+    const { data: attendanceRecord, error: attendanceError } = await clientToUse
       .from("attendance_records")
       .insert(attendanceData)
       .select("*")
       .single()
+
+    console.log("[v0] Check-in insert result:", { error: attendanceError, hasData: !!attendanceRecord })
 
     // Calculate check-in position for the location today
     let checkInPosition = null

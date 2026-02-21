@@ -514,11 +514,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Use admin client for UPDATE to bypass RLS policies
-    const adminSupabase = await createAdminClient()
-    const { error: updateError } = await adminSupabase
+    let adminSupabase
+    try {
+      adminSupabase = await createAdminClient()
+      console.log("[v0] Admin client created successfully for checkout")
+    } catch (adminClientError) {
+      console.error("[v0] Admin client creation failed, will use regular client:", adminClientError)
+      // Fallback: use regular client - the RLS policy should allow updating own record
+      adminSupabase = null
+    }
+
+    // Try to update with admin client first, then fallback to regular client
+    const clientToUse = adminSupabase || supabase
+    console.log("[v0] Using", adminSupabase ? "admin" : "regular", "client for checkout update")
+
+    const { error: updateError, data: updateData } = await clientToUse
       .from("attendance_records")
       .update(checkoutData)
       .eq("id", attendanceRecord.id)
+      .select("*")
+      .single()
+
+    console.log("[v0] Checkout update result:", { error: updateError, hasData: !!updateData, id: attendanceRecord.id })
 
     if (updateError) {
       console.error("[v0] Update error:", updateError)
@@ -532,23 +549,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to record check-out", dbError: devDetails }, { status: 500 })
     }
 
-    // Then, fetch the updated record separately
-    const { data: updatedRecord, error: fetchError } = await supabase
-      .from("attendance_records")
-      .select("*")
-      .eq("id", attendanceRecord.id)
-      .single()
+    console.log("[v0] Checkout update successful for attendance record:", attendanceRecord.id)
 
-    if (fetchError || !updatedRecord) {
-      console.error("[v0] Fetch error after update:", fetchError)
-      // Still consider this a success since the update happened
-      return NextResponse.json({
-        success: true,
-        earlyCheckoutWarning,
-        deviceSharingWarning,
-        data: { ...checkoutData, id: attendanceRecord.id },
-        message: `Successfully checked out. Work hours: ${(Math.round(checkoutData.work_hours * 100) / 100).toFixed(2)}`,
-      })
+    // Use the updated record from the response if available, otherwise fetch it
+    let updatedRecord = updateData
+    
+    if (!updatedRecord) {
+      const { data: fetchedRecord, error: fetchError } = await supabase
+        .from("attendance_records")
+        .select("*")
+        .eq("id", attendanceRecord.id)
+        .single()
+
+      if (fetchError) {
+        console.error("[v0] Fetch error after update:", fetchError)
+        // Still consider this a success since the update happened
+        return NextResponse.json({
+          success: true,
+          earlyCheckoutWarning,
+          deviceSharingWarning,
+          data: { ...checkoutData, id: attendanceRecord.id },
+          message: `Successfully checked out. Work hours: ${(Math.round(checkoutData.work_hours * 100) / 100).toFixed(2)}`,
+        })
+      }
+      
+      updatedRecord = fetchedRecord
     }
 
     try {
