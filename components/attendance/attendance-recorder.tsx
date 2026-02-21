@@ -1456,14 +1456,9 @@ export function AttendanceRecorder({
         setRecentCheckOut(true)
         setTimeout(() => setRecentCheckOut(false), 3000)
 
-        const checkInTime = new Date(result.data.check_in_time)
-        const checkOutTime = new Date(result.data.check_out_time)
-        const workHours = ((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)).toFixed(2)
-
-        setFlashMessage({
-          message: `Successfully checked out from ${result.data.check_out_location_name}! Great work today. Total work hours: ${workHours} hours. See you tomorrow!`,
-          type: "success",
-        })
+        // Don't show flash message - let the attendance completion card display instead
+        // This provides a better UX with comprehensive checkout information
+        setFlashMessage(null)
 
         setEarlyCheckoutReason("")
         setPendingCheckoutData(null)
