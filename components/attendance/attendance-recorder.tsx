@@ -1464,28 +1464,19 @@ export function AttendanceRecorder({
 
   // Handle 2-hour countdown timer for off-premises checkout eligibility
   useEffect(() => {
-    console.log("[v0] Countdown timer effect triggered:", { checkInCountdown })
-    if (checkInCountdown === null || checkInCountdown === 0) {
-      console.log("[v0] Countdown timer exit condition met:", { checkInCountdown })
-      return
-    }
+    if (checkInCountdown === null || checkInCountdown === 0) return
 
     const timer = setInterval(() => {
       setCheckInCountdown(prev => {
-        console.log("[v0] Countdown decremented from", prev, "to", (prev || 1) - 1)
         if (prev === null || prev <= 1) {
-          console.log("[v0] Countdown timer finished")
           clearInterval(timer)
           return 0
         }
-        return (prev || 0) - 1
+        return prev - 1
       })
     }, 1000)
 
-    return () => {
-      console.log("[v0] Cleaning up countdown timer")
-      clearInterval(timer)
-    }
+    return () => clearInterval(timer)
   }, [checkInCountdown])
 
   // Extracted check-in API call for lateness dialog flow
@@ -1558,7 +1549,6 @@ export function AttendanceRecorder({
       console.log("[v0] ✓ Check-in successful")
 
       if (result.attendance) {
-        console.log("[v0] Setting local attendance:", result.attendance)
         // Add device sharing warning to the attendance data if present
         const attendanceWithWarning = {
           ...result.attendance,
@@ -1568,13 +1558,9 @@ export function AttendanceRecorder({
         
         // Start 2-hour countdown timer for off-premises checkout eligibility
         // 2 hours = 7200 seconds
-        console.log("[v0] Starting 2-hour countdown timer")
         setCheckInCountdown(7200)
-      } else {
-        console.error("[v0] No attendance data returned from check-in API")
       }
 
-      console.log("[v0] Setting flash message")
       setFlashMessage({
         message: result.message || "Successfully checked in!",
         type: "success",

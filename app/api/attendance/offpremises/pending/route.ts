@@ -82,6 +82,14 @@ export async function GET(request: NextRequest) {
 
       if (error) {
         console.error("[v0] Failed to fetch staff off-premises requests:", error)
+        // Fallback if column doesn't exist
+        if (error.code === '42703' && error.message?.includes('does not exist')) {
+          console.warn('[v0] Column missing from pending_offpremises_checkins; returning empty array')
+          return NextResponse.json({
+            requests: [],
+            count: 0,
+          })
+        }
         return NextResponse.json(
           { error: "Failed to fetch requests", details: error.message },
           { status: 500 }
