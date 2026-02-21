@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils"
 import { requiresLatenessReason, requiresEarlyCheckoutReason, canCheckInAtTime, canCheckOutAtTime, getCheckInDeadline, getCheckOutDeadline } from "@/lib/attendance-utils"
 import { DeviceActivityHistory } from "@/components/attendance/device-activity-history"
 import { ActiveSessionTimer } from "@/components/attendance/active-session-timer"
+import { CheckoutSuccessModal } from "@/components/attendance/checkout-success-modal"
 
 interface GeofenceLocation {
   id: string
@@ -178,6 +179,14 @@ export function AttendanceRecorder({
   const [pendingCheckoutData, setPendingCheckoutData] = useState<{
     location: LocationData | null
     nearestLocation: any
+  } | null>(null)
+  const [showCheckoutSuccessModal, setShowCheckoutSuccessModal] = useState(false)
+  const [checkoutSuccessData, setCheckoutSuccessData] = useState<{
+    checkoutTime: string
+    checkoutLocation: string
+    workHours: number
+    workMinutes: number
+    isRemoteCheckout: boolean
   } | null>(null)
   const [showLatenessDialog, setShowLatenessDialog] = useState(false)
   const [latenessReason, setLatenessReason] = useState("")
@@ -1432,6 +1441,17 @@ export function AttendanceRecorder({
         const checkInTime = new Date(result.data.check_in_time)
         const checkOutTime = new Date(result.data.check_out_time)
         const workHours = ((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)).toFixed(2)
+        const workMinutes = Math.round(((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60)) % 60)
+
+        // Show completion badge modal
+        setCheckoutSuccessData({
+          checkoutTime: checkOutTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          checkoutLocation: result.data.check_out_location_name,
+          workHours: parseInt(workHours),
+          workMinutes: workMinutes,
+          isRemoteCheckout: result.data.is_remote_checkout || false,
+        })
+        setShowCheckoutSuccessModal(true)
 
         setFlashMessage({
           message: `Successfully checked out from ${result.data.check_out_location_name}! Great work today. Total work hours: ${workHours} hours. See you tomorrow!`,
@@ -2334,6 +2354,19 @@ export function AttendanceRecorder({
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Checkout Success Modal */}
+      {checkoutSuccessData && (
+        <CheckoutSuccessModal
+          open={showCheckoutSuccessModal}
+          onOpenChange={setShowCheckoutSuccessModal}
+          checkoutTime={checkoutSuccessData.checkoutTime}
+          checkoutLocation={checkoutSuccessData.checkoutLocation}
+          workHours={checkoutSuccessData.workHours}
+          workMinutes={checkoutSuccessData.workMinutes}
+          isRemoteCheckout={checkoutSuccessData.isRemoteCheckout}
+        />
       )}
     </div>
   )
