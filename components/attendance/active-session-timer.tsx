@@ -41,6 +41,7 @@ export function ActiveSessionTimer({
   isOffPremisesCheckedIn = false,
   checkInCountdown = null,
 }: ActiveSessionTimerProps) {
+  console.log("[v0] ActiveSessionTimer rendered with checkInCountdown:", checkInCountdown)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [timeUntilCheckout, setTimeUntilCheckout] = useState<{
     hours: number
@@ -212,6 +213,7 @@ export function ActiveSessionTimer({
               <div className="text-right">
                 {checkInCountdown !== null && checkInCountdown > 0 ? (
                   <>
+                    {console.log("[v0] Displaying checkInCountdown:", checkInCountdown)}
                     <div className="text-4xl font-bold text-amber-50 font-mono tracking-wider">
                       {String(Math.floor((checkInCountdown % 3600) / 60)).padStart(2, "0")}:{String(checkInCountdown % 60).padStart(2, "0")}
                     </div>
@@ -219,6 +221,7 @@ export function ActiveSessionTimer({
                   </>
                 ) : (
                   <>
+                    {console.log("[v0] Using timeUntilCheckout instead of checkInCountdown:", { checkInCountdown, timeUntilCheckout })}
                     <div className="flex items-center gap-1 text-3xl font-bold text-orange-200 font-mono">
                       <span className="w-12 text-right">{String(timeUntilCheckout.hours).padStart(2, "0")}</span>
                       <span className="animate-pulse">:</span>
