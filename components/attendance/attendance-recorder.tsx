@@ -33,6 +33,8 @@ import {
   Clock,
   Info,
   Laptop,
+  Calendar,
+  Building,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { LocationCodeDialog } from "@/components/dialogs/location-code-dialog"
@@ -1857,63 +1859,84 @@ export function AttendanceRecorder({
 
       {/* Check-In Success Card */}
       {isCheckedIn && !isCheckedOut && (
-        <div className="rounded-lg border-2 border-blue-500 bg-gradient-to-br from-blue-50 via-cyan-50 to-blue-50 dark:from-blue-950/30 dark:via-cyan-950/30 dark:to-blue-950/30 p-6 shadow-lg">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="h-12 w-12 rounded-full bg-blue-500 flex items-center justify-center">
-              <CheckCircle2 className="h-7 w-7 text-white" />
+        <div className="rounded-lg border-2 border-emerald-500 bg-gradient-to-br from-emerald-800 via-teal-800 to-emerald-900 dark:from-emerald-950 dark:via-teal-950 dark:to-emerald-950 p-6 shadow-lg">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-emerald-500 flex items-center justify-center">
+                <CheckCircle2 className="h-7 w-7 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Active Work Session</h3>
+                <p className="text-sm text-emerald-200">Started just now</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-xl font-bold text-blue-900 dark:text-blue-100">✓ Successfully Checked In!</h3>
-              <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                Your work session has started
-              </p>
-            </div>
+            <div className="px-3 py-1 bg-emerald-500 text-emerald-950 text-sm font-semibold rounded-full">On Duty</div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white/60 dark:bg-black/30 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-            <div className="bg-white/50 dark:bg-gray-900/50 rounded-lg p-3">
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Check-In Time</p>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+          {/* Check-In and Time Worked */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 bg-black/20 rounded-lg p-4 border border-emerald-400/30">
+            <div>
+              <p className="text-xs font-semibold text-emerald-300 mb-2 flex items-center gap-1">
+                <Calendar className="h-3 w-3" /> CHECK-IN
+              </p>
+              <p className="text-2xl font-bold text-white">
                 {new Date(localTodayAttendance.check_in_time).toLocaleTimeString("en-US", {
                   hour: "2-digit",
                   minute: "2-digit",
                   hour12: true,
                 })}
               </p>
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+              <p className="text-sm text-emerald-300 mt-1">
                 📍 {localTodayAttendance.check_in_location_name}
               </p>
             </div>
 
-            <div className="bg-white/50 dark:bg-gray-900/50 rounded-lg p-3">
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Off-Premises Eligible In</p>
+            <div>
+              <p className="text-xs font-semibold text-emerald-300 mb-2 flex items-center gap-1">
+                <Clock className="h-3 w-3" /> TIME WORKED
+              </p>
+              <p className="text-2xl font-bold text-white">0h 0m</p>
+              <p className="text-sm text-emerald-300 mt-1">0 minutes elapsed</p>
+            </div>
+          </div>
+
+          {/* Minimum Work Period Countdown */}
+          <div className="rounded-lg bg-gradient-to-r from-amber-700 to-orange-700 p-4 mb-4 border border-amber-500/50">
+            <p className="text-sm font-semibold text-amber-50 mb-3">Minimum work period in progress</p>
+            <div className="flex items-baseline justify-between">
+              <p className="text-sm text-amber-100">Checkout will be available after 120 minutes</p>
               {checkInCountdown !== null && checkInCountdown > 0 ? (
-                <>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {Math.floor(checkInCountdown / 3600)}:{Math.floor((checkInCountdown % 3600) / 60).toString().padStart(2, "0")}:{(checkInCountdown % 60).toString().padStart(2, "0")}
+                <div className="text-right">
+                  <p className="text-4xl font-bold text-amber-50 tracking-widest font-mono">
+                    {String(Math.floor((checkInCountdown % 3600) / 60)).padStart(2, "0")}:{String(checkInCountdown % 60).padStart(2, "0")}
                   </p>
-                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    ⏱️ 2-hour countdown timer
-                  </p>
-                </>
+                  <p className="text-xs text-amber-100 mt-1">until checkout available</p>
+                </div>
               ) : (
-                <>
-                  <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                    Available Now
-                  </p>
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
-                    ✓ Off-premises checkout eligible
-                  </p>
-                </>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-emerald-300">Available Now</p>
+                  <p className="text-xs text-emerald-200 mt-1">Checkout eligible</p>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="mt-4 text-center">
-            <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">
-              Welcome back! You can use the "Off-Premises Check Out" option after the 2-hour threshold has been met.
-            </p>
-          </div>
+          {/* Location Working Hours */}
+          {assignedLocation && (
+            <div className="rounded-lg bg-gradient-to-r from-blue-700 to-cyan-700 p-4 border border-blue-500/50">
+              <div className="flex items-start gap-3">
+                <Building className="h-5 w-5 text-blue-50 mt-1 flex-shrink-0" />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-blue-50 mb-2">{assignedLocation.name} Working Hours</h4>
+                  <div className="flex flex-col gap-1 text-sm text-blue-100">
+                    <p>Check-In: <span className="font-mono font-semibold text-blue-50">{assignedLocation.check_in_start_time || "N/A"}</span></p>
+                    <p>Check-Out: <span className="font-mono font-semibold text-blue-50">{assignedLocation.check_out_end_time || "N/A"}</span></p>
+                  </div>
+                  <p className="text-xs text-blue-200 mt-2">Remember to check out before the location's closing time</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
