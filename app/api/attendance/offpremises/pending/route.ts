@@ -156,6 +156,14 @@ export async function GET(request: NextRequest) {
     const fallbackRes = await fallbackQuery
     if (fallbackRes.error) {
       console.error('[v0] Failed to fetch off-premises requests:', fallbackRes.error)
+      // Gracefully handle missing columns
+      if (fallbackRes.error.code === '42703') {
+        console.warn('[v0] Column missing from pending_offpremises_checkins table; returning empty array')
+        return NextResponse.json({
+          requests: [],
+          count: 0,
+        })
+      }
       return NextResponse.json({ error: 'Failed to fetch requests', details: fallbackRes.error.message }, { status: 500 })
     }
 
