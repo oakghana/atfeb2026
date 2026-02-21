@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Clock, MapPin, Timer, Calendar, LogOut, Loader2 } from "lucide-react"
 import { CheckoutSuccessModal } from "./checkout-success-modal"
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { formatDistanceToNow } from "date-fns"
 import { canCheckOutAtTime, getCheckOutDeadline } from "@/lib/attendance-utils"
 
