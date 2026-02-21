@@ -567,29 +567,8 @@ export async function POST(request: NextRequest) {
       attendanceData.is_remote_location = true
     }
 
-    // CRITICAL: Always use admin client for check-in inserts
-    // The regular client with ANON key cannot bypass RLS to insert attendance records
-    let adminSupabase
-    try {
-      adminSupabase = await createAdminClient()
-      if (!adminSupabase) {
-        throw new Error("Admin client creation returned null/undefined")
-      }
-      console.log("[v0] Admin client created successfully for check-in")
-    } catch (adminClientError) {
-      console.error("[v0] CRITICAL: Failed to create admin client for check-in:", adminClientError)
-      console.error("[v0] SUPABASE_SERVICE_ROLE_KEY available:", !!process.env.SUPABASE_SERVICE_ROLE_KEY)
-      // Do NOT fallback to regular client - it won't work due to RLS
-      return NextResponse.json(
-        {
-          error: "Critical: Unable to initialize check-in - database access denied",
-          details: process.env.NODE_ENV !== "production" ? adminClientError instanceof Error ? adminClientError.message : String(adminClientError) : undefined,
-        },
-        { status: 500 },
-      )
-    }
-
-    const { data: attendanceRecord, error: attendanceError } = await adminSupabase
+    // Use authenticated client - RLS policies allow users to insert their own attendance
+    const { data: attendanceRecord, error: attendanceError } = await supabase
       .from("attendance_records")
       .insert(attendanceData)
       .select("*")
