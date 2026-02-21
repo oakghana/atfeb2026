@@ -239,6 +239,15 @@ export function StaffManagement() {
         body: JSON.stringify(newStaff),
       })
 
+      // Handle auth failures explicitly so users see a clear message
+      if (response.status === 401 || response.status === 403) {
+        const msg = "Session expired or unauthorized. Please sign in again."
+        showError(msg, "Authentication Required")
+        setError(msg)
+        setTimeout(() => (window.location.href = "/signin"), 1200)
+        return
+      }
+
       const result = await response.json()
       console.log("[v0] Add staff result:", result)
 
@@ -287,6 +296,14 @@ export function StaffManagement() {
         body: JSON.stringify(updates),
       })
 
+      if (response.status === 401 || response.status === 403) {
+        const msg = "Session expired or unauthorized. Please sign in again."
+        showError(msg, "Authentication Required")
+        setError(msg)
+        setTimeout(() => (window.location.href = "/signin"), 1200)
+        return
+      }
+
       const result = await response.json()
       console.log("[v0] Update staff result:", result)
 
@@ -314,6 +331,14 @@ export function StaffManagement() {
       const response = await fetch(`/api/admin/staff/${staffId}`, {
         method: "DELETE",
       })
+
+      if (response.status === 401 || response.status === 403) {
+        const msg = "Session expired or unauthorized. Please sign in again."
+        showError(msg, "Authentication Required")
+        setError(msg)
+        setTimeout(() => (window.location.href = "/signin"), 1200)
+        return
+      }
 
       const result = await response.json()
 
@@ -367,6 +392,14 @@ export function StaffManagement() {
       })
 
       console.log("[v0] Update response status:", response.status)
+
+      if (response.status === 401 || response.status === 403) {
+        const msg = "Session expired or unauthorized. Please sign in again."
+        showError(msg, "Authentication Required")
+        setError(msg)
+        setTimeout(() => (window.location.href = "/signin"), 1200)
+        return
+      }
 
       if (!response.ok) {
         const text = await response.text()
