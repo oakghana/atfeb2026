@@ -22,6 +22,8 @@ interface ActiveSessionTimerProps {
   userRole?: string | null
   // New: indicates the user was checked in via an approved off‑premises request
   isOffPremisesCheckedIn?: boolean
+  // New: countdown timer for 2-hour off-premises checkout eligibility
+  checkInCountdown?: number | null
 }
 
 export function ActiveSessionTimer({
@@ -37,6 +39,7 @@ export function ActiveSessionTimer({
   userDepartment,
   userRole,
   isOffPremisesCheckedIn = false,
+  checkInCountdown = null,
 }: ActiveSessionTimerProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [timeUntilCheckout, setTimeUntilCheckout] = useState<{
@@ -196,25 +199,36 @@ export function ActiveSessionTimer({
             </div>
           </div>
         ) : (
-          <div className="rounded-lg bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/60 dark:to-amber-900/60 border border-orange-200 dark:border-orange-500/50 p-4">
+          <div className="rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700 p-4">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <p className="text-sm font-medium text-orange-900 dark:text-orange-100">
+                <p className="text-sm font-semibold text-amber-50">
                   Minimum work period in progress
                 </p>
-                <p className="text-xs text-orange-700 dark:text-orange-300">
+                <p className="text-xs text-amber-100">
                   Checkout will be available after {minimumWorkMinutes} minutes
                 </p>
               </div>
               <div className="text-right">
-                <div className="flex items-center gap-1 text-3xl font-bold text-orange-600 dark:text-orange-400 font-mono">
-                  <span className="w-12 text-right">{String(timeUntilCheckout.hours).padStart(2, "0")}</span>
-                  <span className="animate-pulse">:</span>
-                  <span className="w-12">{String(timeUntilCheckout.minutes).padStart(2, "0")}</span>
-                  <span className="animate-pulse">:</span>
-                  <span className="w-12">{String(timeUntilCheckout.seconds).padStart(2, "0")}</span>
-                </div>
-                <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">until checkout available</p>
+                {checkInCountdown !== null && checkInCountdown > 0 ? (
+                  <>
+                    <div className="text-4xl font-bold text-amber-50 font-mono tracking-wider">
+                      {String(Math.floor((checkInCountdown % 3600) / 60)).padStart(2, "0")}:{String(checkInCountdown % 60).padStart(2, "0")}
+                    </div>
+                    <p className="text-xs text-amber-100 mt-1">until checkout available</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1 text-3xl font-bold text-orange-200 font-mono">
+                      <span className="w-12 text-right">{String(timeUntilCheckout.hours).padStart(2, "0")}</span>
+                      <span className="animate-pulse">:</span>
+                      <span className="w-12">{String(timeUntilCheckout.minutes).padStart(2, "0")}</span>
+                      <span className="animate-pulse">:</span>
+                      <span className="w-12">{String(timeUntilCheckout.seconds).padStart(2, "0")}</span>
+                    </div>
+                    <p className="text-xs text-orange-100 mt-1">until checkout available</p>
+                  </>
+                )}
               </div>
             </div>
           </div>
