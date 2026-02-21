@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 import { validateCheckoutLocation, type LocationData } from "@/lib/geolocation"
 import { requiresEarlyCheckoutReason, canCheckOutAtTime, getCheckOutDeadline } from "@/lib/attendance-utils"
@@ -513,8 +513,9 @@ export async function POST(request: NextRequest) {
       checkoutData.early_checkout_reason = early_checkout_reason
     }
 
-    // First, perform the update without joins (to avoid foreign key relationship errors)
-    const { error: updateError } = await supabase
+    // Use admin client for UPDATE to bypass RLS policies
+    const adminSupabase = await createAdminClient()
+    const { error: updateError } = await adminSupabase
       .from("attendance_records")
       .update(checkoutData)
       .eq("id", attendanceRecord.id)

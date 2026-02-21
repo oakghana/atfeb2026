@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 import { requiresLatenessReason, canCheckInAtTime, getCheckInDeadline } from "@/lib/attendance-utils"
 
@@ -567,7 +567,8 @@ export async function POST(request: NextRequest) {
       attendanceData.is_remote_location = true
     }
 
-    const { data: attendanceRecord, error: attendanceError } = await supabase
+    const adminSupabase = await createAdminClient()
+    const { data: attendanceRecord, error: attendanceError } = await adminSupabase
       .from("attendance_records")
       .insert(attendanceData)
       .select("*")
