@@ -515,7 +515,6 @@ export async function POST(request: NextRequest) {
 
     // CRITICAL: Always use admin client for checkout updates
     // The regular client with ANON key cannot bypass RLS to update check_out_time
-    let adminSupabase
     try {
       adminSupabase = await createAdminClient()
       if (!adminSupabase) {

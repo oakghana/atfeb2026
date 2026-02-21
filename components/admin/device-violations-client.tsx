@@ -73,7 +73,7 @@ export default function DeviceViolationsClient({
       if (data && data.length > 0) {
         const userIds = [...new Set([...data.map((v: any) => v.attempted_user_id), ...data.map((v: any) => v.bound_user_id)])]
 
-        const { data: profiles } = await supabase.from("user_profiles").select("*").in("id", userIds)
+        const { data: profiles } = await supabase.from("user_profiles").select("id, first_name, last_name").in("id", userIds)
 
         const profileMap = new Map((profiles as any[])?.map((p: any) => [p.id, p]) || [])
 

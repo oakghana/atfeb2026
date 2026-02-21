@@ -15,7 +15,7 @@ export default async function UserManagementPage() {
   }
 
   // Get user profile and check admin access
-  const { data: profile } = await supabase.from("user_profiles").select("*").eq("id", user.id).single()
+  const { data: profile } = await supabase.from("user_profiles").select("id, role").eq("id", user.id).single()
 
   if (!profile || !["admin", "department_head"].includes(profile.role)) {
     redirect("/dashboard")
