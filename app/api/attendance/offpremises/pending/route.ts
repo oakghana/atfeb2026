@@ -95,10 +95,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Build query using admin client to bypass RLS
-    let queryWithReason = adminClient
-      .from("pending_offpremises_checkins")
-      .select(
-        `
+    // NOTE: request_type column may not exist on all databases, use fallback select
+    let fallbackQuery = adminClient
+      .from('pending_offpremises_checkins')
+      .select(`
         id,
         user_id,
         current_location_name,
@@ -106,8 +106,6 @@ export async function GET(request: NextRequest) {
         longitude,
         accuracy,
         device_info,
-        request_type,
-        reason,
         created_at,
         status,
         approved_by_id,
@@ -124,9 +122,8 @@ export async function GET(request: NextRequest) {
           position,
           assigned_location_id
         )
-      `
-      )
-      .order("created_at", { ascending: false })
+      `)
+      .order('created_at', { ascending: false })
 
     // if non-admin manager, restrict to own department or assigned location
     if (managerProfile.role !== 'admin') {
@@ -138,77 +135,25 @@ export async function GET(request: NextRequest) {
         if (deptId) conditions.push(`(user_profiles.department_id.eq.${deptId})`)
         if (locId) conditions.push(`(user_profiles.assigned_location_id.eq.${locId})`)
         if (conditions.length > 0) {
-          queryWithReason = queryWithReason.or(conditions.join(','))
+          fallbackQuery = fallbackQuery.or(conditions.join(','))
         }
       }
     }
 
     // Apply status filter
-    if (statusFilter !== "all") {
-      queryWithReason = queryWithReason.eq("status", statusFilter)
+    if (statusFilter !== 'all') {
+      fallbackQuery = fallbackQuery.eq('status', statusFilter)
     }
 
-    // Try selecting with `reason` and `request_type` columns first (schema-safe)
-    let pendingRequests: any = null
-    let selectError: any = null
-    try {
-      const res = await queryWithReason
-      pendingRequests = res.data
-      selectError = res.error
-      if (selectError) throw selectError
-    } catch (err: any) {
-      // If `reason` OR `request_type` column is missing on older DBs, retry without them
-      const missingReason = err?.message?.includes("column pending_offpremises_checkins.reason does not exist") || err?.code === '42703'
-      const missingRequestType = err?.message?.includes("column pending_offpremises_checkins.request_type does not exist") || err?.code === '42703'
-
-      if (missingReason || missingRequestType) {
-        console.warn('[v0] `reason`/`request_type` column missing from pending_offpremises_checkins; retrying select without them')
-        let fallbackQuery = adminClient
-          .from('pending_offpremises_checkins')
-          .select(`
-            id,
-            user_id,
-            current_location_name,
-            latitude,
-            longitude,
-            accuracy,
-            device_info,
-            created_at,
-            status,
-            approved_by_id,
-            approved_at,
-            rejection_reason,
-            google_maps_name,
-            user_profiles!pending_offpremises_checkins_user_id_fkey (
-              id,
-              first_name,
-              last_name,
-              email,
-              employee_id,
-              department_id,
-              position,
-              assigned_location_id
-            )
-          `)
-          .order('created_at', { ascending: false })
-
-        if (statusFilter !== 'all') fallbackQuery = fallbackQuery.eq('status', statusFilter)
-
-        const fallbackRes = await fallbackQuery
-        if (fallbackRes.error) {
-          console.error('[v0] Failed to fetch off-premises requests (fallback):', fallbackRes.error)
-          return NextResponse.json({ error: 'Failed to fetch requests', details: fallbackRes.error.message }, { status: 500 })
-        }
-        pendingRequests = fallbackRes.data
-      } else {
-        console.error('[v0] Failed to fetch off-premises requests:', err)
-        return NextResponse.json({ error: 'Failed to fetch requests', details: err?.message || String(err) }, { status: 500 })
-      }
+    const fallbackRes = await fallbackQuery
+    if (fallbackRes.error) {
+      console.error('[v0] Failed to fetch off-premises requests:', fallbackRes.error)
+      return NextResponse.json({ error: 'Failed to fetch requests', details: fallbackRes.error.message }, { status: 500 })
     }
 
     return NextResponse.json({
-      requests: pendingRequests || [],
-      count: pendingRequests?.length || 0,
+      requests: fallbackRes.data || [],
+      count: fallbackRes.data?.length || 0,
     })
   } catch (error) {
     console.error("[v0] Error in pending requests endpoint:", error)
