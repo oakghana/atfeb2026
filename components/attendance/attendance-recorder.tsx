@@ -33,8 +33,6 @@ import {
   Clock,
   Info,
   Laptop,
-  Calendar,
-  Building,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { LocationCodeDialog } from "@/components/dialogs/location-code-dialog"
@@ -225,7 +223,6 @@ export function AttendanceRecorder({
 
   const [recentCheckIn, setRecentCheckIn] = useState(false)
   const [recentCheckOut, setRecentCheckOut] = useState(false)
-  const [checkInCountdown, setCheckInCountdown] = useState<number | null>(null)
   const [localTodayAttendance, setLocalTodayAttendance] = useState(initialTodayAttendance)
 
   const [checkoutTimeReached, setCheckoutTimeReached] = useState(false)
@@ -774,23 +771,6 @@ export function AttendanceRecorder({
     }
   }, [userLocation, realTimeLocations, proximitySettings, windowsCapabilities, deviceRadiusSettings])
 
-  // Handle 2-hour countdown timer for off-premises checkout window after check-in
-  useEffect(() => {
-    if (checkInCountdown === null || checkInCountdown === 0) return
-
-    const timer = setInterval(() => {
-      setCheckInCountdown(prev => {
-        if (prev === null || prev <= 1) {
-          clearInterval(timer)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [checkInCountdown])
-
   const fetchUserProfile = async () => {
     try {
       console.log("[v0] Fetching user profile...")
@@ -1121,13 +1101,7 @@ export function AttendanceRecorder({
 
   const handleSendOffPremisesRequest = async () => {
     if (!pendingOffPremisesLocation) return
-    
-    // For checkout requests after 9+ hours, reason is not required
-    const checkInTime = new Date(localTodayAttendance?.check_in_time || new Date())
-    const workHours = (new Date().getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
-    const reasonRequired = offPremisesMode !== 'checkout' || workHours <= 9
-    
-    if (reasonRequired && !offPremisesReason.trim()) {
+    if (!offPremisesReason.trim()) {
       toast({
         title: "Reason Required",
         description: "Please provide a reason for your off-premises request.",
@@ -1175,7 +1149,6 @@ export function AttendanceRecorder({
         user_id: currentUser.id,
         reason: offPremisesReason.trim(),
         request_type: offPremisesMode,
-        workHours: workHours, // Pass work hours for auto-approval decision
       }
       
       console.log("[v0] Sending off-premises request:", payload)
@@ -1216,37 +1189,24 @@ export function AttendanceRecorder({
       }
 
       // safety check: API may return 200 but indicate failure or omit key fields
-      if (result && (result.success === false || (!result.request_id && !result.auto_approved))) {
+      if (result && (result.success === false || !result.request_id)) {
         console.error("[v0] Off-premises request not successful or missing id:", result)
         const msg = result.error || result.message || "Request was not successful"
         throw new Error(msg)
       }
 
-      console.log("[v0] Off-premises request submitted successfully", { request_id: result.request_id, auto_approved: result.auto_approved })
+      console.log("[v0] Off-premises request submitted successfully", { request_id: result.request_id })
 
-      if (result.auto_approved) {
-        setFlashMessage({
-          message: `Your off-premises ${offPremisesMode === 'checkout' ? 'check-out' : 'check-in'} has been automatically approved and recorded. You've worked ${workHours.toFixed(1)} hours today.`,
-          type: "success",
-        })
+      setFlashMessage({
+        message: `Off-premises ${offPremisesMode === 'checkout' ? 'check-out' : 'check-in'} request sent to your supervisor for approval. We'll notify you when the supervisor approves and your attendance will be recorded using the ORIGINAL request time and the submitted location.`,
+        type: "success",
+      })
 
-        toast({
-          title: "Off‑Premises Request Approved",
-          description: `Your ${offPremisesMode === 'checkout' ? 'check-out' : 'check-in'} has been automatically processed.`,
-          action: <ToastAction altText="OK">OK</ToastAction>,
-        })
-      } else {
-        setFlashMessage({
-          message: `Off-premises ${offPremisesMode === 'checkout' ? 'check-out' : 'check-in'} request sent to your supervisor for approval. We'll notify you when the supervisor approves and your attendance will be recorded using the ORIGINAL request time and the submitted location.`,
-          type: "success",
-        })
-
-        toast({
-          title: "Off‑Premises Request Sent",
-          description: `Your request was sent to your supervisor — waiting for approval. You will be automatically ${offPremisesMode === 'checkout' ? 'checked out' : 'checked in'} if approved.`,
-          action: <ToastAction altText="OK">OK</ToastAction>,
-        })
-      }
+      toast({
+        title: "Off‑Premises Request Sent",
+        description: `Your request was sent to your supervisor — waiting for approval. You will be automatically ${offPremisesMode === 'checkout' ? 'checked out' : 'checked in'} if approved.`,
+        action: <ToastAction altText="OK">OK</ToastAction>,
+      })
 
       setPendingOffPremisesLocation(null)
       setOffPremisesReason("")
@@ -1476,9 +1436,14 @@ export function AttendanceRecorder({
         setRecentCheckOut(true)
         setTimeout(() => setRecentCheckOut(false), 3000)
 
-        // Don't show flash message - let the attendance completion card display instead
-        // This provides a better UX with comprehensive checkout information
-        setFlashMessage(null)
+        const checkInTime = new Date(result.data.check_in_time)
+        const checkOutTime = new Date(result.data.check_out_time)
+        const workHours = ((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)).toFixed(2)
+
+        setFlashMessage({
+          message: `Successfully checked out from ${result.data.check_out_location_name}! Great work today. Total work hours: ${workHours} hours. See you tomorrow!`,
+          type: "success",
+        })
 
         setEarlyCheckoutReason("")
         setPendingCheckoutData(null)
@@ -1576,17 +1541,14 @@ export function AttendanceRecorder({
           device_sharing_warning: result.deviceSharingWarning?.message || null
         }
         setLocalTodayAttendance(attendanceWithWarning)
-        
-        // Start 2-hour countdown timer for off-premises checkout window
-        // 2 hours = 7200 seconds
-        setCheckInCountdown(7200)
       }
 
-      // Don't show flash message - let the check-in success state display instead
-      // This provides better UX with comprehensive check-in information
-      setFlashMessage(null)
+      setFlashMessage({
+        message: result.message || "Successfully checked in!",
+        type: "success",
+      })
 
-      // Refresh attendance data after a longer delay to ensure UI updates first
+      // Refresh attendance data
       await fetchTodayAttendance()
 
       // Clear attendance cache
@@ -1605,6 +1567,11 @@ export function AttendanceRecorder({
 
       setLatenessReason("")
       setPendingCheckInData(null)
+
+      // Refetch to verify check-in was recorded
+      setTimeout(() => {
+        fetchTodayAttendance()
+      }, 500)
     } catch (err) {
       console.error("[v0] Check-in error:", err)
       throw err
@@ -1852,89 +1819,6 @@ export function AttendanceRecorder({
         </div>
       )}
 
-      {/* Check-In Success Card */}
-      {isCheckedIn && !isCheckedOut && (
-        <div className="rounded-lg border-2 border-emerald-500 bg-gradient-to-br from-emerald-800 via-teal-800 to-emerald-900 dark:from-emerald-950 dark:via-teal-950 dark:to-emerald-950 p-6 shadow-lg">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-emerald-500 flex items-center justify-center">
-                <CheckCircle2 className="h-7 w-7 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white">Active Work Session</h3>
-                <p className="text-sm text-emerald-200">Started just now</p>
-              </div>
-            </div>
-            <div className="px-3 py-1 bg-emerald-500 text-emerald-950 text-sm font-semibold rounded-full">On Duty</div>
-          </div>
-
-          {/* Check-In and Time Worked */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 bg-black/20 rounded-lg p-4 border border-emerald-400/30">
-            <div>
-              <p className="text-xs font-semibold text-emerald-300 mb-2 flex items-center gap-1">
-                <Calendar className="h-3 w-3" /> CHECK-IN
-              </p>
-              <p className="text-2xl font-bold text-white">
-                {new Date(localTodayAttendance.check_in_time).toLocaleTimeString("en-US", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: true,
-                })}
-              </p>
-              <p className="text-sm text-emerald-300 mt-1">
-                📍 {localTodayAttendance.check_in_location_name}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold text-emerald-300 mb-2 flex items-center gap-1">
-                <Clock className="h-3 w-3" /> TIME WORKED
-              </p>
-              <p className="text-2xl font-bold text-white">0h 0m</p>
-              <p className="text-sm text-emerald-300 mt-1">0 minutes elapsed</p>
-            </div>
-          </div>
-
-          {/* Minimum Work Period Countdown */}
-          <div className="rounded-lg bg-gradient-to-r from-amber-700 to-orange-700 p-4 mb-4 border border-amber-500/50">
-            <p className="text-sm font-semibold text-amber-50 mb-3">Minimum work period in progress</p>
-            <div className="flex items-baseline justify-between">
-              <p className="text-sm text-amber-100">Checkout will be available after 120 minutes</p>
-              {checkInCountdown !== null && checkInCountdown > 0 ? (
-                <div className="text-right">
-                  <p className="text-4xl font-bold text-amber-50 tracking-widest font-mono">
-                    {String(Math.floor((checkInCountdown % 3600) / 60)).padStart(2, "0")}:{String(checkInCountdown % 60).padStart(2, "0")}
-                  </p>
-                  <p className="text-xs text-amber-100 mt-1">until checkout available</p>
-                </div>
-              ) : (
-                <div className="text-right">
-                  <p className="text-xl font-bold text-emerald-300">Available Now</p>
-                  <p className="text-xs text-emerald-200 mt-1">Checkout eligible</p>
-          </div>
-      )}
-            </div>
-          </div>
-
-          {/* Location Working Hours */}
-          {assignedLocation && (
-            <div className="rounded-lg bg-gradient-to-r from-blue-700 to-cyan-700 p-4 border border-blue-500/50">
-              <div className="flex items-start gap-3">
-                <Building className="h-5 w-5 text-blue-50 mt-1 flex-shrink-0" />
-                <div className="flex-1">
-                  <h4 className="font-semibold text-blue-50 mb-2">{assignedLocation.name} Working Hours</h4>
-                  <div className="flex flex-col gap-1 text-sm text-blue-100">
-                    <p>Check-In: <span className="font-mono font-semibold text-blue-50">{assignedLocation.check_in_start_time || "N/A"}</span></p>
-                    <p>Check-Out: <span className="font-mono font-semibold text-blue-50">{assignedLocation.check_out_end_time || "N/A"}</span></p>
-                  </div>
-                  <p className="text-xs text-blue-200 mt-2">Remember to check out before the location's closing time</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {(localTodayAttendance as any)?.device_sharing_warning && (
         <Alert className="bg-yellow-50 border-yellow-400 dark:bg-yellow-900/60 dark:border-yellow-500/50 mb-4">
           <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-300" />
@@ -1993,9 +1877,10 @@ export function AttendanceRecorder({
                 const checkInLocationData = realTimeLocations?.find(
                   (loc) => loc.id === localTodayAttendance.check_in_location_id
                 )
-                // Consider them off-premises only if they cannot checkout (still outside range)
-                // If they are within range (canCheckOut === true), always show regular "Check Out Now" button
-                const isOffPremisesCheckedIn = !(locationValidation?.canCheckOut === true)
+                // Consider them off-premises only while still out of range; once locationValidation allows checkout we revert to normal
+                const wasOffPremises = !!localTodayAttendance?.on_official_duty_outside_premises || !!localTodayAttendance?.is_remote_location
+                const isOffPremisesCheckedIn =
+                  wasOffPremises && !(locationValidation?.canCheckOut === true)
 
                 return (
                   <ActiveSessionTimer
