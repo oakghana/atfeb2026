@@ -795,11 +795,8 @@ export function AttendanceRecorder({
             employee_id,
             position,
             assigned_location_id,
-          password_changed_at,
-              name,
-              code
-            )
-          `)
+            password_changed_at
+            `)
           .eq("id", user.id)
           .single()
 
