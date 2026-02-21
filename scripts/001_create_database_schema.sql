@@ -220,7 +220,7 @@ CREATE POLICY "Users can insert their own attendance" ON public.attendance_recor
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update their own attendance" ON public.attendance_records
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Admins can view all attendance" ON public.attendance_records
     FOR ALL USING (
