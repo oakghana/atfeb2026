@@ -1586,7 +1586,7 @@ export function AttendanceRecorder({
       // This provides better UX with comprehensive check-in information
       setFlashMessage(null)
 
-      // Refresh attendance data
+      // Refresh attendance data after a longer delay to ensure UI updates first
       await fetchTodayAttendance()
 
       // Clear attendance cache
@@ -1605,11 +1605,6 @@ export function AttendanceRecorder({
 
       setLatenessReason("")
       setPendingCheckInData(null)
-
-      // Refetch to verify check-in was recorded
-      setTimeout(() => {
-        fetchTodayAttendance()
-      }, 500)
     } catch (err) {
       console.error("[v0] Check-in error:", err)
       throw err
@@ -1916,8 +1911,8 @@ export function AttendanceRecorder({
                 <div className="text-right">
                   <p className="text-xl font-bold text-emerald-300">Available Now</p>
                   <p className="text-xs text-emerald-200 mt-1">Checkout eligible</p>
-                </div>
-              )}
+          </div>
+      )}
             </div>
           </div>
 
