@@ -175,6 +175,7 @@ export function AttendanceRecorder({
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split("T")[0])
   const [showEarlyCheckoutDialog, setShowEarlyCheckoutDialog] = useState(false)
   const [earlyCheckoutReason, setEarlyCheckoutReason] = useState("")
+  const [earlyCheckoutReasonRequired, setEarlyCheckoutReasonRequired] = useState(true)
   const [pendingCheckoutData, setPendingCheckoutData] = useState<{
     location: LocationData | null
     nearestLocation: any
@@ -1303,7 +1304,57 @@ export function AttendanceRecorder({
       }
       
       // OPTIMIZATION: Validate location ONCE
-      const checkoutValidation = validateCheckoutLocation(locationData, realTimeLocations || [], checkOutRadius)
+      let checkoutValidation = validateCheckoutLocation(locationData, realTimeLocations || [], checkOutRadius)
+
+      // Fallback: if validation fails but the client-side nearest-location check (used by the UI badge)
+      // indicates the user is within range, allow checkout. This keeps the badge and button behavior
+      // consistent when device radius settings or rounding differ between helpers.
+      if (!checkoutValidation.canCheckOut && realTimeLocations && realTimeLocations.length > 0) {
+        try {
+          const deviceInfoLocal = deviceInfo || getDeviceInfo()
+          // derive proximity radius similarly to `location-preview-card` and `useDeviceRadiusSettings`
+          let proximityRadius = 100
+          if (deviceRadiusSettings) {
+            if (deviceInfoLocal.device_type === "mobile") {
+              proximityRadius = deviceRadiusSettings.mobile.checkOut
+            } else if (deviceInfoLocal.device_type === "tablet") {
+              proximityRadius = deviceRadiusSettings.tablet.checkOut
+            } else if (deviceInfoLocal.device_type === "laptop") {
+              proximityRadius = deviceRadiusSettings.laptop.checkOut
+            } else if (deviceInfoLocal.device_type === "desktop") {
+              proximityRadius = deviceRadiusSettings.desktop.checkOut
+            }
+          } else {
+            if (deviceInfoLocal.isMobile || deviceInfoLocal.isTablet) {
+              proximityRadius = 400
+            } else if (deviceInfoLocal.isLaptop) {
+              proximityRadius = 700
+            } else {
+              proximityRadius = 1000
+            }
+          }
+
+          const distances = (realTimeLocations || [])
+            .map((loc) => ({
+              location: loc,
+              distance: calculateDistance(locationData.latitude, locationData.longitude, loc.latitude, loc.longitude),
+            }))
+            .sort((a, b) => a.distance - b.distance)
+
+          const nearest = distances[0]
+          if (nearest && nearest.distance <= proximityRadius) {
+            console.log('[v0] Fallback proximity check passed - allowing checkout based on nearest location', { nearest: nearest.location.name, distance: nearest.distance, proximityRadius })
+            checkoutValidation = {
+              canCheckOut: true,
+              nearestLocation: nearest.location,
+              distance: nearest.distance,
+              message: `Allowed by fallback proximity (${proximityRadius}m)`,
+            } as any
+          }
+        } catch (fallbackErr) {
+          console.warn('[v0] Fallback proximity check failed or errored:', fallbackErr)
+        }
+      }
 
       // Check if early checkout is needed
       const now = new Date()
@@ -1314,6 +1365,8 @@ export function AttendanceRecorder({
       const checkOutEndTime = assignedLocation?.check_out_end_time || "17:00"
       const requireEarlyCheckoutReason = assignedLocation?.require_early_checkout_reason ?? true
       const effectiveRequireEarlyCheckoutReason = requiresEarlyCheckoutReason(now, requireEarlyCheckoutReason)
+      // Persist effective requirement into state so the modal can relax validation on weekends
+      setEarlyCheckoutReasonRequired(Boolean(effectiveRequireEarlyCheckoutReason))
 
       const [endHour, endMinute] = checkOutEndTime.split(":").map(Number)
       const checkoutEndTimeMinutes = endHour * 60 + (endMinute || 0)
@@ -1361,7 +1414,7 @@ export function AttendanceRecorder({
       const checkInTimeForHours = localTodayAttendance && localTodayAttendance.check_in_time ? new Date(localTodayAttendance.check_in_time) : null
       const hoursSinceCheckIn = checkInTimeForHours ? (now.getTime() - checkInTimeForHours.getTime()) / (1000 * 60 * 60) : 0
 
-      if (!isBeforeCheckoutTime || !requireEarlyCheckoutReason || isSecurityStaff || hoursSinceCheckIn >= 9) {
+      if (!isBeforeCheckoutTime || !effectiveRequireEarlyCheckoutReason || isSecurityStaff || hoursSinceCheckIn >= 9) {
         console.log("[v0] SMART CHECKOUT: Checkout time passed or no reason needed or Security staff or worked >=9 hours - immediate checkout", { hoursSinceCheckIn })
         await performCheckoutAPI(locationData, nearestLocation, "")
         return
@@ -1370,6 +1423,8 @@ export function AttendanceRecorder({
       // If checkout time is NOT reached and reason required, show modal
       // Store pending checkout data and show dialog - THEN release loading
       setPendingCheckoutData({ location: locationData, nearestLocation })
+      // if we reach here the modal will be shown; clear any previous reason
+      setEarlyCheckoutReason("")
       setShowEarlyCheckoutDialog(true)
       setIsLoading(false)
     } catch (error) {
@@ -1410,6 +1465,20 @@ export function AttendanceRecorder({
 
         setRecentCheckOut(true)
         setTimeout(() => setRecentCheckOut(false), 3000)
+
+        // Show a toast to confirm the checkout was persisted
+        try {
+          const checkInTime = new Date(result.data.check_in_time)
+          const checkOutTime = new Date(result.data.check_out_time)
+          const workHours = ((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)).toFixed(2)
+          toast({
+            title: "Check-out recorded",
+            description: `Checked out from ${result.data.check_out_location_name || nearestLocation?.name || 'location'}. Worked ${workHours} hours.`,
+          })
+        } catch (e) {
+          // swallow toast errors
+          console.warn('[v0] Toast error', e)
+        }
 
         const checkInTime = new Date(result.data.check_in_time)
         const checkOutTime = new Date(result.data.check_out_time)
@@ -1516,6 +1585,15 @@ export function AttendanceRecorder({
           device_sharing_warning: result.deviceSharingWarning?.message || null
         }
         setLocalTodayAttendance(attendanceWithWarning)
+        // Toast confirm check-in persisted
+        try {
+          toast({
+            title: "Check-in recorded",
+            description: `Checked in at ${attendanceWithWarning.check_in_location_name || nearestLocation?.name || 'location'}`,
+          })
+        } catch (e) {
+          console.warn('[v0] Toast error', e)
+        }
       }
 
       setFlashMessage({
@@ -1559,21 +1637,24 @@ export function AttendanceRecorder({
 
   const handleEarlyCheckoutConfirm = async () => {
     const trimmedReason = earlyCheckoutReason.trim()
-    
-    if (!trimmedReason) {
-      setFlashMessage({
-        message: "Please provide a reason for early checkout before proceeding.",
-        type: "error",
-      })
-      return
-    }
-    
-    if (trimmedReason.length < 10) {
-      setFlashMessage({
-        message: "Early checkout reason must be at least 10 characters long. Please provide more details.",
-        type: "error",
-      })
-      return
+
+    // If a reason is required (weekday / policy), enforce validation.
+    if (earlyCheckoutReasonRequired) {
+      if (!trimmedReason) {
+        setFlashMessage({
+          message: "Please provide a reason for early checkout before proceeding.",
+          type: "error",
+        })
+        return
+      }
+
+      if (trimmedReason.length < 10) {
+        setFlashMessage({
+          message: "Early checkout reason must be at least 10 characters long. Please provide more details.",
+          type: "error",
+        })
+        return
+      }
     }
 
     setShowEarlyCheckoutDialog(false)
@@ -1591,6 +1672,14 @@ export function AttendanceRecorder({
         type: "error",
       })
     }
+  }
+  
+  const handleEarlyCheckoutCancel = () => {
+    // Close the early checkout dialog and reset related state
+    setShowEarlyCheckoutDialog(false)
+    setEarlyCheckoutReason("")
+    setPendingCheckoutData(null)
+    setIsLoading(false)
   }
   const handleLatenessConfirm = async () => {
     const trimmedReason = latenessReason.trim()
@@ -1704,28 +1793,30 @@ export function AttendanceRecorder({
   return (
     <div className={cn("space-y-6", className)}>
       {flashMessage && (
-        <Card className="mb-4 border-l-4 border-l-green-500 bg-green-50 dark:bg-green-900/60 dark:border-green-500/50">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 bg-green-100 dark:bg-green-800/60 rounded-full p-2">
-                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-300" />
-              </div>
-              <div className="flex-1">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-green-900 dark:text-green-100">Success</p>
-                  <p className="text-xs text-green-800 dark:text-green-100">{successMessage}</p>
+        <Card className={cn("mb-4", flashMessage?.type === 'success' ? 'border-l-4 border-l-green-500 bg-green-50 dark:bg-green-900/60 dark:border-green-500/50' : flashMessage?.type === 'error' ? 'border-l-4 border-l-rose-500 bg-rose-50 dark:bg-rose-900/60 dark:border-rose-500/50' : flashMessage?.type === 'warning' ? 'border-l-4 border-l-amber-500 bg-amber-50 dark:bg-amber-900/60 dark:border-amber-500/50' : 'border-l-4 border-l-slate-400 bg-slate-50') }>
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className={cn("flex-shrink-0 rounded-full p-2", flashMessage?.type === 'success' ? 'bg-green-100 dark:bg-green-800/60' : flashMessage?.type === 'error' ? 'bg-rose-100 dark:bg-rose-800/60' : flashMessage?.type === 'warning' ? 'bg-amber-100 dark:bg-amber-800/60' : 'bg-slate-100') }>
+                  <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-300" />
+                </div>
+                <div className="flex-1">
+                  <div className="space-y-1">
+                    <p className={cn("text-sm font-medium", flashMessage?.type === 'success' ? 'text-green-900 dark:text-green-100' : flashMessage?.type === 'error' ? 'text-rose-900 dark:text-rose-100' : flashMessage?.type === 'warning' ? 'text-amber-800 dark:text-amber-100' : 'text-slate-800') }>
+                      {flashMessage?.type === 'success' ? 'Success' : flashMessage?.type === 'error' ? 'Error' : flashMessage?.type === 'warning' ? 'Notice' : 'Info'}
+                    </p>
+                    <p className={cn("text-xs", flashMessage?.type === 'success' ? 'text-green-800 dark:text-green-100' : flashMessage?.type === 'error' ? 'text-rose-800 dark:text-rose-100' : flashMessage?.type === 'warning' ? 'text-amber-700 dark:text-amber-200' : 'text-slate-700') }>{flashMessage?.message}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
       )}
 
       {hasPendingOffPremisesRequest && !localTodayAttendance?.check_in_time && (
         <Alert className="mb-4 bg-amber-50 border-amber-200">
           <AlertTitle className="text-amber-800">Off‑Premises Request Pending</AlertTitle>
           <AlertDescription className="text-amber-700">
-            You already submitted an off‑premises check‑in request for today. Please wait for your supervisor to review and approve it — you cannot submit another request until a decision is made.
+            Your request has been submitted successfully. You have sent an off‑premises check‑in request for today. Please wait for your supervisor to review and approve it. You will not be able to submit another request until a decision has been made.
           </AlertDescription>
         </Alert>
       )}
@@ -1782,7 +1873,7 @@ export function AttendanceRecorder({
 
             <div className="bg-white/50 dark:bg-gray-900/50 rounded-lg p-3">
               <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Status</p>
-              <Badge className="bg-emerald-500 text-white hover:bg-emerald-600">✓ Completed for Today</Badge>
+              <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Completed for Today</p>
             </div>
           </div>
 
@@ -2158,20 +2249,22 @@ export function AttendanceRecorder({
                 Early Check-Out Notice
               </CardTitle>
             <CardDescription>
-              {getFormattedCheckoutTime()}. Please provide a reason.
+              {getFormattedCheckoutTime()}{earlyCheckoutReasonRequired ? " Please provide a reason." : ""}
             </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Alert className="border-orange-200 bg-orange-50">
-                <Info className="h-4 w-4 text-orange-600" />
-                <AlertTitle className="text-orange-800">Important</AlertTitle>
-                <AlertDescription className="text-orange-700">
-                  Your reason will be visible to your department head, supervisor, and HR portal for review.
-                </AlertDescription>
-              </Alert>
+              {earlyCheckoutReasonRequired && (
+                <Alert className="border-orange-200 bg-orange-50">
+                  <Info className="h-4 w-4 text-orange-600" />
+                  <AlertTitle className="text-orange-800">Important</AlertTitle>
+                  <AlertDescription className="text-orange-700">
+                    Your reason will be visible to your department head, supervisor, and HR portal for review.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <div className="space-y-2">
-                <Label htmlFor="early-checkout-reason">Reason for Early Checkout *</Label>
+                <Label htmlFor="early-checkout-reason">Reason for Early Checkout {earlyCheckoutReasonRequired ? '*' : '(optional)'} </Label>
                 <textarea
                   id="early-checkout-reason"
                   value={earlyCheckoutReason}
@@ -2180,8 +2273,8 @@ export function AttendanceRecorder({
                   className="w-full min-h-[100px] p-3 border rounded-md resize-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   maxLength={500}
                 />
-                <p className={`text-xs ${earlyCheckoutReason.length < 10 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                  {earlyCheckoutReason.length}/500 characters (minimum 10 required)
+                <p className={`text-xs ${earlyCheckoutReasonRequired && earlyCheckoutReason.length < 10 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                  {earlyCheckoutReason.length}/500 characters {earlyCheckoutReasonRequired ? '(minimum 10 required)' : '(optional)'}
                 </p>
               </div>
 
@@ -2197,7 +2290,7 @@ export function AttendanceRecorder({
                 <Button
                   onClick={handleEarlyCheckoutConfirm}
                   className="flex-1 bg-orange-600 hover:bg-orange-700"
-                  disabled={isLoading || earlyCheckoutReason.trim().length < 10}
+                  disabled={isLoading || (earlyCheckoutReasonRequired && earlyCheckoutReason.trim().length < 10)}
                 >
                   {isLoading ? (
                     <>

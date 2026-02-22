@@ -46,6 +46,7 @@ import { createClient } from "@/lib/supabase/client"
 
 interface AttendanceRecord {
   id: string
+  google_maps_name?: string
   check_in_time: string
   check_out_time?: string
   work_hours?: number
@@ -123,7 +124,18 @@ export function AttendanceReports() {
   const [summary, setSummary] = useState<ReportSummary | null>(null)
   const [loading, setLoading] = useState(false)
   const [compactMode, setCompactMode] = useState(false) // compact / landscape view for mobile
-
+  
+  // Auto-enable compact mode on small screens for denser layout
+  useEffect(() => {
+    const checkCompact = () => setCompactMode(window.innerWidth <= 768)
+    if (typeof window !== 'undefined') {
+      checkCompact()
+      window.addEventListener('resize', checkCompact)
+    }
+    return () => {
+      if (typeof window !== 'undefined') window.removeEventListener('resize', checkCompact)
+    }
+  }, [])
   const [startDate, setStartDate] = useState(() => {
     const date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     return date.toISOString().split("T")[0]
@@ -174,6 +186,22 @@ export function AttendanceReports() {
   })
 
   const [departments, setDepartments] = useState<Department[]>([])
+
+  const getLocationLabel = (record: AttendanceRecord, which: 'in' | 'out' = 'in') => {
+    if (which === 'in') {
+      return (
+        (record.google_maps_name && record.is_check_in_outside_location && record.google_maps_name) ||
+        record.check_in_location_name ||
+        record.check_in_location?.name ||
+        record.geofence_locations?.name ||
+        'N/A'
+      )
+    }
+
+    return (
+      record.check_out_location?.name || record.check_out_location_name || record.check_in_location_name || record.geofence_locations?.name || 'N/A'
+    )
+  }
 
   useEffect(() => {
     fetchReport()
@@ -335,26 +363,32 @@ export function AttendanceReports() {
             "Status",
             "Location Status",
           ].join(","),
-          ...records.map((record) =>
-            [
-              new Date(record.check_in_time).toLocaleDateString(),
-              `"${record.user_profiles?.employee_id || "N/A"}"`,
-              `"${(record.user_profiles?.first_name || "") + (record.user_profiles?.last_name ? ' ' + record.user_profiles.last_name : '') || 'Unknown User'}"`,
-              `"${record.user_profiles.departments?.name || "N/A"}"`,
-              `"${record.user_profiles.assigned_location?.name || "N/A"}"`,
-              `"${new Date(record.check_in_time).toLocaleTimeString()}"`,
-              `"${record.check_in_location?.name || record.check_in_location_name || "N/A"}"`,
-              `"${record.is_check_in_outside_location ? "Outside Assigned Location" : "On-site"}"`,
-              `"${record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : "N/A"}"`,
-              `"${record.check_out_location?.name || record.check_out_location_name || "N/A"}"`,
-              `"${record.is_check_out_outside_location ? "Outside Assigned Location" : "On-site"}"`,
-              `"${record.early_checkout_reason || "-"}"`,
-              `"${record.lateness_reason || "-"}"`,
-              record.work_hours?.toFixed(2) || "0",
-              `"${record.status}"`,
-              `"${record.is_check_in_outside_location || record.is_check_out_outside_location ? "Remote Work" : "On-site"}"`,
-            ].join(","),
-          ),
+          ...records.map((record) => {
+              const checkInLabel = record.google_maps_name && record.is_check_in_outside_location
+                ? record.google_maps_name
+                : record.check_in_location?.name || record.check_in_location_name || "N/A"
+
+              const checkOutLabel = record.check_out_location?.name || record.check_out_location_name || record.check_in_location_name || "N/A"
+
+              return [
+                new Date(record.check_in_time).toLocaleDateString(),
+                `"${record.user_profiles?.employee_id || "N/A"}"`,
+                `"${(record.user_profiles?.first_name || "") + (record.user_profiles?.last_name ? ' ' + record.user_profiles.last_name : '') || 'Unknown User'}"`,
+                `"${record.user_profiles.departments?.name || "N/A"}"`,
+                `"${record.user_profiles.assigned_location?.name || "N/A"}"`,
+                `"${new Date(record.check_in_time).toLocaleTimeString()}"`,
+                `"${checkInLabel}"`,
+                `"${record.is_check_in_outside_location ? "Outside Assigned Location" : "On-site"}"`,
+                `"${record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : "N/A"}"`,
+                `"${checkOutLabel}"`,
+                `"${record.is_check_out_outside_location ? "Outside Assigned Location" : "On-site"}"`,
+                `"${record.early_checkout_reason || "-"}"`,
+                `"${record.lateness_reason || "-"}"`,
+                record.work_hours?.toFixed(2) || "0",
+                `"${record.status}"`,
+                `"${record.is_check_in_outside_location || record.is_check_out_outside_location ? "Remote Work" : "On-site"}"`,
+              ].join(",")
+            }),
         ].join("\n")
 
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
@@ -586,10 +620,10 @@ export function AttendanceReports() {
   const earlyPageItems = earlyList.slice(earlyStart, earlyStart + earlyPageSize)
 
   return (
-    <div className="space-y-4">
+    <div className={compactMode ? "space-y-2 text-sm" : "space-y-4"}>
       {/* Advanced Filters - Modern Design */}
-      <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
-          <div className="p-3 sm:p-4 md:p-6">
+        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+          <div className={compactMode ? "p-2" : "p-3 sm:p-4 md:p-6"}>
             {exportError && (
               <div className="bg-red-500/20 backdrop-blur-sm border border-red-400/30 rounded-xl p-4 mt-2">
                 <div className="flex items-center gap-3">
@@ -600,9 +634,9 @@ export function AttendanceReports() {
             )}
           </div>
 
-        <div className="p-3 sm:p-4 md:p-6">
+        <div className={compactMode ? "p-2" : "p-3 sm:p-4 md:p-6"}>
           {/* Primary Filters */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4 items-end">
+          <div className={compactMode ? "grid gap-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 mb-3 items-end" : "grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4 items-end"}>
             <div className="space-y-3">
               <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                 <CalendarIcon className="h-4 w-4 text-blue-600" />
@@ -612,7 +646,7 @@ export function AttendanceReports() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 bg-gray-50 hover:bg-white text-sm"
+                className={`w-full border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 bg-gray-50 hover:bg-white ${compactMode ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'}`}
               />
             </div>
 
@@ -625,7 +659,7 @@ export function AttendanceReports() {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 bg-gray-50 hover:bg-white text-sm"
+                className={`w-full border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 bg-gray-50 hover:bg-white ${compactMode ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'}`}
               />
             </div>
 
@@ -635,7 +669,7 @@ export function AttendanceReports() {
                 Location
               </label>
               <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                <SelectTrigger className="w-full px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-150 bg-gray-50 hover:bg-white text-sm">
+                <SelectTrigger className={`w-full border border-gray-200 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-150 bg-gray-50 hover:bg-white ${compactMode ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'}`}>
                   <SelectValue placeholder="All Locations" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1195,9 +1229,9 @@ export function AttendanceReports() {
                           </TableCell>
                           <TableCell className={compactMode ? "py-1" : "py-2"}><Badge variant="outline" className={compactMode ? "font-medium text-gray-700 dark:text-slate-200 text-xs" : "font-medium text-gray-700 dark:text-slate-200 text-sm"}>{record.user_profiles.departments?.name || 'N/A'}</Badge></TableCell>
                           <TableCell className={compactMode ? "py-1 text-gray-800 dark:text-slate-200 text-xs" : "py-2 text-gray-800 dark:text-slate-200 text-sm"}>{new Date(record.check_in_time).toLocaleTimeString()}</TableCell>
-                          <TableCell className="py-2 text-gray-800 dark:text-slate-200 text-sm"><div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-gray-500 dark:text-slate-400" /><span className="text-sm text-gray-700 dark:text-slate-300">{record.check_in_location_name || 'N/A'}</span></div></TableCell>
+                          <TableCell className="py-2 text-gray-800 dark:text-slate-200 text-sm"><div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-gray-500 dark:text-slate-400" /><span className="text-sm text-gray-700 dark:text-slate-300 max-w-xs truncate block" title={getLocationLabel(record, 'in')}>{getLocationLabel(record, 'in')}</span></div></TableCell>
                           <TableCell className={compactMode ? "hidden sm:table-cell py-1 text-gray-800 dark:text-slate-200 text-xs" : "hidden sm:table-cell py-2 text-gray-800 dark:text-slate-200 text-sm"}>{record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : <span className="text-gray-400 dark:text-slate-400">-</span>}</TableCell>
-                          <TableCell className="hidden sm:table-cell py-2 text-gray-800 dark:text-slate-200 text-sm"><div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-gray-500 dark:text-slate-400" /><span className="text-sm text-gray-700 dark:text-slate-300">{record.check_out_location_name || 'N/A'}</span></div></TableCell>
+                          <TableCell className="hidden sm:table-cell py-2 text-gray-800 dark:text-slate-200 text-sm"><div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-gray-500 dark:text-slate-400" /><span className="text-sm text-gray-700 dark:text-slate-300 max-w-xs truncate block" title={getLocationLabel(record, 'out')}>{getLocationLabel(record, 'out')}</span></div></TableCell>
                           <TableCell className={compactMode ? "py-1 text-gray-800 dark:text-slate-200 text-xs" : "py-2 text-gray-800 dark:text-slate-200 text-sm"}><span className="font-medium">{record.work_hours ? `${record.work_hours.toFixed(1)}h` : '-'}</span></TableCell>
                           <TableCell className="py-2"><Badge
                             variant={
@@ -1268,13 +1302,16 @@ export function AttendanceReports() {
                       </div>
                       <div className="mt-2 text-xs text-gray-600 flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
-                        <span>{record.check_in_location_name || 'N/A'}</span>
+                        <span className="max-w-xs truncate block" title={getLocationLabel(record, 'in')}>{getLocationLabel(record, 'in')}</span>
                       </div>
                     </div>
                   ))}
                 </div>
 
                 {/* Pagination Controls */}
+                  <div className="px-3 py-2">
+                    <p className="text-xs text-gray-500 italic">Note: when a staff member checked in using an off‑premises request, the Google location name (if available) is shown.</p>
+                  </div>
                 <div className="p-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <Button variant="ghost" size="sm" onClick={() => setPage(1)} disabled={page === 1}>First</Button>
@@ -1337,7 +1374,7 @@ export function AttendanceReports() {
                                   {/* Location line */}
                                   <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
                                     <MapPin className="h-4 w-4" />
-                                    <span>{record.check_in_location_name || record.geofence_locations?.name || 'N/A'}</span>
+                                    <span className="max-w-xs truncate block" title={getLocationLabel(record, 'in')}>{getLocationLabel(record, 'in')}</span>
                                   </div>
 
                                   <p className="text-sm text-orange-700 mt-2 font-medium">
@@ -1349,8 +1386,8 @@ export function AttendanceReports() {
                                   <Badge variant="secondary">
                                     {record.user_profiles.departments?.name}
                                   </Badge>
-                                  <Badge variant="outline" className="text-xs">
-                                    {record.check_in_location_name || record.geofence_locations?.name || 'Unknown'}
+                                  <Badge variant="outline" className="text-xs max-w-xs truncate block" title={getLocationLabel(record, 'in')}>
+                                    {getLocationLabel(record, 'in')}
                                   </Badge>
                                 </div>
                               </div>
@@ -1398,7 +1435,7 @@ export function AttendanceReports() {
                                   {/* Location line */}
                                   <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
                                     <MapPin className="h-4 w-4" />
-                                    <span>{record.check_out_location_name || record.check_in_location_name || record.geofence_locations?.name || 'N/A'}</span>
+                                    <span className="max-w-xs truncate block" title={getLocationLabel(record, 'out')}>{getLocationLabel(record, 'out')}</span>
                                   </div>
 
                                   <p className="text-sm text-blue-700 mt-2 font-medium">
@@ -1410,8 +1447,8 @@ export function AttendanceReports() {
                                   <Badge variant="secondary">
                                     {record.user_profiles.departments?.name}
                                   </Badge>
-                                  <Badge variant="outline" className="text-xs">
-                                    {record.check_out_location_name || record.check_in_location_name || record.geofence_locations?.name || 'Unknown'}
+                                  <Badge variant="outline" className="text-xs max-w-xs truncate block" title={getLocationLabel(record, 'out')}>
+                                    {getLocationLabel(record, 'out')}
                                   </Badge>
                                 </div>
                               </div>
@@ -1449,7 +1486,7 @@ export function AttendanceReports() {
                             reasonsRecords
                               .filter((r) => r.lateness_reason || r.early_checkout_reason)
                               .reduce((acc, record) => {
-                                const location = record.check_in_location_name || 'Unknown'
+                                const location = getLocationLabel(record, 'in') || 'Unknown'
                                 if (!acc[location]) {
                                   acc[location] = { lateness: 0, earlyCheckout: 0 }
                                 }

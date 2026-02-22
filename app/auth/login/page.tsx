@@ -230,6 +230,20 @@ export default function LoginPage() {
           return
         }
 
+        // If there are concurrent active sessions on other devices, warn the user but allow login to continue
+        if (deviceCheck.concurrent) {
+          try {
+            const first = Array.isArray(deviceCheck.sessions) && deviceCheck.sessions.length > 0 ? deviceCheck.sessions[0] : null
+            const deviceLabel = first ? `${first.device_name || first.device_type || first.device_id} (last seen ${new Date(first.last_activity).toLocaleString()})` : 'another device'
+            showWarning(
+              `Another active session was detected on ${deviceLabel}. Proceeding will allow you to sign in; if this wasn't you, contact IT immediately.`,
+              'Concurrent Session Detected',
+            )
+          } catch (warnErr) {
+            showWarning('Another active session was detected on this account. Proceeding will allow you to sign in.', 'Concurrent Session Detected')
+          }
+        }
+
         // Log successful login
         await logLoginActivity(data.user.id, "login_success", true, "password")
       }
@@ -680,7 +694,7 @@ export default function LoginPage() {
           <div className="mt-6 text-center border-t border-border pt-6">
             <p className="text-sm font-medium text-foreground">Quality Control Company Limited</p>
             <p className="text-xs text-muted-foreground mt-1">Intranet Portal - Powered by IT Department</p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono text-center">V.2.2.18.26</p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono text-center">V.1.1.2-23-26</p>
           </div>
           </CardContent>
         </Card>

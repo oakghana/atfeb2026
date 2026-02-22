@@ -578,6 +578,7 @@ export function DepartmentSummariesClient({ userRole, departmentId }: Department
                   </TableBody>
                 </Table>
               )}
+              <div className="mt-2 text-xs text-gray-500 italic">Note: Google location name is shown when an off‑premises check‑in was used.</div>
             </div>
           )}
         </DialogContent>

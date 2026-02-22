@@ -43,34 +43,36 @@ export async function GET(request: NextRequest) {
       // Staff members can only see their own pending requests
       let query = adminClient
         .from("pending_offpremises_checkins")
-        .select(
-          `
-          id,
-          user_id,
-          current_location_name,
-          latitude,
-          longitude,
-          accuracy,
-          device_info,
-          created_at,
-          status,
-          approved_by_id,
-          approved_at,
-          rejection_reason,
-          google_maps_name,
-          user_profiles!pending_offpremises_checkins_user_id_fkey (
+          .select(`
             id,
-            first_name,
-            last_name,
-            email,
-            employee_id,
-            department_id,
-            position,
-            assigned_location_id
-          )
-        `
-        )
+            user_id,
+            current_location_name,
+            latitude,
+            longitude,
+            accuracy,
+            device_info,
+            created_at,
+            status,
+            approved_by_id,
+            approved_at,
+            rejection_reason,
+            google_maps_name,
+            reason,
+            request_type,
+            user_profiles!pending_offpremises_checkins_user_id_fkey (
+              id,
+              first_name,
+              last_name,
+              email,
+              employee_id,
+              department_id,
+              position,
+              assigned_location_id
+            )
+          `)
         .eq("user_id", user.id)
+        // exclude deprecated checkout requests
+        .neq("request_type", "checkout")
         .order("created_at", { ascending: false })
 
       // Apply status filter if not "all"
@@ -98,8 +100,7 @@ export async function GET(request: NextRequest) {
     // Note: request_type and reason columns may not exist, so we exclude them from the base query
     let queryWithReason = adminClient
       .from("pending_offpremises_checkins")
-      .select(
-        `
+      .select(`
         id,
         user_id,
         current_location_name,
@@ -113,6 +114,8 @@ export async function GET(request: NextRequest) {
         approved_at,
         rejection_reason,
         google_maps_name,
+        reason,
+        request_type,
         user_profiles!pending_offpremises_checkins_user_id_fkey (
           id,
           first_name,
@@ -123,8 +126,9 @@ export async function GET(request: NextRequest) {
           position,
           assigned_location_id
         )
-      `
-      )
+      `)
+      // don't return checkout requests
+      .neq("request_type", "checkout")
       .order("created_at", { ascending: false })
 
     // if non-admin manager, restrict to own department or assigned location

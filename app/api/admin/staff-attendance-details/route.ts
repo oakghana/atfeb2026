@@ -56,7 +56,7 @@ export async function GET(request: Request) {
         checkInTime: record.check_in_time,
         checkOutTime: record.check_out_time,
         workHours: record.work_hours || 0,
-        location: record.check_in_location_name || "Unknown",
+        location: record.google_maps_name || record.check_in_location_name || "Unknown",
         status: record.check_out_time ? (checkInTime > standardTime ? "late" : "present") : "incomplete",
       }
     })

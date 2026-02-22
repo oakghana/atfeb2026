@@ -79,6 +79,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // new policy: off-premises check-out requests are deprecated and cannot be approved
+    if ((pendingRequest.request_type || 'checkin') === 'checkout') {
+      console.warn('[v0] Attempted to process deprecated checkout request', pendingRequest.id)
+      return NextResponse.json({ error: 'Off-premises check-out requests are no longer supported' }, { status: 400 })
+    }
+
     // Permission validation based on role
     if (approverProfile.role === "admin") {
       // Admins can approve all requests

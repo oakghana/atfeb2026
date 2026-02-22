@@ -1,5 +1,5 @@
 import "server-only"
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { emailService } from "./email-service"
 
 interface BackupConfig {
@@ -41,7 +41,7 @@ class BackupService {
 
     try {
       console.log(`[BackupService] Starting backup: ${backupId}`)
-      const supabase = await createClient()
+      const supabase = await createAdminClient()
 
       // Define tables to backup.  We avoid querying pg_catalog via PostgREST
       // because the schema cache often doesn't expose system catalogs, leading
@@ -89,25 +89,40 @@ class BackupService {
       let totalSize = 0
 
       // Backup each table (skip missing ones)
+      const PAGE_SIZE = 1000
       for (const table of tables) {
         try {
-          const { data, error } = await supabase.from(table).select("*")
+          const rows: any[] = []
+          let from = 0
+          while (true) {
+            const to = from + PAGE_SIZE - 1
+            const { data, error } = await supabase.from(table).select("*").range(from, to)
 
-          if (error) {
-            // ignore missing-table error code from PostgREST
-            if (error.code === "PGRST205" || error.message?.includes("Could not find the table")) {
-              console.warn(`[BackupService] Table ${table} does not exist, skipping.`)
-              continue
+            if (error) {
+              if (error.code === "PGRST205" || error.message?.includes("Could not find the table")) {
+                console.warn(`[BackupService] Table ${table} does not exist, skipping.`)
+                break
+              }
+              console.error(`[BackupService] Error backing up table ${table} (range ${from}-${to}):`, error)
+              break
             }
-            console.error(`[BackupService] Error backing up table ${table}:`, error)
-            continue
+
+            if (data && data.length > 0) {
+              rows.push(...data)
+            }
+
+            // If fewer than PAGE_SIZE rows returned, we've fetched all rows
+            if (!data || data.length < PAGE_SIZE) {
+              break
+            }
+
+            from += PAGE_SIZE
           }
 
-          backupData[table] = data || []
-          totalSize += JSON.stringify(data).length
-          console.log(`[BackupService] Backed up ${data?.length || 0} records from ${table}`)
+          backupData[table] = rows
+          totalSize += JSON.stringify(rows).length
+          console.log(`[BackupService] Backed up ${rows.length} records from ${table}`)
         } catch (tableError: any) {
-          // similarly suppress missing-table errors thrown as exceptions
           if (tableError?.code === "PGRST205" || tableError?.message?.includes("Could not find the table")) {
             console.warn(`[BackupService] Table ${table} does not exist (exception), skipping.`)
             continue
@@ -187,7 +202,7 @@ class BackupService {
     // Store backup reference in database.  We keep the whole payload inside
     // metadata so that restores can access the data; the table already has a
     // JSONB metadata field and RLS policy restricting access to admins.
-    const supabase = await createClient()
+      const supabase = await createAdminClient()
     await supabase.from("system_backups").upsert({
       id: backupId,
       created_at: new Date().toISOString(),
@@ -202,7 +217,7 @@ class BackupService {
       const cutoffDate = new Date()
       cutoffDate.setDate(cutoffDate.getDate() - retentionDays)
 
-      const supabase = await createClient()
+      const supabase = await createAdminClient()
       const { data: oldBackups } = await supabase
         .from("system_backups")
         .select("id")
@@ -269,7 +284,7 @@ class BackupService {
 
   async getBackupHistory(limit = 10) {
     try {
-      const supabase = await createClient()
+      const supabase = await createAdminClient()
       const { data: backups } = await supabase
         .from("system_backups")
         .select("*")
@@ -289,7 +304,7 @@ class BackupService {
 
     try {
       console.log(`[BackupService] Starting restore: ${backupId}`)
-      const supabase = await createClient()
+      const supabase = await createAdminClient()
 
       // Get backup data from storage (in real implementation, this would fetch from cloud storage)
       const { data: backupRecord, error: fetchError } = await supabase

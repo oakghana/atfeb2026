@@ -284,16 +284,19 @@ export async function POST(request: NextRequest) {
     const { email, first_name, last_name, employee_id, department_id, position, role, assigned_location_id, password } =
       body
 
-    if (profile.role === "it-admin" && (role === "admin" || role === "it-admin")) {
-      console.error("[v0] Staff API - IT-Admin tried to create admin/it-admin user")
-      return createJsonResponse(
-        {
-          success: false,
-          error: "IT-Admin users cannot create Admin or IT-Admin accounts",
-          details: "You can only create: Staff, Department Head, NSP, Intern, or Contract users",
-        },
-        403,
-      )
+    if (profile.role === "it-admin") {
+      const allowedForItAdmin = ["staff", "nsp", "contract", "department_head"]
+      if (!allowedForItAdmin.includes(role)) {
+        console.error("[v0] Staff API - IT-Admin attempted to create disallowed role:", role)
+        return createJsonResponse(
+          {
+            success: false,
+            error: "IT-Admin users cannot create this role",
+            details: `IT-Admin may only create the following roles: ${allowedForItAdmin.join(", ")}`,
+          },
+          403,
+        )
+      }
     }
 
     if ((role === "admin" || role === "regional_manager") && profile.role !== "admin") {

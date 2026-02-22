@@ -127,6 +127,24 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      // Detect concurrent active device sessions for this user (other devices)
+      let concurrentSessions: any[] = []
+      try {
+        const { data: otherSessions, error: sessionsError } = await supabase
+          .from("device_sessions")
+          .select("id, device_name, device_type, device_id, ip_address, last_activity")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .neq("device_id", device_id)
+          .limit(10)
+
+        if (!sessionsError && Array.isArray(otherSessions) && otherSessions.length > 0) {
+          concurrentSessions = otherSessions
+        }
+      } catch (sessionErr) {
+        console.log('[v0] Could not check concurrent device sessions:', sessionErr)
+      }
+
       if (!existingBinding) {
         try {
           await supabase.from("device_user_bindings").insert({
@@ -159,6 +177,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         allowed: true,
         violation: false,
+        concurrent: concurrentSessions.length > 0,
+        sessions: concurrentSessions,
         message: "Device verified successfully",
       })
     } catch (dbError: any) {

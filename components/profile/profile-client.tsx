@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -84,17 +85,17 @@ export function ProfileClient({ initialUser, initialProfile }: ProfileClientProp
     confirmPassword: "",
   })
   const [showPasswordChange, setShowPasswordChange] = useState(false)
-  const router = useRouter()
+  const searchParams = useSearchParams()
 
   // if redirected with forceChange flag, open password form automatically
   useEffect(() => {
-    if (router && router.search) {
-      const params = new URLSearchParams(router.search)
-      if (params.get('forceChange')) {
-        setShowPasswordChange(true)
-      }
+    try {
+      const force = searchParams?.get?.("forceChange")
+      if (force) setShowPasswordChange(true)
+    } catch (e) {
+      // ignore
     }
-  }, [router.search])
+  }, [searchParams])
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -554,7 +555,7 @@ export function ProfileClient({ initialUser, initialProfile }: ProfileClientProp
                 </div>
 
                 {/* if redirected due to expiry, force form open */}
-                {router && router.search && new URLSearchParams(router.search).get('forceChange') && !showPasswordChange && (
+                {searchParams?.get?.("forceChange") && !showPasswordChange && (
                   <p className="text-sm text-red-600 mt-2">Your password has expired; please update before using the app.</p>
                 )}
 

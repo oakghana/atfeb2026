@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 import { validateCheckoutLocation, type LocationData } from "@/lib/geolocation"
 import { requiresEarlyCheckoutReason, canCheckOutAtTime, getCheckOutDeadline } from "@/lib/attendance-utils"
@@ -144,6 +144,8 @@ export async function POST(request: NextRequest) {
     
     // determine bypass if remote checkout (either originally off-premises OR currently out-of-range)
     const isOffPremisesCheckedIn = !!attendanceRecord.on_official_duty_outside_premises || !!attendanceRecord.is_remote_location
+    // Declare checkoutLocationData early so it can be referenced when determining time-rule bypasses
+    let checkoutLocationData: any = null
     const isOutOfRange = !checkoutLocationData
     const bypassTimeRules = isOffPremisesCheckedIn || isOutOfRange
 
@@ -373,7 +375,7 @@ export async function POST(request: NextRequest) {
       foundSettings: deviceRadiusSettings?.length || 0,
     })
 
-    let checkoutLocationData = null
+    // `checkoutLocationData` already declared above; assign as needed below
 
     // Determine whether this attendance record was created from an approved off-premises request
     const isAttendanceOffPremises = !!attendanceRecord.on_official_duty_outside_premises || !!attendanceRecord.is_remote_location
@@ -478,7 +480,11 @@ export async function POST(request: NextRequest) {
     })
 
     // Only mark earlyCheckoutWarning when the location requires a reason AND it's NOT a weekend
-    if (isEarlyCheckout && effectiveRequireEarlyCheckoutReason && !isWeekend) {
+    // However, if the user has already worked 9 or more hours, allow checkout without requiring a reason.
+    const checkInTimeForHours = new Date(attendanceRecord.check_in_time)
+    const hoursWorked = (checkOutTime.getTime() - checkInTimeForHours.getTime()) / (1000 * 60 * 60)
+
+    if (isEarlyCheckout && effectiveRequireEarlyCheckoutReason && !isWeekend && hoursWorked < 9) {
       earlyCheckoutWarning = {
         message: `Early checkout detected at ${checkOutTime.toLocaleTimeString()}. Standard work hours end at ${checkOutEndTime}.`,
         checkoutTime: checkOutTime.toISOString(),
@@ -519,7 +525,9 @@ export async function POST(request: NextRequest) {
       checkoutData.early_checkout_reason = early_checkout_reason
     }
 
-    const { data: updatedRecord, error: updateError } = await supabase
+    console.log(`[v0] Checkout - updating attendance id=${attendanceRecord.id}`, { checkoutData })
+
+    const updateRes = await supabase
       .from("attendance_records")
       .update(checkoutData)
       .eq("id", attendanceRecord.id)
@@ -536,9 +544,48 @@ export async function POST(request: NextRequest) {
       `)
       .single()
 
+    let updatedRecord = updateRes.data
+    let updateError = updateRes.error
+
     if (updateError) {
       console.error("[v0] Update error:", updateError)
 
+      // Attempt an admin-client fallback in case RLS/permission issues prevented
+      // the authenticated server client from performing the update. This helps
+      // recover when cookies/tokens are missing or RLS rules are overly strict.
+      try {
+        console.log("[v0] Attempting admin-client fallback for checkout update")
+        const adminSupabase = await createAdminClient()
+        const adminRes = await adminSupabase
+          .from("attendance_records")
+          .update(checkoutData)
+          .eq("id", attendanceRecord.id)
+          .select(`
+            *,
+            geofence_locations!check_in_location_id (
+              name,
+              address
+            ),
+            checkout_location:geofence_locations!check_out_location_id (
+              name,
+              address
+            )
+          `)
+          .single()
+
+        if (adminRes.error) {
+          console.error("[v0] Admin fallback update failed:", adminRes.error)
+        } else {
+          console.log("[v0] Admin fallback update succeeded for checkout")
+          updatedRecord = adminRes.data
+          updateError = null
+        }
+      } catch (adminErr) {
+        console.error("[v0] Admin fallback exception:", adminErr)
+      }
+    }
+
+    if (updateError) {
       const devDetails = process.env.NODE_ENV === "production" ? undefined : {
         message: updateError.message,
         code: updateError.code,

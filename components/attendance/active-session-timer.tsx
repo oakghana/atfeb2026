@@ -21,7 +21,6 @@ interface ActiveSessionTimerProps {
   userDepartment?: { code?: string | null; name?: string | null } | undefined | null
   userRole?: string | null
   // New: indicates the user was checked in via an approved off‑premises request
-  isOffPremisesCheckedIn?: boolean
 }
 
 export function ActiveSessionTimer({
@@ -36,7 +35,6 @@ export function ActiveSessionTimer({
   isCheckingOut = false,
   userDepartment,
   userRole,
-  isOffPremisesCheckedIn = false,
 }: ActiveSessionTimerProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [timeUntilCheckout, setTimeUntilCheckout] = useState<{
@@ -140,18 +138,17 @@ export function ActiveSessionTimer({
         </div>
 
         {/* Checkout Button - Show when ready */}
-        {(timeUntilCheckout.canCheckout || isOffPremisesCheckedIn) && onCheckOut && (
+        {timeUntilCheckout.canCheckout && onCheckOut && (
           <Button
             onClick={onCheckOut}
             // once the minimum work period has elapsed we allow checkout regardless of the 6pm deadline
-            // allow checkout if location is valid OR the user has met time/remote conditions
+            // allow checkout if location is valid or the user has met time requirements
             disabled={
               isCheckingOut ||
               !(
                 canCheckOut ||
                 canCheckOutAtTime(new Date(), userDepartment, userRole) ||
-                timeUntilCheckout.canCheckout ||
-                isOffPremisesCheckedIn
+                timeUntilCheckout.canCheckout
               )
             }
             variant="destructive"
@@ -159,29 +156,27 @@ export function ActiveSessionTimer({
             size="lg"
             title={
               // explain why button is disabled if still blocked by time restrictions
-              !(canCheckOut || canCheckOutAtTime(new Date(), userDepartment, userRole) || timeUntilCheckout.canCheckout || isOffPremisesCheckedIn)
+              !(canCheckOut || canCheckOutAtTime(new Date(), userDepartment, userRole) || timeUntilCheckout.canCheckout)
                 ? `Check-out only allowed before ${getCheckOutDeadline()} or after minimum work period of ${minimumWorkMinutes} minutes or if in range`
-                : isOffPremisesCheckedIn
-                ? "Off‑premises checkout allowed — will be recorded as remote"
                 : "Check out from your location"
             }
           >
             {isCheckingOut ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                {isOffPremisesCheckedIn ? 'Checking Out (Off‑Premises)...' : 'Checking Out...'}
+                {'Checking Out...'}
               </>
             ) : (
               <>
                 <LogOut className="mr-2 h-5 w-5" />
-                {isOffPremisesCheckedIn ? 'Off‑Premises Check Out' : 'Check Out Now'}
+                {'Check Out Now'}
               </>
             )}
           </Button>
         )}
 
         {/* Countdown Timer */}
-        {(timeUntilCheckout.canCheckout || isOffPremisesCheckedIn) ? (
+        {timeUntilCheckout.canCheckout ? (
           <div className="rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/60 dark:to-emerald-900/60 border border-green-200 dark:border-green-500/50 p-4">
             <div className="flex items-center gap-3">
               <div className="bg-green-500 rounded-full p-2">
@@ -190,7 +185,7 @@ export function ActiveSessionTimer({
               <div>
                 <p className="font-semibold text-green-900 dark:text-green-100">Ready to check out</p>
                 <p className="text-sm text-green-700 dark:text-green-300">
-                  {isOffPremisesCheckedIn ? 'Off‑premises checkout allowed — will be recorded as remote.' : 'You can now check out from your location'}
+                  {'You can now check out from your location'}
                 </p>
               </div>
             </div>
