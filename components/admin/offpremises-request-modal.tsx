@@ -80,21 +80,23 @@ export function OffPremisesRequestModal({
         throw new Error(result.error || 'Failed to process request')
       }
 
-      // Show toast
+      // Show toast (success or rejection) with action link and close modal
       toast({
-        title: approved ? 'Request Approved' : 'Request Rejected',
+        title: approved ? 'Off‑Premises Request Approved' : 'Off‑Premises Request Rejected',
         description: approved
-          ? `${request.user_profiles.first_name} has been checked in to their assigned location and marked as on official duty outside premises.`
-          : `The off-premises check-in request has been rejected.`,
+          ? `${request.user_profiles.first_name} has been checked in and marked as on official duty outside premises.`
+          : `The off‑premises check‑in request has been rejected.`,
+        action: (
+          <Button asChild variant="outline">
+            <a href="/offpremises-approvals">View Requests</a>
+          </Button>
+        ),
+        className: approved ? 'border-emerald-400 bg-emerald-50 text-emerald-900' : undefined,
       })
 
-      // Close modal immediately
+      // Close modal and refresh immediately
       onClose()
-      
-      // Trigger refresh after a small delay to let modal animation complete
-      setTimeout(() => {
-        onApprovalComplete()
-      }, 300)
+      onApprovalComplete()
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -120,7 +122,7 @@ export function OffPremisesRequestModal({
   const mapUrl = `https://www.google.com/maps?q=${request.latitude},${request.longitude}`
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -133,6 +135,14 @@ export function OffPremisesRequestModal({
               : 'Staff member is requesting to check in from outside their assigned QCC location'}
           </DialogDescription>
         </DialogHeader>
+        {request.request_type === 'checkout' && (
+          <Alert className="mt-2 border-yellow-200 bg-yellow-50">
+            <AlertTitle>Checkout Requests Disabled</AlertTitle>
+            <AlertDescription>
+              Off‑premises check‑out requests are no longer supported. Users must return to a registered location to check out normally. This request will not be processed automatically; please ignore or reject it.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="space-y-4 py-4">
           {/* Staff Member Information */}
@@ -266,14 +276,14 @@ export function OffPremisesRequestModal({
           <Button
             variant="outline"
             onClick={onClose}
-            disabled={isApproving}
+            disabled={isApproving || request.request_type === 'checkout'}
           >
             Cancel
           </Button>
           <Button
             variant="destructive"
             onClick={() => handleApprove(false)}
-            disabled={isApproving}
+            disabled={isApproving || request.request_type === 'checkout'}
             className="gap-2"
           >
             {isApproving ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
@@ -281,7 +291,7 @@ export function OffPremisesRequestModal({
           </Button>
           <Button
             onClick={() => handleApprove(true)}
-            disabled={isApproving}
+            disabled={isApproving || request.request_type === 'checkout'}
             className="bg-green-600 hover:bg-green-700 gap-2"
           >
             {isApproving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}

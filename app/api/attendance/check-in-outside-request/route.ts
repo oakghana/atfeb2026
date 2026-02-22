@@ -16,8 +16,15 @@ export async function POST(request: NextRequest) {
 
     // Normalize request type: accept `request_type`, `action`, or `mode` (legacy)
     const normalizedRequestType = (request_type || action || mode || 'checkin').toString().toLowerCase()
-    const allowedTypes = ['checkin','checkout']
-    const finalRequestType = allowedTypes.includes(normalizedRequestType) ? normalizedRequestType : 'checkin'
+    // Since off-premises check-out is no longer supported, always treat as check-in
+    if (normalizedRequestType === 'checkout') {
+      console.warn('[v0] Received off-premises checkout request; rejecting')
+      return NextResponse.json(
+        { error: 'Off-premises check-out requests are disabled' },
+        { status: 400 }
+      )
+    }
+    const finalRequestType = 'checkin'
 
     if (!current_location) {
       console.error("[v0] Missing current_location")
@@ -61,29 +68,87 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get ALL managers (admins, regional managers, department heads) - no department/location filtering
-    console.log("[v0] Looking for all managers (admin, regional_manager, department_head)...")
-    const { data: allManagers } = await supabase
-      .from("user_profiles")
-      .select("id, email, first_name, last_name, role")
-      .in("role", ["admin", "regional_manager", "department_head"])
-      .eq("is_active", true)
-    
-    console.log("[v0] Managers found:", { count: allManagers?.length || 0 })
+    // Resolve approvers as follows:
+    //  - All admins should always receive notifications
+    //  - The department head for the user's department should receive the request
+    //  - The regional manager for the location's district (if determinable) should receive the request
+    console.log('[v0] Resolving approvers: admins, department head, regional manager (if available)')
 
-    if (!allManagers || allManagers.length === 0) {
-      console.error("[v0] No managers found in the system")
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Cannot submit off-premises request: No managers found in the system. Please contact HR.",
-          requiresManualApproval: true,
-        },
-        { status: 400 }
-      )
+    // 1) Admins
+    const { data: admins } = await supabase
+      .from('user_profiles')
+      .select('id, email, first_name, last_name, role')
+      .eq('role', 'admin')
+      .eq('is_active', true)
+
+    // 2) Department head for the user's department
+    let departmentHeads: any[] = []
+    if (userProfile.department_id) {
+      const { data: deptHeads } = await supabase
+        .from('user_profiles')
+        .select('id, email, first_name, last_name, role')
+        .eq('role', 'department_head')
+        .eq('department_id', userProfile.department_id)
+        .eq('is_active', true)
+      departmentHeads = deptHeads || []
     }
 
-    const managers = allManagers
+    // 3) Regional manager for the location's district (attempt to infer district)
+    let regionalManagers: any[] = []
+    let districtId: any = current_location?.district_id || null
+    if (!districtId && current_location?.latitude && current_location?.longitude) {
+      // Try to find a nearby geofence location and use its district
+      const lat = Number(current_location.latitude)
+      const lng = Number(current_location.longitude)
+      const latDelta = 0.02
+      const lngDelta = 0.02
+      const { data: nearby } = await supabase
+        .from('geofence_locations')
+        .select('id, district_id')
+        .gte('latitude', lat - latDelta)
+        .lte('latitude', lat + latDelta)
+        .gte('longitude', lng - lngDelta)
+        .lte('longitude', lng + lngDelta)
+        .limit(1)
+      if (nearby && nearby.length > 0) {
+        districtId = nearby[0].district_id
+      }
+    }
+
+    if (districtId) {
+      const { data: regional } = await supabase
+        .from('user_profiles')
+        .select('id, email, first_name, last_name, role')
+        .eq('role', 'regional_manager')
+        .eq('district_id', districtId)
+        .eq('is_active', true)
+      regionalManagers = regional || []
+    }
+
+    // Merge unique managers: admins + departmentHeads + regionalManagers
+    const managersMap: Record<string, any> = {}
+    const pushUnique = (arr: any[] | undefined) => {
+      (arr || []).forEach((m) => {
+        if (m && m.id && !managersMap[m.id]) managersMap[m.id] = m
+      })
+    }
+
+    pushUnique(admins)
+    pushUnique(departmentHeads)
+    pushUnique(regionalManagers)
+
+    const managers = Object.values(managersMap)
+
+    console.log('[v0] Approvers resolved:', { admins: admins?.length || 0, departmentHeads: departmentHeads.length, regionalManagers: regionalManagers.length, total: managers.length })
+
+    if (managers.length === 0) {
+      console.error('[v0] No approvers resolved for off-premises request')
+      return NextResponse.json({
+        success: false,
+        error: 'Cannot submit off-premises request: No approvers available. Please contact HR.',
+        requiresManualApproval: true,
+      }, { status: 400 })
+    }
 
     // Store the off-premises check-in request for manager approval
     console.log("[v0] Inserting pending check-in:", {
@@ -91,6 +156,33 @@ export async function POST(request: NextRequest) {
       location_name: current_location.name,
       status: "pending",
     })
+
+    // Server-side guard: prevent duplicate pending requests from the same user for the same day
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const { data: existing, error: existingErr } = await supabase
+        .from('pending_offpremises_checkins')
+        .select('id, status, created_at')
+        .eq('user_id', user_id)
+        .gte('created_at', `${today}T00:00:00`)
+        .lte('created_at', `${today}T23:59:59`)
+        .limit(1)
+        .maybeSingle()
+
+      if (existingErr) {
+        console.warn('[v0] Could not check for existing pending off-premises request:', existingErr)
+      } else if (existing && String(existing.status).toLowerCase() === 'pending') {
+        console.log('[v0] Duplicate pending off-premises request detected for user:', user_id)
+        return NextResponse.json({
+          success: false,
+          error: 'You already have a pending off‑premises request for today. Please wait for your approver to review it.',
+          duplicate: true,
+        }, { status: 409 })
+      }
+    } catch (dupErr) {
+      console.warn('[v0] Error while checking duplicate off-premises request:', dupErr)
+      // continue — do not block creation on duplicate-check failure
+    }
 
     // Try inserting with `reason` column if it exists; fall back if DB doesn't have that column yet
     let requestRecord: any = null

@@ -77,7 +77,24 @@ export function PendingOffPremisesRequests() {
       console.log("[v0] Loaded requests:", data.requests)
       console.log("[v0] Total count:", data.count)
       console.log("[v0] Pending filter:", data.requests?.filter((r: any) => r.status === 'pending'))
-      setAllRequests(data.requests || [])
+
+      // Preserve selectedRequest during polling so the open review modal isn't closed
+      // when the list refreshes. If the selected request still exists in the fresh
+      // dataset, update it with the latest values; otherwise keep the existing
+      // selectedRequest so the reviewer can finish their work.
+      const fresh = data.requests || []
+      setAllRequests(fresh)
+      if (selectedRequest) {
+        const updated = fresh.find((r: any) => r.id === selectedRequest.id)
+        if (updated) {
+          setSelectedRequest(updated)
+        } else {
+          // If the selected request was removed from the list (e.g., processed by
+          // another approver), keep the modal open and leave the selectedRequest
+          // as-is so the reviewer can still inspect it; do not automatically close.
+          console.log('[v0] Selected request not found in fresh list; preserving current selection')
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'An error occurred while loading requests')
     } finally {
