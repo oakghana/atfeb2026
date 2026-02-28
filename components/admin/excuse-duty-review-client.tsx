@@ -77,15 +77,30 @@ export function ExcuseDutyReviewClient({ userRole, userDepartment }: ExcuseDutyR
   const [reviewStatus, setReviewStatus] = useState<"approved" | "rejected">("approved")
   const [reviewNotes, setReviewNotes] = useState("")
   const [submitting, setSubmitting] = useState(false)
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
+  // Default to pending to speed initial load; department heads see their department by default
+  const [statusFilter, setStatusFilter] = useState("pending")
+  const [departmentFilter, setDepartmentFilter] = useState<string>(() => {
+    if (userRole !== "admin" && userDepartment) return userDepartment
+    return "all"
+  })
+  const [docTypeFilter, setDocTypeFilter] = useState<string>("all")
+  const [dateFrom, setDateFrom] = useState<string | null>(null)
+  const [dateTo, setDateTo] = useState<string | null>(null)
+  const [page, setPage] = useState<number>(1)
+  const [perPage, setPerPage] = useState<number>(50)
+  const [hasMore, setHasMore] = useState<boolean>(false)
+
+  useEffect(() => {
+    // When filters change, reset to first page
+    setPage(1)
+  }, [statusFilter, departmentFilter, docTypeFilter, dateFrom, dateTo, userRole, userDepartment])
 
   useEffect(() => {
     fetchExcuseDocuments()
     if (userRole === "admin") {
       fetchDepartments()
     }
-  }, [statusFilter, departmentFilter])
+  }, [statusFilter, departmentFilter, docTypeFilter, dateFrom, dateTo, page, perPage, userRole, userDepartment])
 
   const fetchDepartments = async () => {
     try {
@@ -109,15 +124,25 @@ export function ExcuseDutyReviewClient({ userRole, userDepartment }: ExcuseDutyR
       if (departmentFilter !== "all" && userRole === "admin") {
         params.append("department", departmentFilter)
       }
+      if (docTypeFilter !== "all") {
+        params.append("document_type", docTypeFilter)
+      }
+      if (dateFrom) params.append("date_from", dateFrom)
+      if (dateTo) params.append("date_to", dateTo)
+      params.append("page", String(page))
+      params.append("per_page", String(perPage))
 
       const response = await fetch(`/api/admin/excuse-duty?${params.toString()}`)
 
       if (!response.ok) {
-        throw new Error("Failed to fetch excuse documents")
+        const text = await response.text().catch(() => "")
+        console.error("Excuse documents fetch failed:", response.status, text)
+        throw new Error(`Failed to fetch excuse documents: ${response.status} ${text}`)
       }
 
       const data = await response.json()
       setExcuseDocuments(data.excuseDocuments || [])
+      setHasMore(Boolean(data.pagination && data.pagination.hasMore))
     } catch (error) {
       console.error("Failed to fetch excuse documents:", error)
       setError("Failed to load excuse documents")
@@ -302,6 +327,36 @@ export function ExcuseDutyReviewClient({ userRole, userDepartment }: ExcuseDutyR
                 </SelectContent>
               </Select>
 
+              <Select value={docTypeFilter} onValueChange={setDocTypeFilter}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Document type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="medical">Medical</SelectItem>
+                  <SelectItem value="emergency">Emergency</SelectItem>
+                  <SelectItem value="personal">Personal</SelectItem>
+                  <SelectItem value="official">Official</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={dateFrom ?? ""}
+                  onChange={(e) => setDateFrom(e.target.value || null)}
+                  className="input input-sm"
+                  title="From"
+                />
+                <input
+                  type="date"
+                  value={dateTo ?? ""}
+                  onChange={(e) => setDateTo(e.target.value || null)}
+                  className="input input-sm"
+                  title="To"
+                />
+              </div>
+
               {userRole === "admin" && (
                 <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                   <SelectTrigger className="w-[180px]">
@@ -416,6 +471,32 @@ export function ExcuseDutyReviewClient({ userRole, userDepartment }: ExcuseDutyR
                   ))}
                 </TableBody>
               </Table>
+                <div className="flex items-center justify-between p-3">
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
+                      Previous
+                    </Button>
+                    <div className="text-sm text-muted-foreground">Page {page}</div>
+                    <Button size="sm" onClick={() => hasMore && setPage((p) => p + 1)} disabled={!hasMore}>
+                      Next
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm text-muted-foreground">Per page:</div>
+                    <Select value={String(perPage)} onValueChange={(v) => setPerPage(Number(v))}>
+                      <SelectTrigger className="w-[80px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
             </div>
           )}
         </CardContent>

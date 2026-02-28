@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
-import { requiresLatenessReason, canCheckInAtTime, getCheckInDeadline } from "@/lib/attendance-utils"
+import { requiresLatenessReason, canCheckInAtTime, getCheckInDeadline, isSecurityDept, isOperationalDept, isTransportDept } from "@/lib/attendance-utils"
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
+    let overrideMeta: { type: string } | null = null
 
     const getClientIp = () => {
       return (request as any).ip || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || null
@@ -19,6 +20,9 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    // parse request body once
+    const body = await request.json()
 
     // Check if user already checked in today IMMEDIATELY at the start
     const today = new Date().toISOString().split("T")[0]
@@ -40,7 +44,6 @@ export async function POST(request: NextRequest) {
       console.log("[v0] DUPLICATE CHECK-IN BLOCKED - User already checked in today")
 
       // Log security violation
-      const body = await request.json()
       if (body.device_info?.device_id) {
         const ipAddress = request.ip || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null
 
@@ -123,17 +126,53 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return NextResponse.json(
-        {
-          error: `You are currently on approved leave${startDate && endDate ? ` from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` : ""}. You cannot check in during this period. Please contact your manager if you believe this is incorrect.`,
-          onLeave: true,
-        },
-        { status: 403 }
-      )
+      // check for override request from exempt staff
+      if (override_request && override_reason) {
+        const isSec = isSecurityDept(userProfile?.departments)
+        const isOp = isOperationalDept(userProfile?.departments)
+        const isTrans = isTransportDept(userProfile?.departments)
+        if (isSec || isOp || isTrans) {
+          // log override and continue with check-in
+          await supabase.from("emergency_check_in_overrides").insert({
+            user_id: user.id,
+            check_in_time: new Date().toISOString(),
+            override_type: 'leave_override',
+            reason: override_reason,
+            is_security_staff: isSec,
+            is_operational_staff: isOp,
+            is_transport_staff: isTrans,
+          }).catch(() => {})
+          overrideMeta = { type: 'leave_override' }
+          // send notification to manager
+          await supabase.from("staff_notifications").insert({
+            user_id: user.id,
+            title: "Emergency override used",
+            message: "An override was used for leave restriction during check-in.",
+            type: "info",
+            is_read: false,
+          }).catch(() => {})
+          // allow to proceed (do nothing here)
+        } else {
+          return NextResponse.json(
+            {
+              error: `You are currently on approved leave${startDate && endDate ? ` from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` : ""}. You cannot check in during this period. Please contact your manager if you believe this is incorrect.`,
+              onLeave: true,
+            },
+            { status: 403 }
+          )
+        }
+      } else {
+        return NextResponse.json(
+          {
+            error: `You are currently on approved leave${startDate && endDate ? ` from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` : ""}. You cannot check in during this period. Please contact your manager if you believe this is incorrect.`,
+            onLeave: true,
+          },
+          { status: 403 }
+        )
+      }
     }
 
-    const body = await request.json()
-    const { latitude, longitude, location_id, device_info, qr_code_used, qr_timestamp, lateness_reason, accuracy, location_timestamp, location_source } = body
+    const { latitude, longitude, location_id, device_info, qr_code_used, qr_timestamp, lateness_reason, accuracy, location_timestamp, location_source, override_request, override_reason } = body
 
     // Fetch geo settings from system settings for server-side enforcement
     const { data: sysSettings } = await supabase.from("system_settings").select("geo_settings").maybeSingle()
@@ -311,13 +350,63 @@ export async function POST(request: NextRequest) {
               // ignore logging failure
             }
 
-            return NextResponse.json({ error: "Your device appears to be outside the allowed proximity for the selected location. Please move closer or use the QR code option." }, { status: 400 })
+            // allow override for exempt staff
+            const isSec2 = isSecurityDept(userProfile?.departments)
+            const isOp2 = isOperationalDept(userProfile?.departments)
+            const isTrans2 = isTransportDept(userProfile?.departments)
+            if (override_request && override_reason && (isSec2 || isOp2 || isTrans2)) {
+              await supabase.from("emergency_check_in_overrides").insert({
+                user_id: user.id,
+                check_in_time: checkInTime.toISOString(),
+                override_type: 'location_restriction',
+                reason: override_reason,
+                is_security_staff: isSec2,
+                is_operational_staff: isOp2,
+                is_transport_staff: isTrans2,
+              }).catch(() => {})
+              await supabase.from("staff_notifications").insert({
+                user_id: user.id,
+                title: "Emergency override used",
+                message: "An override was used to bypass location restriction during check-in.",
+                type: "info",
+                is_read: false,
+              }).catch(() => {})
+              overrideMeta = { type: 'location_restriction' }
+              // continue with check-in
+            } else {
+              return NextResponse.json({ error: "Your device appears to be outside the allowed proximity for the selected location. Please move closer or use the QR code option." }, { status: 400 })
+            }
           }
         }
       } else {
         // If no location_id was provided, ensure the nearest location is within the allowed radius
         if (nearest && nearest.distance > deviceCheckInRadius + 500) {
-          return NextResponse.json({ error: "You are too far from any registered QCC location to check in. Please move closer or use the QR code." }, { status: 400 })
+          // allow emergency override for exempt staff
+          const isSec3 = isSecurityDept(userProfile?.departments)
+          const isOp3 = isOperationalDept(userProfile?.departments)
+          const isTrans3 = isTransportDept(userProfile?.departments)
+          if (override_request && override_reason && (isSec3 || isOp3 || isTrans3)) {
+            await supabase.from("emergency_check_in_overrides").insert({
+              user_id: user.id,
+              check_in_time: checkInTime.toISOString(),
+              override_type: 'location_restriction',
+              reason: override_reason,
+              is_security_staff: isSec3,
+              is_operational_staff: isOp3,
+              is_transport_staff: isTrans3,
+            }).catch(() => {})
+            await supabase.from("staff_notifications").insert({
+              user_id: user.id,
+              title: "Emergency override used",
+              message: "An override was used to bypass location restriction during check-in.",
+              type: "info",
+              is_read: false,
+            }).catch(() => {})
+            overrideMeta = { type: 'location_restriction' }
+            // proceed normally
+          } else {
+            return NextResponse.json({ error: "You are too far from any registered QCC location to check in. Please move closer or use the QR code." }, { status: 400 })
+          }
         }
       }
 
@@ -521,12 +610,38 @@ export async function POST(request: NextRequest) {
     // CHECK TIME RESTRICTION: Check if check-in is after 1 PM (13:00)
     const canCheckIn = canCheckInAtTime(checkInTime, userProfile?.departments, userProfile?.role)
     if (!canCheckIn) {
-      return NextResponse.json({
-        error: `Check-in is only allowed before ${getCheckInDeadline()}. Your department/role does not have exceptions for late check-ins.`,
-        checkInBlocked: true,
-        currentTime: checkInTime.toLocaleTimeString(),
-        deadline: getCheckInDeadline(),
-      }, { status: 403 })
+      // allow eligible staff to override
+      const isSec = isSecurityDept(userProfile?.departments)
+      const isOp = isOperationalDept(userProfile?.departments)
+      const isTrans = isTransportDept(userProfile?.departments)
+      if (override_request && override_reason && (isSec || isOp || isTrans)) {
+        await supabase.from("emergency_check_in_overrides").insert({
+          user_id: user.id,
+          check_in_time: checkInTime.toISOString(),
+          override_type: 'time_restriction',
+          reason: override_reason,
+          is_security_staff: isSec,
+          is_operational_staff: isOp,
+          is_transport_staff: isTrans,
+        }).catch(() => {})
+        overrideMeta = { type: 'time_restriction' }
+        await supabase.from("staff_notifications").insert({
+          user_id: user.id,
+          title: "Emergency override used",
+          message: "An override was used to bypass time restriction during check-in.",
+          type: "info",
+          is_read: false,
+        }).catch(() => {})
+        // continue to normal check-in flow, but also inform front-end
+        // we can attach a flag later in response
+      } else {
+        return NextResponse.json({
+          error: `Check-in is only allowed before ${getCheckInDeadline()}. Your department/role does not have exceptions for late check-ins.`,
+          checkInBlocked: true,
+          currentTime: checkInTime.toLocaleTimeString(),
+          deadline: getCheckInDeadline(),
+        }, { status: 403 })
+      }
     }
 
     const latenessRequired = requiresLatenessReason(checkInTime, userProfile?.departments, userProfile?.role)
@@ -655,6 +770,8 @@ export async function POST(request: NextRequest) {
       attendance: attendanceRecord,
       message: checkInMessage,
       checkInPosition: checkInPosition,
+      overrideUsed: overrideMeta !== null,
+      overrideType: overrideMeta?.type || null,
     });
   }
   catch (error: unknown) {

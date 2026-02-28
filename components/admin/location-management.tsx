@@ -1004,10 +1004,12 @@ export function LocationManagement() {
                     id="editLatitude"
                     type="number"
                     step="any"
-                    value={editingLocation.latitude}
-                    onChange={(e) =>
-                      setEditingLocation({ ...editingLocation, latitude: Number.parseFloat(e.target.value) })
-                    }
+                    value={editingLocation.latitude ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      const parsed = Number.parseFloat(v)
+                      setEditingLocation({ ...editingLocation, latitude: Number.isNaN(parsed) ? null : parsed })
+                    }}
                     placeholder="25.2854"
                     required
                   />
@@ -1018,24 +1020,28 @@ export function LocationManagement() {
                     id="editLongitude"
                     type="number"
                     step="any"
-                    value={editingLocation.longitude}
-                    onChange={(e) =>
-                      setEditingLocation({ ...editingLocation, longitude: Number.parseFloat(e.target.value) })
-                    }
+                    value={editingLocation.longitude ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      const parsed = Number.parseFloat(v)
+                      setEditingLocation({ ...editingLocation, longitude: Number.isNaN(parsed) ? null : parsed })
+                    }}
                     placeholder="51.5310"
                     required
                   />
                 </div>
               </div>
-              <div>
+                <div>
                   <Label htmlFor="editRadius">Radius (meters)</Label>
                   <Input
                     id="editRadius"
                     type="number"
-                    value={editingLocation.radius_meters}
-                    onChange={(e) =>
-                      setEditingLocation({ ...editingLocation, radius_meters: Number.parseInt(e.target.value) })
-                    }
+                    value={editingLocation.radius_meters ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      const parsed = Number.parseInt(v)
+                      setEditingLocation({ ...editingLocation, radius_meters: Number.isNaN(parsed) ? null : parsed })
+                    }}
                     placeholder="50"
                     required
                   />

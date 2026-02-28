@@ -427,7 +427,8 @@ If you prefer GPS:
             }
 
             const fullMessage = guidance ? `${message}\n\n${guidance}` : message
-            reject(new Error(fullMessage))
+            // Use structured GeolocationError so callers can handle specific cases
+            reject(new GeolocationError(fullMessage, normalizedError.code ?? 0))
           },
           options,
         )
@@ -453,6 +454,23 @@ export function calculateDistance(lat1: number, lon1: number, lat2: number, lon2
 
   // Round to nearest meter for consistency
   return Math.round(distance)
+}
+
+/**
+ * Safe wrapper around `getCurrentLocation` that returns a structured result
+ * instead of rejecting. Callers that prefer not to handle exceptions can use
+ * this to receive `{ location }` or `{ error }` and display friendly UI.
+ */
+export async function safeGetCurrentLocation(useCache = false): Promise<{ location?: LocationData; error?: GeolocationError }> {
+  try {
+    const location = await getCurrentLocation(useCache)
+    return { location }
+  } catch (err: any) {
+    if (err instanceof GeolocationError) {
+      return { error: err }
+    }
+    return { error: new GeolocationError(err?.message || String(err), err?.code ?? 0) }
+  }
 }
 
 // OPTIMIZATION: Memoized distance cache to prevent recalculating same distances

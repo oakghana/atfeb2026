@@ -37,91 +37,142 @@ export async function GET(request: NextRequest) {
 
     console.log("[v0] HOD Excuse duty API - User authorized:", profile.role)
 
-    // Build base query without relationships
-    let query = supabase.from("excuse_documents").select("*")
+    // Build base query for excuse documents (select only needed columns)
+    let query = supabase
+      .from("excuse_documents")
+      .select(
+        "id,document_name,document_type,file_url,excuse_reason,excuse_date,status,user_id,reviewed_by,reviewed_at,review_notes,created_at,attendance_record_id"
+      )
 
-    // Get URL parameters for filtering
+    // Get URL parameters for filtering and pagination
     const url = new URL(request.url)
     const status = url.searchParams.get("status")
-    const department = url.searchParams.get("department")
+    const departmentFilter = url.searchParams.get("department")
+    const docType = url.searchParams.get("document_type")
+    const dateFrom = url.searchParams.get("date_from")
+    const dateTo = url.searchParams.get("date_to")
+    const pageParam = parseInt(url.searchParams.get("page") || "1", 10)
+    const perPage = Math.min(parseInt(url.searchParams.get("per_page") || "50", 10), 200)
 
     if (status && status !== "all") {
       query = query.eq("status", status)
     }
 
-    const { data: excuseDocs, error } = await query.order("created_at", { ascending: false })
+    if (docType && docType !== "all") {
+      query = query.eq("document_type", docType)
+    }
+
+    if (dateFrom) {
+      query = query.gte("excuse_date", dateFrom)
+    }
+    if (dateTo) {
+      query = query.lte("excuse_date", dateTo)
+    }
+
+    // If the requester is a department head, restrict the query to user_ids in their department
+    if (profile.role === "department_head" && profile.department_id) {
+      const { data: deptUsers } = await supabase
+        .from("user_profiles")
+        .select("id")
+        .eq("department_id", profile.department_id)
+
+      const userIds = (deptUsers || []).map((u: any) => u.id)
+      if (userIds.length === 0) {
+        // No users in department -> return empty
+        return NextResponse.json({ excuseDocuments: [], userRole: profile.role, userDepartment: profile.department_id })
+      }
+      query = query.in("user_id", userIds)
+    }
+
+    // If admin supplied a department filter, restrict to users in that department
+    if (departmentFilter && profile.role === "admin") {
+      const { data: deptUsers } = await supabase
+        .from("user_profiles")
+        .select("id")
+        .eq("department_id", departmentFilter)
+
+      const userIds = (deptUsers || []).map((u: any) => u.id)
+      if (userIds.length === 0) {
+        return NextResponse.json({ excuseDocuments: [], userRole: profile.role, userDepartment: profile.department_id })
+      }
+      query = query.in("user_id", userIds)
+    }
+
+    // Pagination: request one extra row to determine if there is more data
+    const page = Math.max(1, isNaN(pageParam) ? 1 : pageParam)
+    const start = (page - 1) * perPage
+    const end = start + perPage // request perPage+1 rows
+    const { data: excuseDocsRaw, error } = await query.order("created_at", { ascending: false }).range(start, end)
+    const excuseDocs = excuseDocsRaw || []
 
     if (error) {
-      console.error("[v0] HOD Excuse duty API - Query error:", error.message)
-      return NextResponse.json({ error: "Failed to fetch excuse documents" }, { status: 500 })
+      console.error("[v0] HOD Excuse duty API - Query error:", error)
+      const detail = (error && (error as any).message) || JSON.stringify(error)
+      return NextResponse.json({ error: "Failed to fetch excuse documents", details: detail }, { status: 500 })
     }
 
-    const docsWithProfiles = await Promise.all(
-      (excuseDocs || []).map(async (doc) => {
-        // Get user profile for the document submitter
-        const { data: userProfile } = await supabase
-          .from("user_profiles")
-          .select("first_name, last_name, employee_id, department_id")
-          .eq("id", doc.user_id)
-          .single()
+    // Batch fetch related user profiles and departments to avoid N+1 queries
+    const userIds = Array.from(new Set((excuseDocs || []).map((d: any) => d.user_id).filter(Boolean)))
+    const reviewerIds = Array.from(new Set((excuseDocs || []).map((d: any) => d.reviewed_by).filter(Boolean)))
+    const allProfileIds = Array.from(new Set([...userIds, ...reviewerIds]))
 
-        // Get department info if user profile exists
-        let department = null
-        if (userProfile?.department_id) {
-          const { data: deptData } = await supabase
-            .from("departments")
-            .select("name, code")
-            .eq("id", userProfile.department_id)
-            .single()
-          department = deptData
-        }
+    const profilesMap: Record<string, any> = {}
+    if (allProfileIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("user_profiles")
+        .select("id, first_name, last_name, employee_id, department_id")
+        .in("id", allProfileIds)
 
-        // Get reviewer profile if document has been reviewed
-        let reviewer = null
-        if (doc.reviewed_by) {
-          const { data: reviewerData } = await supabase
-            .from("user_profiles")
-            .select("first_name, last_name")
-            .eq("id", doc.reviewed_by)
-            .single()
-          reviewer = reviewerData
-        }
-
-        return {
-          ...doc,
-          user_profiles: userProfile
-            ? {
-                ...userProfile,
-                departments: department,
-              }
-            : null,
-          reviewer,
-        }
-      }),
-    )
-
-    let filteredDocs = docsWithProfiles
-
-    // If department head, only show documents from their department
-    if (profile.role === "department_head" && profile.department_id) {
-      filteredDocs = docsWithProfiles.filter((doc) => doc.user_profiles?.department_id === profile.department_id)
+      for (const p of profiles || []) {
+        profilesMap[p.id] = p
+      }
     }
 
-    // If admin with department filter, apply it
-    if (department && profile.role === "admin") {
-      filteredDocs = docsWithProfiles.filter((doc) => doc.user_profiles?.department_id === department)
+    // Batch fetch departments for any department_ids found
+    const deptIds = Array.from(new Set(Object.values(profilesMap).map((p: any) => p.department_id).filter(Boolean)))
+    const deptMap: Record<string, any> = {}
+    if (deptIds.length > 0) {
+      const { data: depts } = await supabase.from("departments").select("id, name, code").in("id", deptIds)
+      for (const d of depts || []) deptMap[d.id] = d
     }
 
-    console.log("[v0] HOD Excuse duty API - Found documents:", filteredDocs.length)
+    const docsWithProfiles = (excuseDocs || []).map((doc: any) => {
+      const userProfile = profilesMap[doc.user_id] || null
+      const reviewer = doc.reviewed_by ? profilesMap[doc.reviewed_by] || null : null
+      const department = userProfile?.department_id ? deptMap[userProfile.department_id] || null : null
+
+      return {
+        ...doc,
+        user_profiles: userProfile
+          ? {
+              ...userProfile,
+              departments: department,
+            }
+          : null,
+        reviewer: reviewer ? { first_name: reviewer.first_name, last_name: reviewer.last_name } : null,
+      }
+    })
+
+    console.log("[v0] HOD Excuse duty API - Found documents:", docsWithProfiles.length)
+
+    // Determine hasMore based on whether we requested more than perPage
+    const hasMore = (excuseDocs.length || 0) > perPage
+    const limitedDocs = docsWithProfiles.slice(0, perPage)
 
     return NextResponse.json({
-      excuseDocuments: filteredDocs,
+      excuseDocuments: limitedDocs,
       userRole: profile.role,
       userDepartment: profile.department_id,
+      pagination: {
+        page,
+        perPage,
+        hasMore,
+      },
     })
   } catch (error) {
     console.error("[v0] HOD Excuse duty API - Error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    const detail = (error && (error as any).message) || JSON.stringify(error)
+    return NextResponse.json({ error: "Internal server error", details: detail }, { status: 500 })
   }
 }
 

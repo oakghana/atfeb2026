@@ -1,11 +1,12 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 import { validateCheckoutLocation, type LocationData } from "@/lib/geolocation"
-import { requiresEarlyCheckoutReason, canCheckOutAtTime, getCheckOutDeadline } from "@/lib/attendance-utils"
+import { requiresEarlyCheckoutReason, canCheckOutAtTime, getCheckOutDeadline, isSecurityDept, isOperationalDept, isTransportDept } from "@/lib/attendance-utils"
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
+    let overrideMeta: { type: string } | null = null
 
     const {
       data: { user },
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { latitude, longitude, location_id, qr_code_used, qr_timestamp, early_checkout_reason } = body
+    const { latitude, longitude, location_id, qr_code_used, qr_timestamp, early_checkout_reason, override_request, override_reason } = body
 
     if (!qr_code_used && (!latitude || !longitude)) {
       return NextResponse.json({ error: "Location coordinates are required for GPS check-out" }, { status: 400 })
@@ -75,12 +76,35 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return NextResponse.json(
-        {
-          error: `You are currently on approved leave${startDate && endDate ? ` from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` : ""}. You cannot check out during this period.`,
-        },
-        { status: 403 },
-      )
+      const isSec = isSecurityDept(userProfile?.departments)
+      const isOp = isOperationalDept(userProfile?.departments)
+      const isTrans = isTransportDept(userProfile?.departments)
+      if (override_request && override_reason && (isSec || isOp || isTrans)) {
+        await supabase.from("emergency_check_in_overrides").insert({
+          user_id: user.id,
+          check_out_time: new Date().toISOString(),
+          override_type: 'leave_override',
+          reason: override_reason,
+          is_security_staff: isSec,
+          is_operational_staff: isOp,
+          is_transport_staff: isTrans,
+        }).catch(() => {})
+        await supabase.from("staff_notifications").insert({
+          user_id: user.id,
+          title: "Emergency override used",
+          message: "An override was used to bypass leave restriction during check-out.",
+          type: "info",
+          is_read: false,
+        }).catch(() => {})
+        // continue
+      } else {
+        return NextResponse.json(
+          {
+            error: `You are currently on approved leave${startDate && endDate ? ` from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` : ""}. You cannot check out during this period.`,
+          },
+          { status: 403 },
+        )
+      }
     }
 
     // Fallback: respect legacy `user_profiles.leave_status` if present
@@ -150,25 +174,50 @@ export async function POST(request: NextRequest) {
     const bypassTimeRules = isOffPremisesCheckedIn || isOutOfRange
 
     if (!canCheckOut && !bypassTimeRules) {
-      // Create a notification for users trying to check out after 6 PM
-      await supabase
-        .from("staff_notifications")
-        .insert({
+      // allow overrides for eligible staff
+      const isSec = isSecurityDept(userProfile?.departments)
+      const isOp = isOperationalDept(userProfile?.departments)
+      const isTrans = isTransportDept(userProfile?.departments)
+      if (override_request && override_reason && (isSec || isOp || isTrans)) {
+        await supabase.from("emergency_check_in_overrides").insert({
           user_id: user.id,
-          title: "Check-out Time Exceeded",
-          message: `You attempted to check out after ${getCheckOutDeadline()}. Check-outs are only allowed until ${getCheckOutDeadline()} unless you are in an exempt department (Operational/Security).`,
-          type: "warning",
+          check_out_time: now.toISOString(),
+          override_type: 'time_restriction',
+          reason: override_reason,
+          is_security_staff: isSec,
+          is_operational_staff: isOp,
+          is_transport_staff: isTrans,
+        }).catch(() => {})
+        await supabase.from("staff_notifications").insert({
+          user_id: user.id,
+          title: "Emergency override used",
+          message: "An override was used to bypass time restriction during check-out.",
+          type: "info",
           is_read: false,
-        })
-        .catch(() => {}) // Silently fail if notification table doesn't exist
+        }).catch(() => {})
+        overrideMeta = { type: 'time_restriction' }
+        // continue through flow
+      } else {
+        // Create a notification for users trying to check out after 6 PM
+        await supabase
+          .from("staff_notifications")
+          .insert({
+            user_id: user.id,
+            title: "Check-out Time Exceeded",
+            message: `You attempted to check out after ${getCheckOutDeadline()}. Check-outs are only allowed until ${getCheckOutDeadline()} unless you are in an exempt department (Operational/Security).`,
+            type: "warning",
+            is_read: false,
+          })
+          .catch(() => {}) // Silently fail if notification table doesn't exist
 
-      return NextResponse.json({
-        error: `Check-out is only allowed before ${getCheckOutDeadline()}. Your department/role does not have exceptions for late check-outs.`,
-        checkOutBlocked: true,
-        currentTime: now.toLocaleTimeString(),
-        deadline: getCheckOutDeadline(),
-        notification: "Your attempt to check out after hours has been recorded."
-      }, { status: 403 })
+        return NextResponse.json({
+          error: `Check-out is only allowed before ${getCheckOutDeadline()}. Your department/role does not have exceptions for late check-outs.`,
+          checkOutBlocked: true,
+          currentTime: now.toLocaleTimeString(),
+          deadline: getCheckOutDeadline(),
+          notification: "Your attempt to check out after hours has been recorded."
+        }, { status: 403 })
+      }
     }
 
     // Enhanced device sharing detection for checkout
@@ -616,6 +665,8 @@ export async function POST(request: NextRequest) {
       deviceSharingWarning,
       data: updatedRecord,
       message: `Successfully checked out at ${checkoutLocationData?.name}. Work hours: ${workHours.toFixed(2)}`,
+      overrideUsed: overrideMeta !== null,
+      overrideType: overrideMeta?.type || null,
     })
   } catch (error) {
     console.error("[v0] Check-out error:", error)

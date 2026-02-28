@@ -43,7 +43,7 @@ import { Label } from "@/components/ui/label"
 import { ToastAction } from "@/components/ui/toast"
 import { clearAttendanceCache, shouldClearCache, setCachedDate } from "@/lib/utils/attendance-cache"
 import { cn } from "@/lib/utils"
-import { requiresLatenessReason, requiresEarlyCheckoutReason, canCheckInAtTime, canCheckOutAtTime, getCheckInDeadline, getCheckOutDeadline } from "@/lib/attendance-utils"
+import { requiresLatenessReason, requiresEarlyCheckoutReason, canCheckInAtTime, canCheckOutAtTime, getCheckInDeadline, getCheckOutDeadline, isSecurityDept, isOperationalDept, isTransportDept } from "@/lib/attendance-utils"
 import { DeviceActivityHistory } from "@/components/attendance/device-activity-history"
 import { ActiveSessionTimer } from "@/components/attendance/active-session-timer"
 
@@ -240,10 +240,18 @@ export function AttendanceRecorder({
     const now = new Date()
     const userDept = userProfile?.departments
     const userRole = userProfile?.role
-    
+
+    // If user is in an exempt department (security / operations / transport),
+    // do not show time-based restriction warnings — they can check in/out anytime.
+    const isExemptDept = isSecurityDept(userDept) || isOperationalDept(userDept) || isTransportDept(userDept)
+    if (isExemptDept) {
+      setTimeRestrictionWarning(null)
+      return
+    }
+
     const canCheckIn = canCheckInAtTime(now, userDept, userRole)
     const canCheckOut = canCheckOutAtTime(now, userDept, userRole)
-    
+
     if (!canCheckIn && !localTodayAttendance?.check_in_time) {
       setTimeRestrictionWarning({
         type: 'checkin',

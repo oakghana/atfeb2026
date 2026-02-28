@@ -123,7 +123,7 @@ export function OffPremisesRequestModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-yellow-600" />
@@ -272,11 +272,12 @@ export function OffPremisesRequestModal({
           </Alert>
         </div>
 
-        <DialogFooter className="flex gap-2 justify-end pt-4 border-t">
+        <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end pt-4 border-t">
           <Button
             variant="outline"
             onClick={onClose}
             disabled={isApproving || request.request_type === 'checkout'}
+            className="w-full sm:w-auto"
           >
             Cancel
           </Button>
@@ -284,7 +285,7 @@ export function OffPremisesRequestModal({
             variant="destructive"
             onClick={() => handleApprove(false)}
             disabled={isApproving || request.request_type === 'checkout'}
-            className="gap-2"
+            className="gap-2 w-full sm:w-auto"
           >
             {isApproving ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
             Reject Request
@@ -292,7 +293,7 @@ export function OffPremisesRequestModal({
           <Button
             onClick={() => handleApprove(true)}
             disabled={isApproving || request.request_type === 'checkout'}
-            className="bg-green-600 hover:bg-green-700 gap-2"
+            className="bg-green-600 hover:bg-green-700 gap-2 w-full sm:w-auto"
           >
             {isApproving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
             {request.request_type === 'checkout' ? 'Approve & Check Out' : 'Approve & Check In'}

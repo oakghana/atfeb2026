@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -44,6 +46,11 @@ export function PendingOffPremisesRequests() {
   const [error, setError] = useState<string | null>(null)
   const [managerProfile, setManagerProfile] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<string>('all')
+  const [compactMode, setCompactMode] = useState(false)
+  const [quickSelectedRequest, setQuickSelectedRequest] = useState<PendingRequest | null>(null)
+  const [processingId, setProcessingId] = useState<string | null>(null)
+  const { toast } = useToast()
+  const [quickEnabledOnDesktop, setQuickEnabledOnDesktop] = useState(false)
 
   // Always load ALL requests, then filter client-side for accurate tab counts
   const loadPendingRequests = async () => {
@@ -106,8 +113,31 @@ export function PendingOffPremisesRequests() {
   useEffect(() => {
     loadPendingRequests()
     const interval = setInterval(loadPendingRequests, 30000)
+    // Responsive compact mode for small screens / mobile reviewers
+    const handleResize = () => setCompactMode(typeof window !== 'undefined' && window.innerWidth <= 768)
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    // load persisted desktop quick-actions preference
+    try {
+      const saved = typeof window !== 'undefined' ? window.localStorage.getItem('offpremises.quickActions') : null
+      if (saved !== null) setQuickEnabledOnDesktop(saved === '1')
+    } catch (e) {
+      // ignore
+    }
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Persist quick actions toggle
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('offpremises.quickActions', quickEnabledOnDesktop ? '1' : '0')
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [quickEnabledOnDesktop])
 
   // Derive counts and filtered list from allRequests
   const pendingCount = allRequests.filter(r => r.status === 'pending').length
@@ -133,6 +163,12 @@ export function PendingOffPremisesRequests() {
   }
 
   const handleRequestClick = (request: PendingRequest) => {
+    // On mobile compact mode or when desktop quick actions enabled, select for quick actions; otherwise open full modal
+    if (compactMode || quickEnabledOnDesktop) {
+      setQuickSelectedRequest(request)
+      // do not open modal by default on compact
+      return
+    }
     setSelectedRequest(request)
     setIsModalOpen(true)
   }
@@ -141,6 +177,71 @@ export function PendingOffPremisesRequests() {
     setIsModalOpen(false)
     setSelectedRequest(null)
     loadPendingRequests()
+  }
+
+  // Quick approve/reject handlers used by mobile quick actions
+  const quickProcess = async (request: PendingRequest, approved: boolean) => {
+    if (processingId) return
+    setProcessingId(request.id)
+    try {
+      const supabase = createClient()
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+
+      const response = await fetch('/api/attendance/offpremises/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ request_id: request.id, approved, comments: '', user_id: currentUser?.id }),
+      })
+
+
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || 'Failed to process request')
+
+      // Capture attendance record id if the approval created one so we can offer Undo
+      const attendanceId = result.attendance_record_id || null
+
+      toast({
+        title: approved ? 'Approved' : 'Rejected',
+        description: approved
+          ? `${request.user_profiles.first_name} ${request.user_profiles.last_name} checked in (off-premises).`
+          : `Off-premises request rejected.`,
+        action: attendanceId ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              try {
+                setProcessingId(request.id)
+                const sup = createClient()
+                const { data: { user: currentUser2 } } = await sup.auth.getUser()
+                await fetch('/api/attendance/offpremises/revert', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ request_id: request.id, user_id: currentUser2?.id, attendance_record_id: attendanceId }),
+                })
+                toast({ title: 'Reverted', description: 'Approval reverted' })
+                loadPendingRequests()
+                setQuickSelectedRequest(null)
+              } catch (err: any) {
+                toast({ title: 'Undo Failed', description: err?.message || 'Failed to undo approval', variant: 'destructive' })
+              } finally {
+                setProcessingId(null)
+              }
+            }}
+          >
+            Undo
+          </Button>
+        ) : undefined,
+      })
+
+      // Refresh list and clear quick selection
+      loadPendingRequests()
+      setQuickSelectedRequest(null)
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message || 'Failed to process request', variant: 'destructive' })
+    } finally {
+      setProcessingId(null)
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -237,22 +338,31 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
               <Badge variant="outline" className="text-sm">
                 {allRequests.length} Total
               </Badge>
+              <label className="ml-2 flex items-center text-sm select-none">
+                <input
+                  type="checkbox"
+                  className="mr-2 rounded"
+                  checked={quickEnabledOnDesktop}
+                  onChange={(e) => setQuickEnabledOnDesktop(e.target.checked)}
+                />
+                Quick actions on desktop
+              </label>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-4">
-              <TabsTrigger value="all">
+            <TabsList className={compactMode ? 'flex gap-2 overflow-x-auto mb-4' : 'grid w-full grid-cols-4 mb-4'}>
+              <TabsTrigger value="all" className={compactMode ? 'whitespace-nowrap px-3 py-2 text-sm' : ''}>
                 All ({allRequests.length})
               </TabsTrigger>
-              <TabsTrigger value="pending">
+              <TabsTrigger value="pending" className={compactMode ? 'whitespace-nowrap px-3 py-2 text-sm' : ''}>
                 Pending ({pendingCount})
               </TabsTrigger>
-              <TabsTrigger value="approved">
+              <TabsTrigger value="approved" className={compactMode ? 'whitespace-nowrap px-3 py-2 text-sm' : ''}>
                 Approved ({approvedCount})
               </TabsTrigger>
-              <TabsTrigger value="rejected">
+              <TabsTrigger value="rejected" className={compactMode ? 'whitespace-nowrap px-3 py-2 text-sm' : ''}>
                 Rejected ({rejectedCount})
               </TabsTrigger>
             </TabsList>
@@ -267,7 +377,7 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
                 {filteredRequests.map((request) => (
                   <div
                     key={request.id}
-                    className="border rounded-lg p-4 hover:bg-muted/50 cursor-pointer transition-colors"
+                    className={"border rounded-lg transition-colors cursor-pointer " + (compactMode ? 'p-3 hover:bg-muted/40' : 'p-4 hover:bg-muted/50')}
                     onClick={() => handleRequestClick(request)}
                   >
                     <div className="flex items-start justify-between">
@@ -333,17 +443,47 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
                       </div>
                       
                       {request.status === 'pending' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="ml-4 flex-shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleRequestClick(request)
-                          }}
-                        >
-                          Review
-                        </Button>
+                        // On compact (mobile) show quick action buttons and a review button on larger screens
+                        compactMode ? (
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <Button
+                              variant="ghost"
+                              className="w-full"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                quickProcess(request, true)
+                              }}
+                              disabled={processingId === request.id}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              className="w-full"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                quickProcess(request, false)
+                              }}
+                              disabled={processingId === request.id}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="ml-4 flex-shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRequestClick(request)
+                              }}
+                            >
+                              Review
+                            </Button>
+                          </div>
+                        )
                       )}
                     </div>
                   </div>
@@ -364,6 +504,22 @@ CREATE INDEX IF NOT EXISTS idx_pending_offpremises_created_at ON public.pending_
           request={selectedRequest}
           onApprovalComplete={handleApprovalComplete}
         />
+      )}
+
+      {/* Sticky quick action bar for mobile when a request is selected */}
+      {compactMode && quickSelectedRequest && (
+        <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-3 safe-area-inset-x">
+          <div className="max-w-4xl mx-auto flex items-center gap-3">
+            <div className="flex-1">
+              <div className="text-sm font-medium">{quickSelectedRequest.user_profiles.first_name} {quickSelectedRequest.user_profiles.last_name}</div>
+              <div className="text-xs text-muted-foreground">{quickSelectedRequest.google_maps_name || quickSelectedRequest.current_location_name}</div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" className="px-4" onClick={() => quickProcess(quickSelectedRequest, false)} disabled={processingId === quickSelectedRequest.id}>Reject</Button>
+              <Button className="px-4 bg-green-600 hover:bg-green-700" onClick={() => quickProcess(quickSelectedRequest, true)} disabled={processingId === quickSelectedRequest.id}>Approve</Button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

@@ -51,36 +51,83 @@ export async function GET(request: NextRequest) {
       query = query.in("final_status", ["hr_review", "approved", "rejected"])
     }
 
-    const { data: excuseDocs, error } = await query.order("created_at", { ascending: false })
+      const departmentFilter = url.searchParams.get("department")
+      const docType = url.searchParams.get("document_type")
+      const dateFrom = url.searchParams.get("date_from")
+      const dateTo = url.searchParams.get("date_to")
+      const pageParam = parseInt(url.searchParams.get("page") || "1", 10)
+      const perPage = Math.min(parseInt(url.searchParams.get("per_page") || "50", 10), 200)
 
-    if (error) {
-      console.error("[v0] HR Excuse duty API - Query error:", error.message)
-      return NextResponse.json({ error: "Failed to fetch excuse documents" }, { status: 500 })
-    }
+      // Select only required columns to reduce payload
+      query = supabase
+        .from("excuse_documents")
+        .select(
+          "id,document_name,document_type,file_url,excuse_reason,excuse_date,hod_status,hod_reviewed_by,hod_reviewed_at,hod_review_notes,hr_status,hr_reviewed_by,hr_reviewed_at,hr_review_notes,final_status,created_at,user_id"
+        )
 
-    const docsWithProfiles = await Promise.all(
-      (excuseDocs || []).map(async (doc) => {
-        const { data: userProfile } = await supabase
-          .from("user_profiles")
-          .select(`
-            first_name, 
-            last_name, 
-            employee_id, 
-            department_id,
-            departments:departments(name, code)
-          `)
-          .eq("id", doc.user_id)
-          .single()
+      if (finalStatus && finalStatus !== "all") {
+        query = query.eq("final_status", finalStatus)
+      } else {
+        query = query.in("final_status", ["hr_review", "approved", "rejected"])
+      }
 
-        let hodReviewer = null
-        if (doc.hod_reviewed_by) {
-          const { data: reviewerData } = await supabase
-            .from("user_profiles")
-            .select("first_name, last_name")
-            .eq("id", doc.hod_reviewed_by)
-            .single()
-          hodReviewer = reviewerData
+      if (docType && docType !== "all") {
+        query = query.eq("document_type", docType)
+      }
+      if (dateFrom) query = query.gte("excuse_date", dateFrom)
+      if (dateTo) query = query.lte("excuse_date", dateTo)
+
+    
+
+      // If admin provided a department filter, convert to user_ids
+      if (departmentFilter && departmentFilter !== "all" && isAdmin) {
+        const { data: deptUsers } = await supabase.from("user_profiles").select("id").eq("department_id", departmentFilter)
+        const userIds = (deptUsers || []).map((u: any) => u.id)
+        if (userIds.length === 0) {
+          return NextResponse.json({ excuseDocuments: [], pagination: { page: 1, perPage, hasMore: false } })
         }
+        query = query.in("user_id", userIds)
+      }
+
+      // If requester is an HR department head (non-admin), restrict to their department
+      if (!isAdmin && profile.role === "department_head" && profile.department_id) {
+        const { data: deptUsers } = await supabase.from("user_profiles").select("id").eq("department_id", profile.department_id)
+        const userIds = (deptUsers || []).map((u: any) => u.id)
+        if (userIds.length === 0) return NextResponse.json({ excuseDocuments: [], pagination: { page: 1, perPage, hasMore: false } })
+        query = query.in("user_id", userIds)
+      }
+
+      const page = Math.max(1, isNaN(pageParam) ? 1 : pageParam)
+      const start = (page - 1) * perPage
+      const end = start + perPage
+      const { data: excuseDocsRaw, error } = await query.order("created_at", { ascending: false }).range(start, end)
+      const excuseDocs = excuseDocsRaw || []
+
+      if (error) {
+        console.error("[v0] HR Excuse duty API - Query error:", error.message)
+        return NextResponse.json({ error: "Failed to fetch excuse documents" }, { status: 500 })
+      }
+
+      // Batch fetch profiles and reviewers to avoid N+1
+      const userIds = Array.from(new Set(excuseDocs.map((d: any) => d.user_id).filter(Boolean)))
+      const reviewerIds = Array.from(new Set(excuseDocs.map((d: any) => d.hod_reviewed_by).filter(Boolean)))
+      const allProfileIds = Array.from(new Set([...userIds, ...reviewerIds]))
+
+      const profilesMap: Record<string, any> = {}
+      if (allProfileIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("user_profiles")
+          .select("id, first_name, last_name, employee_id, department_id, departments:departments(name, code)")
+          .in("id", allProfileIds)
+
+        for (const p of profiles || []) {
+          profilesMap[p.id] = p
+        }
+      }
+
+      const docsWithProfilesHR = excuseDocs.map((doc: any) => {
+        const userProfile = profilesMap[doc.user_id] || null
+        const hodReviewer = doc.hod_reviewed_by ? profilesMap[doc.hod_reviewed_by] || null : null
 
         return {
           ...doc,
@@ -93,14 +140,14 @@ export async function GET(request: NextRequest) {
                 departments: userProfile.departments,
               }
             : null,
-          hod_reviewer: hodReviewer,
+          hod_reviewer: hodReviewer ? { first_name: hodReviewer.first_name, last_name: hodReviewer.last_name } : null,
         }
-      }),
-    )
+      })
 
-    return NextResponse.json({
-      excuseDocuments: docsWithProfiles,
-    })
+      const hasMore = excuseDocs.length > perPage
+      const limitedDocs = docsWithProfilesHR.slice(0, perPage)
+
+      return NextResponse.json({ excuseDocuments: limitedDocs, pagination: { page, perPage, hasMore } })
   } catch (error) {
     console.error("HR Excuse duty API - Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
