@@ -226,40 +226,32 @@ export function HRExcuseDutyClient() {
     )
   }, [])
 
-  const viewDocument = useCallback((fileUrl: string) => {
-    // If it's a base64 data URL, convert to Blob for better PDF rendering
-    if (fileUrl.startsWith("data:")) {
-      try {
-        // Extract the base64 data and mime type
-        const [header, base64Data] = fileUrl.split(",")
-        const mimeType = header.match(/:(.*?);/)?.[1] || "application/pdf"
-        
-        // Convert base64 to binary
-        const binaryString = atob(base64Data)
-        const bytes = new Uint8Array(binaryString.length)
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i)
+  const viewDocument = useCallback(async (docId: string) => {
+    try {
+      const res = await fetch(`/api/admin/hr-excuse-duty?doc_id=${docId}`)
+      const data = await res.json()
+      const fileUrl: string = data.file_url
+      if (!fileUrl) return
+      // If it's a base64 data URL, convert to Blob for better PDF rendering
+      if (fileUrl.startsWith("data:")) {
+        try {
+          const [header, base64Data] = fileUrl.split(",")
+          const mimeType = header.match(/:(.*?);/)?.[1] || "application/pdf"
+          const binaryString = atob(base64Data)
+          const bytes = new Uint8Array(binaryString.length)
+          for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i)
+          const blob = new Blob([bytes], { type: mimeType })
+          const objectUrl = URL.createObjectURL(blob)
+          window.open(objectUrl, "_blank", "width=800,height=600,scrollbars=yes,resizable=yes")
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 60000)
+        } catch {
+          window.open(fileUrl, "_blank", "width=800,height=600,scrollbars=yes,resizable=yes")
         }
-        
-        // Create Blob and object URL
-        const blob = new Blob([bytes], { type: mimeType })
-        const objectUrl = URL.createObjectURL(blob)
-        
-        // Open in new window
-        window.open(objectUrl, "_blank", "width=800,height=600,scrollbars=yes,resizable=yes")
-        
-        // Clean up object URL after 1 minute
-        setTimeout(() => {
-          URL.revokeObjectURL(objectUrl)
-        }, 60000)
-      } catch (error) {
-        console.error("[v0] Error converting base64 to Blob:", error)
-        // Fallback to direct open
+      } else {
         window.open(fileUrl, "_blank", "width=800,height=600,scrollbars=yes,resizable=yes")
       }
-    } else {
-      // Regular URL, open directly
-      window.open(fileUrl, "_blank", "width=800,height=600,scrollbars=yes,resizable=yes")
+    } catch (err) {
+      console.error("[v0] Failed to fetch document file:", err)
     }
   }, [])
 
@@ -271,14 +263,42 @@ export function HRExcuseDutyClient() {
     }
   }, [excuseDocuments])
 
-  if (loading) {
+  if (loading && excuseDocuments.length === 0) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin mr-2" />
-          Loading excuse documents...
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        {/* Stats skeleton */}
+        <div className="grid gap-4 md:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 w-12 bg-muted animate-pulse rounded mb-1" />
+                <div className="h-3 w-40 bg-muted animate-pulse rounded" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        {/* Table skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="h-5 w-48 bg-muted animate-pulse rounded" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex gap-4">
+                  <div className="h-10 flex-1 bg-muted animate-pulse rounded" />
+                  <div className="h-10 w-24 bg-muted animate-pulse rounded" />
+                  <div className="h-10 w-24 bg-muted animate-pulse rounded" />
+                  <div className="h-10 w-20 bg-muted animate-pulse rounded" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
@@ -326,6 +346,9 @@ export function HRExcuseDutyClient() {
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Excuse Duty Requests
+                {loading && excuseDocuments.length > 0 && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground ml-1" />
+                )}
               </CardTitle>
               <CardDescription>Process excuse duty requests approved by department heads</CardDescription>
             </div>
@@ -446,7 +469,7 @@ export function HRExcuseDutyClient() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => viewDocument(doc.file_url)}
+                            onClick={() => viewDocument(doc.id)}
                             className="flex items-center gap-1"
                           >
                             <Eye className="h-3 w-3" />
